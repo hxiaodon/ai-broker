@@ -1,0 +1,36 @@
+syntax = "proto3";
+package marketdata;
+
+option go_package = "github.com/brokerage/market-service/proto";
+
+// 统一行情快照
+message Quote {
+  string symbol = 1;
+  string market = 2;
+  string currency = 3;
+  string price = 4;
+  string change = 5;
+  string change_percent = 6;
+  int64 volume = 7;
+  int64 timestamp = 8;
+}
+
+// WebSocket 消息
+message WSMessage {
+  string type = 1;        // quote/kline/news/heartbeat
+  string symbol = 2;
+  bytes data = 3;         // 序列化后的具体数据
+  int64 time = 4;
+}
+
+// 订阅请求
+message SubscribeRequest {
+  repeated string symbols = 1;
+}
+
+// 订阅响应
+message SubscribeResponse {
+  string action = 1;
+  repeated string symbols = 2;
+  int64 time = 3;
+}

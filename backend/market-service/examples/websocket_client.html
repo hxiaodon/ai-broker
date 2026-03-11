@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Market WebSocket Test</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        #messages { border: 1px solid #ccc; height: 400px; overflow-y: scroll; padding: 10px; margin: 10px 0; }
+        .message { margin: 5px 0; padding: 5px; background: #f0f0f0; }
+        .quote { background: #e8f5e9; }
+        button { margin: 5px; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Market WebSocket Test Client</h1>
+
+    <div>
+        <button onclick="connect()">Connect</button>
+        <button onclick="disconnect()">Disconnect</button>
+        <button onclick="subscribe()">Subscribe AAPL,TSLA</button>
+        <button onclick="unsubscribe()">Unsubscribe AAPL</button>
+    </div>
+
+    <div id="messages"></div>
+
+    <script>
+        let ws = null;
+        const token = 'YOUR_JWT_TOKEN'; // 替换为实际的 JWT token
+
+        function connect() {
+            ws = new WebSocket('ws://localhost:8080/api/v1/market/realtime');
+
+            ws.onopen = () => {
+                addMessage('Connected', 'system');
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                addMessage(JSON.stringify(data, null, 2), data.type);
+            };
+
+            ws.onerror = (error) => {
+                addMessage('Error: ' + error, 'error');
+            };
+
+            ws.onclose = () => {
+                addMessage('Disconnected', 'system');
+            };
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+
+        function subscribe() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'subscribe',
+                    symbols: ['AAPL', 'TSLA']
+                }));
+            }
+        }
+
+        function unsubscribe() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'unsubscribe',
+                    symbols: ['AAPL']
+                }));
+            }
+        }
+
+        function addMessage(text, type) {
+            const div = document.createElement('div');
+            div.className = 'message ' + (type === 'quote' ? 'quote' : '');
+            div.textContent = new Date().toLocaleTimeString() + ' - ' + text;
+            document.getElementById('messages').appendChild(div);
+            div.scrollIntoView();
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,338 @@
+package com.brokerage.ui.screens.market
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.brokerage.domain.marketdata.Stock
+import com.brokerage.domain.marketdata.StockCategory
+import com.brokerage.presentation.market.MarketViewModel
+import com.brokerage.ui.components.*
+import com.brokerage.ui.theme.*
+import org.koin.compose.koinInject
+
+/**
+ * Market screen - displays stock list with tabs
+ * Based on market.html prototype
+ */
+@Composable
+fun MarketScreen(
+    onStockClick: (String) -> Unit,
+    onSearchClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    viewModel: MarketViewModel = koinInject()
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    var selectedTab by remember { mutableStateOf(0) }
+    val tabs = listOf("自选", "美股", "港股", "热门")
+    val categories = listOf(
+        StockCategory.WATCHLIST,
+        StockCategory.US,
+        StockCategory.HK,
+        StockCategory.HOT
+    )
+
+    // 初始加载
+    LaunchedEffect(Unit) {
+        viewModel.loadStocks(StockCategory.WATCHLIST)
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(BackgroundLight)
+    ) {
+        // Top bar with search and notification
+        MarketTopBar(
+            onSearchClick = onSearchClick,
+            onNotificationClick = { /* TODO */ },
+            wsConnected = uiState.wsConnected
+        )
+
+        // Tab row
+        AppTabRow(
+            selectedTabIndex = selectedTab,
+            tabs = tabs,
+            onTabSelected = { index ->
+                selectedTab = index
+                viewModel.switchCategory(categories[index])
+            }
+        )
+
+        Divider(color = BorderLight, thickness = 1.dp)
+
+        // Content
+        Box(modifier = Modifier.weight(1f)) {
+            when {
+                uiState.isLoading -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+                uiState.error != null -> {
+                    ErrorView(
+                        message = uiState.error!!,
+                        onRetry = { viewModel.refresh() },
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+                uiState.stocks.isEmpty() -> {
+                    EmptyView(
+                        message = "暂无数据",
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+                else -> {
+                    StockList(
+                        stocks = uiState.stocks,
+                        onStockClick = onStockClick,
+                        onAddToWatchlist = { symbol -> viewModel.addToWatchlist(symbol) },
+                        onRemoveFromWatchlist = { symbol -> viewModel.removeFromWatchlist(symbol) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Top bar with title and action buttons
+ */
+@Composable
+private fun MarketTopBar(
+    onSearchClick: () -> Unit,
+    onNotificationClick: () -> Unit,
+    wsConnected: Boolean = false
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = Color.White,
+        shadowElevation = 1.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .padding(horizontal = Spacing.medium),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = "行情",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = TextPrimaryLight
+            )
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(Spacing.small)
+            ) {
+                IconButton(onClick = onSearchClick) {
+                    Text(text = "🔍", fontSize = 20.sp)
+                }
+                IconButton(onClick = onNotificationClick) {
+                    Text(text = "🔔", fontSize = 20.sp)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Stock list component
+ */
+@Composable
+private fun StockList(
+    stocks: List<StockItem>,
+    onStockClick: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize()
+    ) {
+        items(stocks) { stock ->
+            StockListItem(
+                stock = stock,
+                onClick = { onStockClick(stock.symbol) }
+            )
+            Divider(color = DividerLight, thickness = 1.dp)
+        }
+    }
+}
+
+/**
+ * Single stock list item
+ */
+@Composable
+private fun StockListItem(
+    stock: StockItem,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        color = Color.White,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = Spacing.medium, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Left: Symbol, Name, and Metrics
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                // Symbol and indicator
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = stock.symbol,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimaryLight
+                    )
+                    Text(
+                        text = if (stock.isUp) "▲" else "▼",
+                        fontSize = 10.sp,
+                        color = if (stock.isUp) TradingColors.UpUS else TradingColors.DownUS
+                    )
+                    Text(
+                        text = stock.name,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = TextSecondaryLight
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Metrics: Market Cap, PE, Volume
+                Text(
+                    text = "市值 ${stock.marketCap} | PE ${stock.pe} | 成交量 ${stock.volume}",
+                    fontSize = 11.sp,
+                    color = TextTertiaryLight
+                )
+            }
+
+            // Right: Price and Change
+            Column(
+                horizontalAlignment = Alignment.End
+            ) {
+                Text(
+                    text = "$${String.format("%.2f", stock.price)}",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (stock.isUp) TradingColors.UpUS else TradingColors.DownUS
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "${if (stock.change > 0) "+" else ""}${String.format("%.2f", stock.change)} (${if (stock.changePercent > 0) "+" else ""}${String.format("%.2f", stock.changePercent)}%)",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = if (stock.isUp) TradingColors.UpUS else TradingColors.DownUS
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Stock data model
+ */
+data class StockItem(
+    val symbol: String,
+    val name: String,
+    val price: Double,
+    val change: Double,
+    val changePercent: Double,
+    val isUp: Boolean,
+    val marketCap: String,
+    val pe: Double,
+    val volume: String
+)
+
+/**
+ * Sample stock data (from HTML prototype)
+ */
+internal fun getSampleStocks(): List<StockItem> {
+    return listOf(
+        StockItem(
+            symbol = "AAPL",
+            name = "Apple Inc.",
+            price = 175.23,
+            change = 2.34,
+            changePercent = 1.35,
+            isUp = true,
+            marketCap = "2.8T",
+            pe = 28.5,
+            volume = "45.2M"
+        ),
+        StockItem(
+            symbol = "TSLA",
+            name = "Tesla Inc.",
+            price = 245.67,
+            change = -3.21,
+            changePercent = -1.29,
+            isUp = false,
+            marketCap = "780B",
+            pe = 65.3,
+            volume = "52.1M"
+        ),
+        StockItem(
+            symbol = "MSFT",
+            name = "Microsoft",
+            price = 378.90,
+            change = 5.12,
+            changePercent = 1.37,
+            isUp = true,
+            marketCap = "2.9T",
+            pe = 32.1,
+            volume = "38.7M"
+        ),
+        StockItem(
+            symbol = "GOOGL",
+            name = "Alphabet",
+            price = 142.56,
+            change = -1.89,
+            changePercent = -1.31,
+            isUp = false,
+            marketCap = "1.8T",
+            pe = 24.8,
+            volume = "28.3M"
+        ),
+        StockItem(
+            symbol = "AMZN",
+            name = "Amazon",
+            price = 178.34,
+            change = 3.45,
+            changePercent = 1.97,
+            isUp = true,
+            marketCap = "1.9T",
+            pe = 58.2,
+            volume = "41.5M"
+        ),
+        StockItem(
+            symbol = "NVDA",
+            name = "NVIDIA",
+            price = 823.45,
+            change = 12.67,
+            changePercent = 1.56,
+            isUp = true,
+            marketCap = "2.1T",
+            pe = 72.4,
+            volume = "67.8M"
+        )
+    )
+}

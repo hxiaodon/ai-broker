@@ -1,0 +1,295 @@
+syntax = "proto3";
+
+package trading.v1;
+
+option go_package = "github.com/brokerage/services/trading-engine/proto/v1;tradingv1";
+
+// ============================================================
+// Order Messages
+// ============================================================
+
+message Order {
+  string order_id = 1;
+  string client_order_id = 2;
+  string exchange_order_id = 3;
+
+  int64 user_id = 4;
+  int64 account_id = 5;
+
+  string symbol = 6;
+  Market market = 7;
+  string exchange = 8;
+
+  OrderSide side = 9;
+  OrderType type = 10;
+  TimeInForce time_in_force = 11;
+
+  int64  quantity = 12;
+  string price = 13;           // Limit price (string for precision)
+  string stop_price = 14;     // Stop trigger price
+  string trail_amount = 15;   // Trailing stop offset
+
+  OrderStatus status = 16;
+  int64  filled_qty = 17;
+  string avg_fill_price = 18;
+  int64  remaining_qty = 19;
+
+  string source = 20;         // IOS / ANDROID / WEB / API
+  string ip_address = 21;
+  string device_id = 22;
+
+  int64 created_at = 23;      // Unix nanos
+  int64 submitted_at = 24;
+  int64 completed_at = 25;
+}
+
+message Execution {
+  string execution_id = 1;
+  string order_id = 2;
+  int64  user_id = 3;
+  int64  account_id = 4;
+  string symbol = 5;
+  Market market = 6;
+  OrderSide side = 7;
+  int64  quantity = 8;
+  string price = 9;
+  string commission = 10;
+  string total_fees = 11;
+  string net_amount = 12;
+  string settlement_date = 13;  // YYYY-MM-DD
+  bool   settled = 14;
+  string venue = 15;
+  int64  executed_at = 16;      // Unix nanos
+}
+
+message Position {
+  int64  user_id = 1;
+  int64  account_id = 2;
+  string symbol = 3;
+  Market market = 4;
+  int64  quantity = 5;
+  string avg_cost_basis = 6;
+  string market_price = 7;
+  string market_value = 8;
+  string unrealized_pnl = 9;
+  string unrealized_pct = 10;
+  string realized_pnl = 11;
+  string day_pnl = 12;
+  int64  settled_qty = 13;
+  int64  unsettled_qty = 14;
+}
+
+message MarginRequirement {
+  int64  account_id = 1;
+  string total_equity = 2;
+  string initial_margin = 3;
+  string maintenance_margin = 4;
+  string available_margin = 5;
+  string margin_usage_pct = 6;
+  string margin_call_amount = 7;
+}
+
+// ============================================================
+// Enums
+// ============================================================
+
+enum Market {
+  MARKET_UNKNOWN = 0;
+  MARKET_US = 1;
+  MARKET_HK = 2;
+}
+
+enum OrderSide {
+  SIDE_UNKNOWN = 0;
+  SIDE_BUY = 1;
+  SIDE_SELL = 2;
+}
+
+enum OrderType {
+  TYPE_UNKNOWN = 0;
+  TYPE_MARKET = 1;
+  TYPE_LIMIT = 2;
+  TYPE_STOP = 3;
+  TYPE_STOP_LIMIT = 4;
+  TYPE_TRAILING_STOP = 5;
+  TYPE_MOO = 6;
+  TYPE_MOC = 7;
+}
+
+enum TimeInForce {
+  TIF_UNKNOWN = 0;
+  TIF_DAY = 1;
+  TIF_GTC = 2;
+  TIF_IOC = 3;
+  TIF_AON = 4;
+}
+
+enum OrderStatus {
+  STATUS_UNKNOWN = 0;
+  STATUS_CREATED = 1;
+  STATUS_VALIDATED = 2;
+  STATUS_RISK_APPROVED = 3;
+  STATUS_PENDING = 4;
+  STATUS_OPEN = 5;
+  STATUS_PARTIAL_FILL = 6;
+  STATUS_FILLED = 7;
+  STATUS_CANCEL_SENT = 8;
+  STATUS_CANCELLED = 9;
+  STATUS_REJECTED = 10;
+  STATUS_EXCHANGE_REJECT = 11;
+}
+
+// ============================================================
+// Service Definitions
+// ============================================================
+
+service OrderService {
+  rpc SubmitOrder(SubmitOrderRequest) returns (SubmitOrderResponse);
+  rpc CancelOrder(CancelOrderRequest) returns (CancelOrderResponse);
+  rpc GetOrder(GetOrderRequest) returns (GetOrderResponse);
+  rpc ListOrders(ListOrdersRequest) returns (ListOrdersResponse);
+  rpc StreamOrderUpdates(StreamOrderUpdatesRequest) returns (stream OrderUpdate);
+}
+
+service PositionService {
+  rpc GetPosition(GetPositionRequest) returns (GetPositionResponse);
+  rpc ListPositions(ListPositionsRequest) returns (ListPositionsResponse);
+  rpc GetPortfolioSummary(GetPortfolioSummaryRequest) returns (PortfolioSummary);
+}
+
+service MarginService {
+  rpc GetMarginRequirement(GetMarginRequest) returns (MarginRequirement);
+  rpc CheckBuyingPower(CheckBuyingPowerRequest) returns (CheckBuyingPowerResponse);
+}
+
+// ============================================================
+// Request / Response Messages
+// ============================================================
+
+message SubmitOrderRequest {
+  int64       account_id = 1;
+  string      symbol = 2;
+  Market      market = 3;
+  OrderSide   side = 4;
+  OrderType   type = 5;
+  TimeInForce time_in_force = 6;
+  int64       quantity = 7;
+  string      price = 8;
+  string      stop_price = 9;
+  string      trail_amount = 10;
+  string      idempotency_key = 11;
+  string      source = 12;
+  string      device_id = 13;
+}
+
+message SubmitOrderResponse {
+  string      order_id = 1;
+  OrderStatus status = 2;
+  string      reject_reason = 3;
+}
+
+message CancelOrderRequest {
+  string order_id = 1;
+  int64  account_id = 2;
+}
+
+message CancelOrderResponse {
+  bool   accepted = 1;
+  string reason = 2;
+}
+
+message GetOrderRequest {
+  string order_id = 1;
+}
+
+message GetOrderResponse {
+  Order order = 1;
+  repeated Execution executions = 2;
+}
+
+message ListOrdersRequest {
+  int64       account_id = 1;
+  OrderStatus status_filter = 2;
+  Market      market_filter = 3;
+  string      symbol_filter = 4;
+  int64       from_timestamp = 5;
+  int64       to_timestamp = 6;
+  int32       page_size = 7;
+  string      page_token = 8;
+}
+
+message ListOrdersResponse {
+  repeated Order orders = 1;
+  string next_page_token = 2;
+  int32  total_count = 3;
+}
+
+message StreamOrderUpdatesRequest {
+  int64 account_id = 1;
+}
+
+message OrderUpdate {
+  Order     order = 1;
+  Execution latest_execution = 2;
+  string    event_type = 3;
+}
+
+message GetPositionRequest {
+  int64  account_id = 1;
+  string symbol = 2;
+  Market market = 3;
+}
+
+message GetPositionResponse {
+  Position position = 1;
+}
+
+message ListPositionsRequest {
+  int64  account_id = 1;
+  Market market_filter = 2;
+}
+
+message ListPositionsResponse {
+  repeated Position positions = 1;
+  string total_market_value = 2;
+  string total_unrealized_pnl = 3;
+  string total_day_pnl = 4;
+}
+
+message GetPortfolioSummaryRequest {
+  int64 account_id = 1;
+}
+
+message PortfolioSummary {
+  int64  account_id = 1;
+  string total_equity = 2;
+  string total_market_value = 3;
+  string cash_balance = 4;
+  string total_unrealized_pnl = 5;
+  string total_realized_pnl = 6;
+  string total_day_pnl = 7;
+  string buying_power = 8;
+  int32  position_count = 9;
+  repeated Position positions = 10;
+  MarginRequirement margin = 11;
+}
+
+message GetMarginRequest {
+  int64 account_id = 1;
+}
+
+message CheckBuyingPowerRequest {
+  int64     account_id = 1;
+  string    symbol = 2;
+  Market    market = 3;
+  OrderSide side = 4;
+  int64     quantity = 5;
+  string    price = 6;
+}
+
+message CheckBuyingPowerResponse {
+  bool   sufficient = 1;
+  string buying_power = 2;
+  string required_amount = 3;
+  string shortfall = 4;
+}

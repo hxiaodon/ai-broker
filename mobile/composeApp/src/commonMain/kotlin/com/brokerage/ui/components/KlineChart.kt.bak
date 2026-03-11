@@ -1,0 +1,117 @@
+package com.brokerage.ui.components
+
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.brokerage.domain.marketdata.Kline
+import com.brokerage.ui.theme.*
+
+/**
+ * K线图组件（简化版）
+ */
+@Composable
+fun KlineChart(
+    data: List<Kline>,
+    modifier: Modifier = Modifier
+) {
+    if (data.isEmpty()) {
+        Box(
+            modifier = modifier
+                .fillMaxWidth()
+                .height(200.dp)
+                .background(BackgroundLight),
+            contentAlignment = androidx.compose.ui.Alignment.Center
+        ) {
+            Text(
+                text = "暂无数据",
+                fontSize = 14.sp,
+                color = TextSecondary
+            )
+        }
+        return
+    }
+
+    var dragOffset by remember { mutableStateOf(0f) }
+
+    Canvas(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(200.dp)
+            .background(Color.White)
+            .pointerInput(Unit) {
+                detectDragGestures { change, dragAmount ->
+                    change.consume()
+                    dragOffset += dragAmount.x
+                }
+            }
+    ) {
+        val width = size.width
+        val height = size.height
+        val padding = 40f
+
+        // 计算价格范围
+        val maxPrice = data.maxOf { maxOf(it.high.toDouble(), it.close.toDouble()) }
+        val minPrice = data.minOf { minOf(it.low.toDouble(), it.close.toDouble()) }
+        val priceRange = maxPrice - minPrice
+
+        if (priceRange == 0.0) return@Canvas
+
+        // 绘制K线
+        val candleWidth = (width - padding * 2) / data.size
+        data.forEachIndexed { index, kline ->
+            val x = padding + index * candleWidth + candleWidth / 2
+            val open = kline.open.toDouble()
+            val close = kline.close.toDouble()
+            val high = kline.high.toDouble()
+            val low = kline.low.toDouble()
+
+            val openY = height - padding - ((open - minPrice) / priceRange * (height - padding * 2)).toFloat()
+            val closeY = height - padding - ((close - minPrice) / priceRange * (height - padding * 2)).toFloat()
+            val highY = height - padding - ((high - minPrice) / priceRange * (height - padding * 2)).toFloat()
+            val lowY = height - padding - ((low - minPrice) / priceRange * (height - padding * 2)).toFloat()
+
+            val color = if (close >= open) SuccessGreen else DangerRed
+
+            // 绘制上下影线
+            drawLine(
+                color = color,
+                start = Offset(x, highY),
+                end = Offset(x, lowY),
+                strokeWidth = 1f
+            )
+
+            // 绘制实体
+            val bodyTop = minOf(openY, closeY)
+            val bodyBottom = maxOf(openY, closeY)
+            val bodyHeight = bodyBottom - bodyTop
+
+            drawRect(
+                color = color,
+                topLeft = Offset(x - candleWidth / 4, bodyTop),
+                size = androidx.compose.ui.geometry.Size(candleWidth / 2, maxOf(bodyHeight, 1f))
+            )
+        }
+
+        // 绘制网格线（简化）
+        for (i in 0..4) {
+            val y = padding + (height - padding * 2) / 4 * i
+            drawLine(
+                color = BorderLight,
+                start = Offset(padding, y),
+                end = Offset(width - padding, y),
+                strokeWidth = 1f
+            )
+        }
+    }
+}

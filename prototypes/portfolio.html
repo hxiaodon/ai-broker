@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>持仓 - 券商交易</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        .price-up { color: #10B981; }
+        .price-down { color: #EF4444; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="max-w-md mx-auto min-h-screen bg-white pb-20">
+        <!-- Header -->
+        <div class="bg-gradient-to-br from-blue-600 to-blue-700 text-white p-6">
+            <div class="text-sm opacity-90 mb-1">总资产</div>
+            <div class="text-3xl font-bold mb-2">$25,340.56</div>
+            <div class="flex items-center text-sm">
+                <span class="price-up">今日盈亏 +$234.50 (+0.93%)</span>
+                <span class="ml-2">▲</span>
+            </div>
+            <div class="grid grid-cols-2 gap-4 mt-4 text-sm">
+                <div>
+                    <div class="opacity-75">可用</div>
+                    <div class="font-semibold mt-1">$10,000</div>
+                </div>
+                <div>
+                    <div class="opacity-75">持仓</div>
+                    <div class="font-semibold mt-1">$15,340</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex border-b border-gray-200 bg-white">
+            <button class="tab-btn flex-1 py-3 text-sm font-medium text-blue-600 border-b-2 border-blue-600" data-tab="holdings">持仓</button>
+            <button class="tab-btn flex-1 py-3 text-sm font-medium text-gray-500" data-tab="analysis">分析</button>
+        </div>
+
+        <!-- Holdings Tab -->
+        <div id="holdingsTab" class="tab-content">
+        <div class="divide-y divide-gray-100">
+            <div class="p-4 bg-white">
+                <div class="flex justify-between items-start mb-3">
+                    <div>
+                        <div class="font-semibold text-gray-900 flex items-center">
+                            AAPL
+                            <span class="price-up ml-2">▲</span>
+                            <span class="text-sm text-gray-500 ml-2">100股</span>
+                        </div>
+                        <div class="text-sm text-gray-500 mt-1">成本 $170.00 (均价)</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-semibold">$175.23</div>
+                        <div class="text-sm price-up">+$523.00 (+3.08%)</div>
+                    </div>
+                </div>
+                <div class="flex space-x-2">
+                    <a href="trade.html?symbol=AAPL&action=buy" class="flex-1 py-2 bg-green-50 text-green-700 text-center rounded-lg text-sm font-medium">买入</a>
+                    <a href="trade.html?symbol=AAPL&action=sell" class="flex-1 py-2 bg-red-50 text-red-700 text-center rounded-lg text-sm font-medium">卖出</a>
+                </div>
+            </div>
+
+            <div class="p-4 bg-white">
+                <div class="flex justify-between items-start mb-3">
+                    <div>
+                        <div class="font-semibold text-gray-900 flex items-center">
+                            TSLA
+                            <span class="price-down ml-2">▼</span>
+                            <span class="text-sm text-gray-500 ml-2">50股</span>
+                        </div>
+                        <div class="text-sm text-gray-500 mt-1">成本 $250.00 (均价)</div>
+                    </div>
+                    <div class="text-right">
+                        <div class="font-semibold">$245.67</div>
+                        <div class="text-sm price-down">-$216.50 (-1.73%)</div>
+                    </div>
+                </div>
+                <div class="flex space-x-2">
+                    <a href="trade.html?symbol=TSLA&action=buy" class="flex-1 py-2 bg-green-50 text-green-700 text-center rounded-lg text-sm font-medium">买入</a>
+                    <a href="trade.html?symbol=TSLA&action=sell" class="flex-1 py-2 bg-red-50 text-red-700 text-center rounded-lg text-sm font-medium">卖出</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analysis Tab -->
+        <div id="analysisTab" class="tab-content hidden">
+            <!-- Sector Distribution -->
+            <div class="p-4 bg-white border-b border-gray-100">
+                <div class="text-sm font-semibold text-gray-900 mb-3">行业分布</div>
+                <div class="space-y-3">
+                    <div>
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="text-gray-600">科技</span>
+                            <span class="font-medium">60%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-blue-600 h-2 rounded-full" style="width: 60%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="text-gray-600">汽车</span>
+                            <span class="font-medium">40%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div class="bg-green-600 h-2 rounded-full" style="width: 40%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- P&L Ranking -->
+            <div class="p-4 bg-white border-b border-gray-100">
+                <div class="text-sm font-semibold text-gray-900 mb-3">盈亏排行</div>
+                <div class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <div class="font-medium text-gray-900">AAPL</div>
+                            <div class="text-xs text-gray-500">100股</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-semibold price-up">+$523.00</div>
+                            <div class="text-xs price-up">+3.08%</div>
+                        </div>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <div class="font-medium text-gray-900">TSLA</div>
+                            <div class="text-xs text-gray-500">50股</div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-semibold price-down">-$216.50</div>
+                            <div class="text-xs price-down">-1.73%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Concentration Analysis -->
+            <div class="p-4 bg-white">
+                <div class="text-sm font-semibold text-gray-900 mb-3">持仓集中度</div>
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                        </svg>
+                        <div class="text-sm text-yellow-800">
+                            <div class="font-medium mb-1">风险提示</div>
+                            <div class="text-xs">AAPL 持仓占比 60%，建议分散投资降低风险</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200">
+        <div class="max-w-md mx-auto flex">
+            <a href="market.html" class="flex-1 flex flex-col items-center py-2 text-gray-400">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
+                </svg>
+                <span class="text-xs mt-1">行情</span>
+            </a>
+            <a href="orders.html" class="flex-1 flex flex-col items-center py-2 text-gray-400">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+                <span class="text-xs mt-1">订单</span>
+            </a>
+            <a href="portfolio.html" class="flex-1 flex flex-col items-center py-2 text-blue-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+                </svg>
+                <span class="text-xs mt-1">持仓</span>
+            </a>
+            <a href="#" class="flex-1 flex flex-col items-center py-2 text-gray-400">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                </svg>
+                <span class="text-xs mt-1">我的</span>
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const tab = this.dataset.tab;
+
+                // Update button styles
+                document.querySelectorAll('.tab-btn').forEach(b => {
+                    b.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
+                    b.classList.add('text-gray-500');
+                });
+                this.classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
+                this.classList.remove('text-gray-500');
+
+                // Show/hide content
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+                document.getElementById(tab + 'Tab').classList.remove('hidden');
+            });
+        });
+    </script>
+</body>
+</html>

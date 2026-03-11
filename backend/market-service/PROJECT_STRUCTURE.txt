@@ -1,0 +1,37 @@
+.
+├── cmd
+│   └── server
+│       └── main.go
+├── config
+│   └── config.yaml
+├── DELIVERY.md
+├── DEPLOYMENT.md
+├── go.mod
+├── go.sum
+├── internal
+│   ├── api
+│   │   └── market_handler.go
+│   ├── config
+│   │   └── config.go
+│   ├── model
+│   │   └── model.go
+│   ├── repository
+│   │   └── repository.go
+│   ├── service
+│   │   └── market_service.go
+│   └── websocket
+├── pkg
+│   ├── cache
+│   │   └── cache.go
+│   ├── database
+│   │   └── database.go
+│   └── polygon
+│       └── client.go
+├── PROJECT_STRUCTURE.txt
+├── README.md
+├── scripts
+│   └── init.sql
+├── start.sh
+└── SUMMARY.md
+
+16 directories, 19 files

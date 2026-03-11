@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>券商交易 APP 原型导航</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="max-w-md mx-auto min-h-screen bg-white">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-6">
+            <h1 class="text-2xl font-bold mb-2">券商交易 APP</h1>
+            <p class="text-blue-100 text-sm">可交互 HTML 原型 v2.0</p>
+        </div>
+
+        <!-- Navigation -->
+        <div class="p-6">
+            <div class="mb-6">
+                <h2 class="text-lg font-semibold text-gray-800 mb-3">P0 核心页面</h2>
+                <div class="space-y-3">
+                    <a href="login.html" class="block bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-500 hover:shadow-md transition">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="font-semibold text-gray-800">登录页</h3>
+                                <p class="text-sm text-gray-500 mt-1">手机号/邮箱登录 + 生物识别</p>
+                            </div>
+                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </div>
+                    </a>
+
+                    <a href="market.html" class="block bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-500 hover:shadow-md transition">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="font-semibold text-gray-800">行情列表页</h3>
+                                <p class="text-sm text-gray-500 mt-1">自选股 + 市场分类 + 搜索</p>
+                            </div>
+                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </div>
+                    </a>
+
+                    <a href="stock-detail.html" class="block bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-500 hover:shadow-md transition">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="font-semibold text-gray-800">股票详情页</h3>
+                                <p class="text-sm text-gray-500 mt-1">实时报价 + K线图 + 快速下单</p>
+                            </div>
+                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </div>
+                    </a>
+
+                    <a href="trade.html" class="block bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-500 hover:shadow-md transition">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="font-semibold text-gray-800">交易下单页</h3>
+                                <p class="text-sm text-gray-500 mt-1">买入/卖出 + 订单确认</p>
+                            </div>
+                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
+            <div>
+                <h2 class="text-lg font-semibold text-gray-800 mb-3">P1 扩展页面</h2>
+                <div class="space-y-3">
+                    <a href="orders.html" class="block bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-500 hover:shadow-md transition">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="font-semibold text-gray-800">订单列表页</h3>
+                                <p class="text-sm text-gray-500 mt-1">订单状态追踪 + 筛选</p>
+                            </div>
+                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </div>
+                    </a>
+
+                    <a href="portfolio.html" class="block bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-500 hover:shadow-md transition">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="font-semibold text-gray-800">持仓页</h3>
+                                <p class="text-sm text-gray-500 mt-1">资产总览 + 持仓列表</p>
+                            </div>
+                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </div>
+                    </a>
+
+                    <a href="funding.html" class="block bg-white border border-gray-200 rounded-lg p-4 hover:border-blue-500 hover:shadow-md transition">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <h3 class="font-semibold text-gray-800">出入金页</h3>
+                                <p class="text-sm text-gray-500 mt-1">入金/出金 + 银行卡管理</p>
+                            </div>
+                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Info -->
+            <div class="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-100">
+                <h3 class="font-semibold text-blue-900 mb-2">设计规范</h3>
+                <ul class="text-sm text-blue-800 space-y-1">
+                    <li>• 涨跌色：绿涨红跌（美股习惯）</li>
+                    <li>• 圆角：统一 8px</li>
+                    <li>• 最小点击区域：44x44px</li>
+                    <li>• 视口宽度：375px（iPhone 标准）</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

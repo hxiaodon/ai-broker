@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>订单 - 券商交易</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        .tab-active { color: #1F2937; border-bottom: 2px solid #3B82F6; }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="max-w-md mx-auto min-h-screen bg-white pb-20">
+        <!-- Header -->
+        <div class="bg-white border-b border-gray-200 sticky top-0 z-10">
+            <div class="px-4 py-3">
+                <h1 class="text-lg font-semibold">订单</h1>
+            </div>
+            <!-- Tabs -->
+            <div class="flex border-b border-gray-200">
+                <button class="tab-active flex-1 py-3 text-sm font-medium">全部</button>
+                <button class="flex-1 py-3 text-sm font-medium text-gray-500">待成交</button>
+                <button class="flex-1 py-3 text-sm font-medium text-gray-500">已成交</button>
+                <button class="flex-1 py-3 text-sm font-medium text-gray-500">已撤销</button>
+            </div>
+        </div>
+
+        <!-- Order List -->
+        <div class="divide-y divide-gray-100">
+            <!-- Order 1 - Partial Fill -->
+            <div class="p-4 bg-white hover:bg-gray-50 cursor-pointer" onclick="showOrderDetail(1)">
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <div class="font-semibold text-gray-900">AAPL 买入 100股</div>
+                        <div class="text-sm text-gray-500 mt-1">限价 $175.00</div>
+                    </div>
+                    <span class="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded">部分成交</span>
+                </div>
+                <div class="text-sm text-gray-600 mb-2">
+                    已成交 50/100 股 @ $175.10
+                </div>
+                <div class="flex justify-between items-center text-xs text-gray-500">
+                    <span>2026-03-07 09:35</span>
+                    <div class="flex space-x-3">
+                        <button class="text-blue-600 font-medium" onclick="event.stopPropagation(); editOrder(1)">修改</button>
+                        <button class="text-red-600 font-medium" onclick="event.stopPropagation(); cancelOrder(1)">撤单</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Order 2 - Filled -->
+            <div class="p-4 bg-white hover:bg-gray-50 cursor-pointer" onclick="showOrderDetail(2)">
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <div class="font-semibold text-gray-900">TSLA 卖出 50股</div>
+                        <div class="text-sm text-gray-500 mt-1">市价单</div>
+                    </div>
+                    <span class="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded">已成交</span>
+                </div>
+                <div class="text-sm text-gray-600 mb-2">
+                    成交价 $245.50 | 手续费 $5.00
+                </div>
+                <div class="text-xs text-gray-500">
+                    2026-03-07 09:30
+                </div>
+            </div>
+
+            <!-- Order 3 - Pending -->
+            <div class="p-4 bg-white hover:bg-gray-50 cursor-pointer" onclick="showOrderDetail(3)">
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <div class="font-semibold text-gray-900">MSFT 买入 30股</div>
+                        <div class="text-sm text-gray-500 mt-1">限价 $380.00</div>
+                    </div>
+                    <span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded">待成交</span>
+                </div>
+                <div class="flex justify-between items-center text-xs text-gray-500">
+                    <span>2026-03-07 09:20</span>
+                    <div class="flex space-x-3">
+                        <button class="text-blue-600 font-medium" onclick="event.stopPropagation(); editOrder(3)">修改</button>
+                        <button class="text-red-600 font-medium" onclick="event.stopPropagation(); cancelOrder(3)">撤单</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Order 4 - Cancelled -->
+            <div class="p-4 bg-white hover:bg-gray-50 cursor-pointer" onclick="showOrderDetail(4)">
+                <div class="flex justify-between items-start mb-2">
+                    <div>
+                        <div class="font-semibold text-gray-900">GOOGL 买入 20股</div>
+                        <div class="text-sm text-gray-500 mt-1">限价 $145.00</div>
+                    </div>
+                    <span class="px-2 py-1 bg-gray-100 text-gray-800 text-xs font-medium rounded">已撤销</span>
+                </div>
+                <div class="text-xs text-gray-500">
+                    2026-03-07 09:10
+                </div>
+            </div>
+        </div>
+
+        <!-- Order Detail Modal -->
+        <div id="orderDetailModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50" onclick="closeOrderDetail()">
+            <div class="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl max-w-md mx-auto" onclick="event.stopPropagation()">
+                <div class="p-4 border-b border-gray-200">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-lg font-semibold">订单详情</h2>
+                        <button onclick="closeOrderDetail()" class="text-gray-400 hover:text-gray-600">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="p-4 max-h-96 overflow-y-auto" id="orderDetailContent">
+                    <!-- Content will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200">
+        <div class="max-w-md mx-auto flex">
+            <a href="market.html" class="flex-1 flex flex-col items-center py-2 text-gray-400">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
+                </svg>
+                <span class="text-xs mt-1">行情</span>
+            </a>
+            <a href="orders.html" class="flex-1 flex flex-col items-center py-2 text-blue-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+                <span class="text-xs mt-1">订单</span>
+            </a>
+            <a href="portfolio.html" class="flex-1 flex flex-col items-center py-2 text-gray-400">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+                </svg>
+                <span class="text-xs mt-1">持仓</span>
+            </a>
+            <a href="#" class="flex-1 flex flex-col items-center py-2 text-gray-400">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                </svg>
+                <span class="text-xs mt-1">我的</span>
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // Tab switching
+        document.querySelectorAll('button[class*="flex-1"]').forEach((tab, index) => {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('button[class*="flex-1"]').forEach(t => {
+                    t.classList.remove('tab-active', 'text-gray-900');
+                    t.classList.add('text-gray-500');
+                });
+                this.classList.add('tab-active', 'text-gray-900');
+                this.classList.remove('text-gray-500');
+            });
+        });
+
+        // Order detail data
+        const orderDetails = {
+            1: {
+                symbol: 'AAPL',
+                action: '买入',
+                quantity: 100,
+                price: 175.00,
+                status: '部分成交',
+                filled: 50,
+                avgPrice: 175.10,
+                orderTime: '2026-03-07 09:35:12',
+                fills: [
+                    { time: '09:35:15', quantity: 30, price: 175.05 },
+                    { time: '09:35:18', price: 175.15, quantity: 20 }
+                ]
+            },
+            2: {
+                symbol: 'TSLA',
+                action: '卖出',
+                quantity: 50,
+                price: '市价',
+                status: '已成交',
+                filled: 50,
+                avgPrice: 245.50,
+                fee: 5.00,
+                orderTime: '2026-03-07 09:30:05',
+                fillTime: '2026-03-07 09:30:06',
+                fills: [
+                    { time: '09:30:06', quantity: 50, price: 245.50 }
+                ]
+            },
+            3: {
+                symbol: 'MSFT',
+                action: '买入',
+                quantity: 30,
+                price: 380.00,
+                status: '待成交',
+                filled: 0,
+                orderTime: '2026-03-07 09:20:30'
+            }
+        };
+
+        function showOrderDetail(orderId) {
+            const order = orderDetails[orderId];
+            if (!order) return;
+
+            let html = `
+                <div class="space-y-4">
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="text-sm font-semibold text-gray-900 mb-2">订单信息</div>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">股票代码</span>
+                                <span class="font-medium">${order.symbol}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">操作</span>
+                                <span class="font-medium">${order.action}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">委托数量</span>
+                                <span class="font-medium">${order.quantity} 股</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">委托价格</span>
+                                <span class="font-medium">${typeof order.price === 'number' ? '$' + order.price.toFixed(2) : order.price}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">订单状态</span>
+                                <span class="font-medium">${order.status}</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">下单时间</span>
+                                <span class="font-medium">${order.orderTime}</span>
+                            </div>
+                        </div>
+                    </div>
+            `;
+
+            if (order.fills && order.fills.length > 0) {
+                html += `
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="text-sm font-semibold text-gray-900 mb-2">成交明细</div>
+                        <div class="space-y-2">
+                `;
+                order.fills.forEach(fill => {
+                    html += `
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">${fill.time}</span>
+                            <span class="font-medium">${fill.quantity}股 @ $${fill.price.toFixed(2)}</span>
+                        </div>
+                    `;
+                });
+                html += `
+                        <div class="pt-2 border-t border-gray-200 flex justify-between text-sm">
+                            <span class="text-gray-600">平均成交价</span>
+                            <span class="font-semibold">$${order.avgPrice.toFixed(2)}</span>
+                        </div>
+                `;
+                if (order.fee) {
+                    html += `
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-600">手续费</span>
+                            <span class="font-medium">$${order.fee.toFixed(2)}</span>
+                        </div>
+                    `;
+                }
+                html += `
+                        </div>
+                    </div>
+                `;
+            }
+
+            html += `</div>`;
+
+            document.getElementById('orderDetailContent').innerHTML = html;
+            document.getElementById('orderDetailModal').classList.remove('hidden');
+        }
+
+        function closeOrderDetail() {
+            document.getElementById('orderDetailModal').classList.add('hidden');
+        }
+
+        function editOrder(orderId) {
+            alert(`修改订单 #${orderId}\n\n功能开发中...`);
+        }
+
+        function cancelOrder(orderId) {
+            if (confirm('确认撤销此订单？')) {
+                alert(`订单 #${orderId} 已撤销`);
+            }
+        }
+    </script>
+</body>
+</html>

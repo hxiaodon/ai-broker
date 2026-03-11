@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+build/
+dist/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Go
+*.out
+vendor/
+
+# Mobile
+mobile/.gradle/
+mobile/.kotlin/
+mobile/build/
+mobile/*/build/
+mobile/local.properties
+*.xcuserdata/
+*.xcworkspace/
+DerivedData/
+Pods/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# MCP config (contains local connection strings)
+.mcp.json
+
+# Environment & Secrets
+.env
+.env.*
+*.key
+*.pem
+credentials.json
+
+# Serena (local tool config)
+.serena/
+
+# Claude Code (local session data)
+.claude/projects/
+.claude/todos/
+
+# Logs
+*.log
+logs/

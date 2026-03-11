@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket 测试客户端</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            margin-top: 0;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+        .status.connected {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.disconnected {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        button.primary {
+            background: #007bff;
+            color: white;
+        }
+        button.success {
+            background: #28a745;
+            color: white;
+        }
+        button.danger {
+            background: #dc3545;
+            color: white;
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        input {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .messages {
+            height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 10px;
+            background: #f9f9f9;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .message {
+            margin-bottom: 8px;
+            padding: 8px;
+            border-radius: 4px;
+            word-break: break-all;
+        }
+        .message.sent {
+            background: #e3f2fd;
+            border-left: 3px solid #2196f3;
+        }
+        .message.received {
+            background: #f1f8e9;
+            border-left: 3px solid #8bc34a;
+        }
+        .message.error {
+            background: #ffebee;
+            border-left: 3px solid #f44336;
+        }
+        .timestamp {
+            color: #666;
+            font-size: 11px;
+            margin-right: 8px;
+        }
+        .subscribe-section {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .subscribed-list {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+        .symbol-tag {
+            background: #007bff;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .symbol-tag .remove {
+            cursor: pointer;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔌 WebSocket 测试客户端</h1>
+
+        <div id="status" class="status disconnected">
+            状态: 未连接
+        </div>
+
+        <div class="controls">
+            <input type="text" id="wsUrl" value="ws://localhost:8080/api/v1/market/realtime" style="flex: 1; min-width: 300px;">
+            <button class="primary" onclick="connect()">连接</button>
+            <button class="danger" onclick="disconnect()" disabled id="disconnectBtn">断开</button>
+            <button class="success" onclick="clearMessages()">清空消息</button>
+        </div>
+
+        <div class="subscribe-section">
+            <input type="text" id="symbolInput" placeholder="输入股票代码 (如: AAPL)" style="flex: 1;">
+            <button class="success" onclick="subscribe()" id="subscribeBtn" disabled>订阅</button>
+        </div>
+
+        <div class="subscribed-list" id="subscribedList"></div>
+
+        <h3>消息记录</h3>
+        <div class="messages" id="messages"></div>
+    </div>
+
+    <script>
+        let ws = null;
+        let subscribedSymbols = new Set();
+
+        function connect() {
+            const url = document.getElementById('wsUrl').value;
+
+            try {
+                ws = new WebSocket(url);
+
+                ws.onopen = function() {
+                    updateStatus(true);
+                    addMessage('已连接到服务器', 'received');
+                };
+
+                ws.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        addMessage(JSON.stringify(data, null, 2), 'received');
+                    } catch (e) {
+                        addMessage(event.data, 'received');
+                    }
+                };
+
+                ws.onerror = function(error) {
+                    addMessage('WebSocket 错误: ' + error, 'error');
+                };
+
+                ws.onclose = function() {
+                    updateStatus(false);
+                    addMessage('连接已关闭', 'error');
+                };
+            } catch (error) {
+                addMessage('连接失败: ' + error.message, 'error');
+            }
+        }
+
+        function disconnect() {
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+        }
+
+        function subscribe() {
+            const symbol = document.getElementById('symbolInput').value.trim().toUpperCase();
+            if (!symbol) {
+                alert('请输入股票代码');
+                return;
+            }
+
+            if (subscribedSymbols.has(symbol)) {
+                alert('已订阅该股票');
+                return;
+            }
+
+            const message = {
+                type: 'subscribe',
+                symbols: [symbol]
+            };
+
+            sendMessage(message);
+            subscribedSymbols.add(symbol);
+            updateSubscribedList();
+            document.getElementById('symbolInput').value = '';
+        }
+
+        function unsubscribe(symbol) {
+            const message = {
+                type: 'unsubscribe',
+                symbols: [symbol]
+            };
+
+            sendMessage(message);
+            subscribedSymbols.delete(symbol);
+            updateSubscribedList();
+        }
+
+        function sendMessage(message) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                const json = JSON.stringify(message);
+                ws.send(json);
+                addMessage(json, 'sent');
+            } else {
+                addMessage('未连接到服务器', 'error');
+            }
+        }
+
+        function updateStatus(connected) {
+            const statusEl = document.getElementById('status');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            const subscribeBtn = document.getElementById('subscribeBtn');
+
+            if (connected) {
+                statusEl.className = 'status connected';
+                statusEl.textContent = '状态: 已连接';
+                disconnectBtn.disabled = false;
+                subscribeBtn.disabled = false;
+            } else {
+                statusEl.className = 'status disconnected';
+                statusEl.textContent = '状态: 未连接';
+                disconnectBtn.disabled = true;
+                subscribeBtn.disabled = true;
+            }
+        }
+
+        function updateSubscribedList() {
+            const listEl = document.getElementById('subscribedList');
+            listEl.innerHTML = '';
+
+            subscribedSymbols.forEach(symbol => {
+                const tag = document.createElement('div');
+                tag.className = 'symbol-tag';
+                tag.innerHTML = `
+                    <span>${symbol}</span>
+                    <span class="remove" onclick="unsubscribe('${symbol}')">×</span>
+                `;
+                listEl.appendChild(tag);
+            });
+        }
+
+        function addMessage(text, type) {
+            const messagesEl = document.getElementById('messages');
+            const messageEl = document.createElement('div');
+            messageEl.className = 'message ' + type;
+
+            const timestamp = new Date().toLocaleTimeString();
+            messageEl.innerHTML = `
+                <span class="timestamp">[${timestamp}]</span>
+                <span>${text}</span>
+            `;
+
+            messagesEl.appendChild(messageEl);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+
+        function clearMessages() {
+            document.getElementById('messages').innerHTML = '';
+        }
+
+        // 快捷键
+        document.getElementById('symbolInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                subscribe();
+            }
+        });
+    </script>
+</body>
+</html>

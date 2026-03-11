@@ -1,0 +1,291 @@
+syntax = "proto3";
+
+package fundtransfer.v1;
+
+option go_package = "github.com/brokerage/fund-transfer/proto/fundtransfer/v1;fundtransferv1";
+
+import "google/protobuf/timestamp.proto";
+
+// Fund Transfer Service
+service FundTransferService {
+  // Deposit operations
+  rpc InitiateDeposit(InitiateDepositRequest) returns (InitiateDepositResponse);
+  rpc GetDeposit(GetDepositRequest) returns (GetDepositResponse);
+  rpc ListDeposits(ListDepositsRequest) returns (ListDepositsResponse);
+
+  // Withdrawal operations
+  rpc InitiateWithdrawal(InitiateWithdrawalRequest) returns (InitiateWithdrawalResponse);
+  rpc ApproveWithdrawal(ApproveWithdrawalRequest) returns (ApproveWithdrawalResponse);
+  rpc GetWithdrawal(GetWithdrawalRequest) returns (GetWithdrawalResponse);
+  rpc ListWithdrawals(ListWithdrawalsRequest) returns (ListWithdrawalsResponse);
+
+  // Bank account operations
+  rpc AddBankAccount(AddBankAccountRequest) returns (AddBankAccountResponse);
+  rpc GetBankAccount(GetBankAccountRequest) returns (GetBankAccountResponse);
+  rpc ListBankAccounts(ListBankAccountsRequest) returns (ListBankAccountsResponse);
+  rpc RemoveBankAccount(RemoveBankAccountRequest) returns (RemoveBankAccountResponse);
+
+  // Balance operations
+  rpc GetBalance(GetBalanceRequest) returns (GetBalanceResponse);
+  rpc GetLedgerEntries(GetLedgerEntriesRequest) returns (GetLedgerEntriesResponse);
+
+  // Reconciliation operations
+  rpc GetReconciliationReport(GetReconciliationReportRequest) returns (GetReconciliationReportResponse);
+}
+
+// Transfer types
+enum TransferType {
+  TRANSFER_TYPE_UNSPECIFIED = 0;
+  TRANSFER_TYPE_DEPOSIT = 1;
+  TRANSFER_TYPE_WITHDRAWAL = 2;
+}
+
+// Transfer status
+enum TransferStatus {
+  TRANSFER_STATUS_UNSPECIFIED = 0;
+  TRANSFER_STATUS_PENDING = 1;
+  TRANSFER_STATUS_COMPLIANCE_CHECK = 2;
+  TRANSFER_STATUS_BALANCE_CHECK = 3;
+  TRANSFER_STATUS_SETTLEMENT_CHECK = 4;
+  TRANSFER_STATUS_APPROVAL = 5;
+  TRANSFER_STATUS_BANK_PROCESSING = 6;
+  TRANSFER_STATUS_CONFIRMED = 7;
+  TRANSFER_STATUS_LEDGER_UPDATED = 8;
+  TRANSFER_STATUS_COMPLETED = 9;
+  TRANSFER_STATUS_FAILED = 10;
+  TRANSFER_STATUS_REJECTED = 11;
+}
+
+// Bank channel
+enum BankChannel {
+  BANK_CHANNEL_UNSPECIFIED = 0;
+  BANK_CHANNEL_ACH = 1;        // US, 3-5 days
+  BANK_CHANNEL_WIRE = 2;       // US, same day
+  BANK_CHANNEL_FPS = 3;        // HK, real-time
+  BANK_CHANNEL_CHATS = 4;      // HK, same day
+  BANK_CHANNEL_SWIFT = 5;      // International, 3-5 days
+}
+
+// Currency
+enum Currency {
+  CURRENCY_UNSPECIFIED = 0;
+  CURRENCY_USD = 1;
+  CURRENCY_HKD = 2;
+}
+
+// Fund transfer
+message FundTransfer {
+  string transfer_id = 1;
+  string account_id = 2;
+  TransferType type = 3;
+  TransferStatus status = 4;
+  string amount = 5;  // decimal string
+  Currency currency = 6;
+  BankChannel channel = 7;
+  string bank_account_id = 8;
+  string request_id = 9;  // idempotency key
+  string failure_reason = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+  google.protobuf.Timestamp completed_at = 13;
+}
+
+// Bank account
+message BankAccount {
+  string bank_account_id = 1;
+  string account_id = 2;
+  string account_name = 3;
+  string account_number = 4;
+  string routing_number = 5;  // US: ABA routing, HK: bank code
+  string swift_code = 6;
+  string bank_name = 7;
+  Currency currency = 8;
+  bool is_verified = 9;
+  google.protobuf.Timestamp created_at = 10;
+}
+
+// Balance
+message Balance {
+  string account_id = 1;
+  Currency currency = 2;
+  string total_balance = 3;      // decimal string
+  string available_balance = 4;  // decimal string (total - unsettled)
+  string unsettled_amount = 5;   // decimal string
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+// Ledger entry
+message LedgerEntry {
+  string entry_id = 1;
+  string transfer_id = 2;
+  string account_type = 3;  // ASSET, LIABILITY, BANK, FEE
+  string account_id = 4;
+  string debit = 5;   // decimal string
+  string credit = 6;  // decimal string
+  Currency currency = 7;
+  string exchange_rate = 8;  // decimal string, if currency conversion
+  string description = 9;
+  google.protobuf.Timestamp created_at = 10;
+}
+
+// Deposit requests/responses
+message InitiateDepositRequest {
+  string account_id = 1;
+  string amount = 2;  // decimal string
+  Currency currency = 3;
+  string bank_account_id = 4;
+  BankChannel channel = 5;
+  string request_id = 6;  // idempotency key
+}
+
+message InitiateDepositResponse {
+  FundTransfer transfer = 1;
+}
+
+message GetDepositRequest {
+  string transfer_id = 1;
+}
+
+message GetDepositResponse {
+  FundTransfer transfer = 1;
+}
+
+message ListDepositsRequest {
+  string account_id = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListDepositsResponse {
+  repeated FundTransfer transfers = 1;
+  string next_page_token = 2;
+}
+
+// Withdrawal requests/responses
+message InitiateWithdrawalRequest {
+  string account_id = 1;
+  string amount = 2;  // decimal string
+  Currency currency = 3;
+  string bank_account_id = 4;
+  BankChannel channel = 5;
+  string request_id = 6;  // idempotency key
+}
+
+message InitiateWithdrawalResponse {
+  FundTransfer transfer = 1;
+}
+
+message ApproveWithdrawalRequest {
+  string transfer_id = 1;
+  string approver_id = 2;
+  bool approved = 3;
+  string reason = 4;
+}
+
+message ApproveWithdrawalResponse {
+  FundTransfer transfer = 1;
+}
+
+message GetWithdrawalRequest {
+  string transfer_id = 1;
+}
+
+message GetWithdrawalResponse {
+  FundTransfer transfer = 1;
+}
+
+message ListWithdrawalsRequest {
+  string account_id = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListWithdrawalsResponse {
+  repeated FundTransfer transfers = 1;
+  string next_page_token = 2;
+}
+
+// Bank account requests/responses
+message AddBankAccountRequest {
+  string account_id = 1;
+  string account_name = 2;
+  string account_number = 3;
+  string routing_number = 4;
+  string swift_code = 5;
+  string bank_name = 6;
+  Currency currency = 7;
+}
+
+message AddBankAccountResponse {
+  BankAccount bank_account = 1;
+}
+
+message GetBankAccountRequest {
+  string bank_account_id = 1;
+}
+
+message GetBankAccountResponse {
+  BankAccount bank_account = 1;
+}
+
+message ListBankAccountsRequest {
+  string account_id = 1;
+}
+
+message ListBankAccountsResponse {
+  repeated BankAccount bank_accounts = 1;
+}
+
+message RemoveBankAccountRequest {
+  string bank_account_id = 1;
+}
+
+message RemoveBankAccountResponse {
+  bool success = 1;
+}
+
+// Balance requests/responses
+message GetBalanceRequest {
+  string account_id = 1;
+  Currency currency = 2;
+}
+
+message GetBalanceResponse {
+  Balance balance = 1;
+}
+
+message GetLedgerEntriesRequest {
+  string account_id = 1;
+  google.protobuf.Timestamp start_time = 2;
+  google.protobuf.Timestamp end_time = 3;
+  int32 page_size = 4;
+  string page_token = 5;
+}
+
+message GetLedgerEntriesResponse {
+  repeated LedgerEntry entries = 1;
+  string next_page_token = 2;
+}
+
+// Reconciliation requests/responses
+message GetReconciliationReportRequest {
+  google.protobuf.Timestamp start_time = 1;
+  google.protobuf.Timestamp end_time = 2;
+}
+
+message ReconciliationRecord {
+  string transfer_id = 1;
+  string amount = 2;
+  Currency currency = 3;
+  bool matched = 4;
+  string mismatch_reason = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message GetReconciliationReportResponse {
+  int32 total_transfers = 1;
+  int32 matched_transfers = 2;
+  int32 mismatched_transfers = 3;
+  string total_amount = 4;
+  repeated ReconciliationRecord records = 5;
+}

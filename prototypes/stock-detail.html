@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>股票详情 - 券商交易</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        .price-up { color: #10B981; }
+        .price-down { color: #EF4444; }
+        .chart-placeholder { background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); }
+    </style>
+</head>
+<body class="bg-white">
+    <div class="max-w-md mx-auto min-h-screen bg-white pb-20">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+            <div class="flex items-center">
+                <a href="market.html" class="mr-3">
+                    <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                    </svg>
+                </a>
+                <div>
+                    <div class="flex items-center">
+                        <span class="font-semibold text-lg">AAPL</span>
+                        <span class="price-up ml-2">▲</span>
+                    </div>
+                    <div class="text-xs text-gray-500">Apple Inc.</div>
+                </div>
+            </div>
+            <button class="p-2 hover:bg-gray-100 rounded-lg">
+                <svg class="w-6 h-6 text-yellow-500" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Price Info -->
+        <div class="px-4 py-4 border-b border-gray-100">
+            <div class="flex items-baseline">
+                <span class="text-3xl font-bold price-up">$175.23</span>
+            </div>
+            <div class="flex items-center mt-1">
+                <span class="price-up text-lg font-medium">+2.34 (+1.35%)</span>
+                <span class="price-up ml-2">▲</span>
+            </div>
+            <div class="grid grid-cols-4 gap-4 mt-4 text-sm">
+                <div>
+                    <div class="text-gray-500">开盘</div>
+                    <div class="font-medium mt-1">$173.50</div>
+                </div>
+                <div>
+                    <div class="text-gray-500">最高</div>
+                    <div class="font-medium mt-1">$176.00</div>
+                </div>
+                <div>
+                    <div class="text-gray-500">最低</div>
+                    <div class="font-medium mt-1">$172.80</div>
+                </div>
+                <div>
+                    <div class="text-gray-500">成交量</div>
+                    <div class="font-medium mt-1">45.2M</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fundamentals -->
+        <div class="px-4 py-4 border-b border-gray-100">
+            <div class="text-sm font-semibold text-gray-900 mb-3">基本面</div>
+            <div class="grid grid-cols-3 gap-4 text-sm">
+                <div>
+                    <div class="text-gray-500">市值</div>
+                    <div class="font-medium mt-1">2.8T</div>
+                </div>
+                <div>
+                    <div class="text-gray-500">市盈率</div>
+                    <div class="font-medium mt-1">28.5</div>
+                </div>
+                <div>
+                    <div class="text-gray-500">市净率</div>
+                    <div class="font-medium mt-1">42.3</div>
+                </div>
+                <div>
+                    <div class="text-gray-500">股息率</div>
+                    <div class="font-medium mt-1">0.52%</div>
+                </div>
+                <div>
+                    <div class="text-gray-500">52周高</div>
+                    <div class="font-medium mt-1">$199.62</div>
+                </div>
+                <div>
+                    <div class="text-gray-500">52周低</div>
+                    <div class="font-medium mt-1">$164.08</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chart Tabs -->
+        <div class="flex border-b border-gray-200 px-4">
+            <button class="tab-btn py-3 px-4 text-sm font-medium text-blue-600 border-b-2 border-blue-600" data-tab="chart">K线</button>
+            <button class="tab-btn py-3 px-4 text-sm font-medium text-gray-500" data-tab="news">新闻</button>
+            <button class="tab-btn py-3 px-4 text-sm font-medium text-gray-500" data-tab="financials">财报</button>
+        </div>
+
+        <!-- Chart Tab Content -->
+        <div id="chartTab" class="tab-content">
+            <div class="flex border-b border-gray-200 px-4">
+                <button class="py-2 px-3 text-xs font-medium text-blue-600 border-b-2 border-blue-600">分时</button>
+                <button class="py-2 px-3 text-xs font-medium text-gray-500">日K</button>
+                <button class="py-2 px-3 text-xs font-medium text-gray-500">周K</button>
+                <button class="py-2 px-3 text-xs font-medium text-gray-500">月K</button>
+            </div>
+            <div class="px-4 py-6">
+                <div class="chart-placeholder rounded-lg h-64 flex items-center justify-center">
+                    <div class="text-center text-gray-500">
+                        <svg class="w-16 h-16 mx-auto mb-2 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
+                        </svg>
+                        <div class="text-sm">K线图表区域</div>
+                        <div class="text-xs mt-1">支持双指拖动/十字线</div>
+                        <div class="text-xs mt-1 text-blue-600">MA5 MA10 MA20</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- News Tab Content -->
+        <div id="newsTab" class="tab-content hidden">
+            <div class="divide-y divide-gray-100">
+                <div class="px-4 py-3">
+                    <div class="text-sm font-medium text-gray-900">苹果发布新款 iPhone 16</div>
+                    <div class="text-xs text-gray-500 mt-1">2026-03-07 09:30 | 路透社</div>
+                </div>
+                <div class="px-4 py-3">
+                    <div class="text-sm font-medium text-gray-900">Q1 财报超预期，营收增长 12%</div>
+                    <div class="text-xs text-gray-500 mt-1">2026-03-06 16:00 | 彭博社</div>
+                </div>
+                <div class="px-4 py-3">
+                    <div class="text-sm font-medium text-gray-900">分析师上调目标价至 $200</div>
+                    <div class="text-xs text-gray-500 mt-1">2026-03-05 10:15 | 摩根士丹利</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Financials Tab Content -->
+        <div id="financialsTab" class="tab-content hidden">
+            <div class="px-4 py-4">
+                <div class="text-sm font-semibold text-gray-900 mb-3">下一个财报日期</div>
+                <div class="bg-blue-50 rounded-lg p-3 text-sm">
+                    <div class="font-medium text-blue-900">2026-04-28（预计）</div>
+                    <div class="text-xs text-blue-700 mt-1">Q2 2026 财报</div>
+                </div>
+                <div class="text-sm font-semibold text-gray-900 mt-4 mb-3">最近财报</div>
+                <div class="space-y-3 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">营收（Q1 2026）</span>
+                        <span class="font-medium">$119.6B</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">净利润</span>
+                        <span class="font-medium">$33.9B</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">EPS</span>
+                        <span class="font-medium">$2.18</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3">
+            <div class="max-w-md mx-auto flex space-x-3">
+                <a href="trade.html?symbol=AAPL&action=buy" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg text-center">
+                    买入
+                </a>
+                <a href="trade.html?symbol=AAPL&action=sell" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-3 rounded-lg text-center">
+                    卖出
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const tab = this.dataset.tab;
+
+                // Update button styles
+                document.querySelectorAll('.tab-btn').forEach(b => {
+                    b.classList.remove('text-blue-600', 'border-b-2', 'border-blue-600');
+                    b.classList.add('text-gray-500');
+                });
+                this.classList.add('text-blue-600', 'border-b-2', 'border-blue-600');
+                this.classList.remove('text-gray-500');
+
+                // Show/hide content
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+                document.getElementById(tab + 'Tab').classList.remove('hidden');
+            });
+        });
+    </script>
+</body>
+</html>
