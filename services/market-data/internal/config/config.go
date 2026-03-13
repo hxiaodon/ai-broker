@@ -1,100 +1,136 @@
 package config
 
-import "time"
+import (
+	"fmt"
+	"os"
 
-// Config 行情系统配置
+	"gopkg.in/yaml.v3"
+)
+
+// Config 全局配置
 type Config struct {
-	Server  ServerConfig  `yaml:"server"`
-	Feed    FeedConfig    `yaml:"feed"`
-	Redis   RedisConfig   `yaml:"redis"`
-	Kafka   KafkaConfig   `yaml:"kafka"`
-	Storage StorageConfig `yaml:"storage"`
-	WS      WSConfig      `yaml:"ws"`
+	Server    ServerConfig    `yaml:"server"`
+	Database  DatabaseConfig  `yaml:"database"`
+	Redis     RedisConfig     `yaml:"redis"`
+	Kafka     KafkaConfig     `yaml:"kafka"`
+	Polygon   PolygonConfig   `yaml:"polygon"`
+	Cache     CacheConfig     `yaml:"cache"`
+	WebSocket WebSocketConfig `yaml:"websocket"`
+	JWT       JWTConfig       `yaml:"jwt"`
+	CORS      CORSConfig      `yaml:"cors"`
+	Log       LogConfig       `yaml:"log"`
 }
 
-// ServerConfig 服务配置
+// ServerConfig 服务器配置
 type ServerConfig struct {
-	GRPCAddr string `yaml:"grpc_addr" env:"GRPC_ADDR" default:":9090"`
-	HTTPAddr string `yaml:"http_addr" env:"HTTP_ADDR" default:":8080"`
-	WSAddr   string `yaml:"ws_addr"   env:"WS_ADDR"   default:":8081"`
+	Port int    `yaml:"port"`
+	Mode string `yaml:"mode"`
 }
 
-// FeedConfig 数据源配置
-type FeedConfig struct {
-	US USFeedConfig `yaml:"us"`
-	HK HKFeedConfig `yaml:"hk"`
-}
-
-// USFeedConfig 美股数据源配置
-type USFeedConfig struct {
-	Primary   DataSourceConfig `yaml:"primary"`   // Polygon
-	Secondary DataSourceConfig `yaml:"secondary"` // IEX
-	Fallback  DataSourceConfig `yaml:"fallback"`  // Alpaca
-}
-
-// HKFeedConfig 港股数据源配置
-type HKFeedConfig struct {
-	Primary   DataSourceConfig `yaml:"primary"`   // HKEX OMD
-	Secondary DataSourceConfig `yaml:"secondary"` // AAStocks
-}
-
-// DataSourceConfig 单个数据源配置
-type DataSourceConfig struct {
-	Enabled         bool          `yaml:"enabled"`
-	Name            string        `yaml:"name"`
-	URL             string        `yaml:"url"`
-	APIKey          string        `yaml:"api_key"    env-prefix:"true"`
-	ReconnectDelay  time.Duration `yaml:"reconnect_delay"  default:"3s"`
-	MaxReconnects   int           `yaml:"max_reconnects"   default:"10"`
-	HeartbeatPeriod time.Duration `yaml:"heartbeat_period" default:"30s"`
+// DatabaseConfig 数据库配置
+type DatabaseConfig struct {
+	Host            string `yaml:"host"`
+	Port            int    `yaml:"port"`
+	User            string `yaml:"user"`
+	Password        string `yaml:"password"`
+	DBName          string `yaml:"dbname"`
+	MaxOpenConns    int    `yaml:"max_open_conns"`
+	MaxIdleConns    int    `yaml:"max_idle_conns"`
+	ConnMaxLifetime int    `yaml:"conn_max_lifetime"`
 }
 
 // RedisConfig Redis 配置
 type RedisConfig struct {
-	Addrs    []string `yaml:"addrs"`    // Cluster 模式多地址
-	Password string   `yaml:"password"  env:"REDIS_PASSWORD"`
-	DB       int      `yaml:"db"        default:"0"`
+	Host         string `yaml:"host"`
+	Port         int    `yaml:"port"`
+	Password     string `yaml:"password"`
+	DB           int    `yaml:"db"`
+	PoolSize     int    `yaml:"pool_size"`
+	MinIdleConns int    `yaml:"min_idle_conns"`
 }
 
 // KafkaConfig Kafka 配置
 type KafkaConfig struct {
 	Brokers []string `yaml:"brokers"`
-	GroupID string   `yaml:"group_id"  default:"market-data-engine"`
-
-	Topics TopicConfig `yaml:"topics"`
+	Topic   string   `yaml:"topic"`
+	GroupID string   `yaml:"group_id"`
 }
 
-// TopicConfig Kafka Topic 配置
-type TopicConfig struct {
-	USQuotes string `yaml:"us_quotes" default:"market-data.quotes.us"`
-	HKQuotes string `yaml:"hk_quotes" default:"market-data.quotes.hk"`
-	USDepth  string `yaml:"us_depth"  default:"market-data.depth.us"`
-	HKDepth  string `yaml:"hk_depth"  default:"market-data.depth.hk"`
-	USTrades string `yaml:"us_trades" default:"market-data.trades.us"`
-	HKTrades string `yaml:"hk_trades" default:"market-data.trades.hk"`
+// PolygonConfig Polygon.io 配置
+type PolygonConfig struct {
+	APIKey  string `yaml:"api_key"`
+	BaseURL string `yaml:"base_url"`
+	WsURL   string `yaml:"ws_url"`
+	Timeout int    `yaml:"timeout"`
 }
 
-// StorageConfig 存储配置
-type StorageConfig struct {
-	TimescaleDB TimescaleDBConfig `yaml:"timescaledb"`
+// CacheConfig 缓存配置
+type CacheConfig struct {
+	QuoteTTL      int `yaml:"quote_ttl"`
+	StockInfoTTL  int `yaml:"stock_info_ttl"`
+	KlineTTL      int `yaml:"kline_ttl"`
+	HotSearchTTL  int `yaml:"hot_search_ttl"`
 }
 
-// TimescaleDBConfig TimescaleDB 配置
-type TimescaleDBConfig struct {
-	DSN             string `yaml:"dsn"              env:"TIMESCALEDB_DSN"`
-	MaxOpenConns    int    `yaml:"max_open_conns"    default:"20"`
-	MaxIdleConns    int    `yaml:"max_idle_conns"    default:"5"`
-	ConnMaxLifetime string `yaml:"conn_max_lifetime" default:"30m"`
+// WebSocketConfig WebSocket 配置
+type WebSocketConfig struct {
+	ReadBufferSize    int `yaml:"read_buffer_size"`
+	WriteBufferSize   int `yaml:"write_buffer_size"`
+	HeartbeatInterval int `yaml:"heartbeat_interval"`
+	MaxConnections    int `yaml:"max_connections"`
 }
 
-// WSConfig WebSocket 网关配置
-type WSConfig struct {
-	MaxConnections     int           `yaml:"max_connections"      default:"100000"`
-	MaxSubsPerConn     int           `yaml:"max_subs_per_conn"    default:"200"`
-	WriteTimeout       time.Duration `yaml:"write_timeout"        default:"5s"`
-	ReadTimeout        time.Duration `yaml:"read_timeout"         default:"60s"`
-	PingInterval       time.Duration `yaml:"ping_interval"        default:"30s"`
-	MessageBatchWindow time.Duration `yaml:"message_batch_window" default:"100ms"`
-	SlowConsumerLimit  int           `yaml:"slow_consumer_limit"  default:"1000"`
-	EnableCompression  bool          `yaml:"enable_compression"   default:"true"`
+// JWTConfig JWT 配置
+type JWTConfig struct {
+	Secret     string `yaml:"secret"`
+	ExpireTime int    `yaml:"expire_time"` // 过期时间（小时）
+}
+
+// CORSConfig CORS 配置
+type CORSConfig struct {
+	AllowedOrigins []string `yaml:"allowed_origins"`
+	AllowedMethods []string `yaml:"allowed_methods"`
+	AllowedHeaders []string `yaml:"allowed_headers"`
+}
+
+// LogConfig 日志配置
+type LogConfig struct {
+	Level    string `yaml:"level"`
+	Format   string `yaml:"format"`
+	Output   string `yaml:"output"`
+	FilePath string `yaml:"file_path"`
+}
+
+var globalConfig *Config
+
+// Load 加载配置文件
+func Load(configPath string) (*Config, error) {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	var cfg Config
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return nil, fmt.Errorf("failed to parse config file: %w", err)
+	}
+
+	globalConfig = &cfg
+	return &cfg, nil
+}
+
+// Get 获取全局配置
+func Get() *Config {
+	return globalConfig
+}
+
+// GetDSN 获取数据库连接字符串
+func (c *DatabaseConfig) GetDSN() string {
+	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+		c.User, c.Password, c.Host, c.Port, c.DBName)
+}
+
+// GetRedisAddr 获取 Redis 地址
+func (c *RedisConfig) GetRedisAddr() string {
+	return fmt.Sprintf("%s:%d", c.Host, c.Port)
 }

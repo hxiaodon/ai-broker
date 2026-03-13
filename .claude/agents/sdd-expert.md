@@ -147,7 +147,7 @@ surface_prd: mobile/docs/prd/04-trading.md
 
 **Domain PRD vs Tech Spec distinction:**
 - Domain PRD = PM writes business rules in business language ("order goes from OPEN to REJECTED when buying power insufficient")
-- Tech Spec = engineer writes implementation in technical language ("PostgreSQL state machine + Kafka event-driven order state transitions")
+- Tech Spec = engineer writes implementation in technical language ("MySQL state machine + Kafka event-driven order state transitions")
 - Domain PRD is the upstream input to Tech Spec.
 
 ### Spec Placement Decision Tree
@@ -235,11 +235,11 @@ continued_by: null                # successor thread
 ---
 type: lightweight
 status: INCORPORATED
-participants: [trading-engine-engineer, product-manager]
+participants: [trading-engineer, product-manager]
 affects_specs: [...]
 ---
 ## Question
-@trading-engine-engineer 2026-03-12T14:00+08:00
+@trading-engineer 2026-03-12T14:00+08:00
 <question>
 ## Reply
 @product-manager 2026-03-12T14:15+08:00
@@ -545,8 +545,8 @@ repo-root/
 │   │   ├── CLAUDE.md                  # Product orchestrator
 │   │   ├── .claude/
 │   │   │   ├── agents/
-│   │   │   │   ├── trading-engine-engineer.md
-│   │   │   │   ├── ios-engineer.md
+│   │   │   │   ├── trading-engineer.md
+│   │   │   │   ├── mobile-engineer.md
 │   │   │   │   └── ...
 │   │   │   └── rules/
 │   │   │       ├── financial-coding.md
@@ -602,7 +602,7 @@ repo-root/
 | Service folder | `kebab-case` | `order-service`, `market-data` |
 | Doc file | `NN-topic.md` (numbered) | `01-auth.md`, `02-kyc.md` |
 | ADR file | `NNN-title.md` | `001-go-for-backend.md` |
-| Agent file | `role-name.md` | `trading-engine-engineer.md` |
+| Agent file | `role-name.md` | `trading-engineer.md` |
 | Rule file | `domain-scope.md` | `financial-coding-standards.md` |
 | Skill folder | `kebab-case` | `build-and-test`, `compliance-audit` |
 
@@ -627,13 +627,14 @@ Global Level                Product Level              Service Level
 ─────────────              ──────────────             ──────────────
 sdd-expert                 product-manager            (none typical)
 tech-lead                  ui-designer
-code-reviewer              ios-engineer
-security-engineer          android-engineer
-devops-engineer            trading-engine-engineer
-data-analyst               fund-transfer-engineer
-                           frontend-engineer
+code-reviewer              mobile-engineer
+security-engineer          ams-engineer
+devops-engineer            trading-engineer
+data-analyst               market-data-engineer
+                           fund-engineer
+                           h5-engineer
+                           admin-panel-engineer
                            qa-engineer
-                           backend-engineer
 ```
 
 **Guidelines:**
@@ -828,7 +829,7 @@ Date: YYYY-MM-DD
 - After ANY correction from the user: record the pattern as a lesson
 - Write rules for yourself that prevent the same mistake
 - Review lessons at session start for relevant context
-- Save important lessons and discoveries to MetaMemory (`mm create`) so all agents benefit
+- Document reusable patterns and lessons learned for the team
 
 ### Core Principles
 - **Structure IS Documentation**: The folder tree should be self-explanatory. If you need a README to explain the structure, the structure is wrong.

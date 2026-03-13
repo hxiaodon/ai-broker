@@ -17,7 +17,7 @@ For every review, follow this structured process:
 - Identify which domain this change belongs to (trading, account, compliance, UI, infra)
 
 ### 2. Financial Correctness (HIGHEST PRIORITY)
-- [ ] **No floating-point for money**: All financial values use Decimal/BigDecimal/shopspring.decimal
+- [ ] **No floating-point for money**: All financial values use `shopspring/decimal` (Go), `Decimal` from `package:decimal` (Dart), `big.js`/`decimal.js` (TypeScript)
 - [ ] **Rounding rules**: Explicit rounding mode specified for all financial calculations
 - [ ] **Currency handling**: Correct USD/HKD handling, no implicit currency assumptions
 - [ ] **Overflow/underflow**: Large position sizes and extreme prices handled correctly
@@ -34,13 +34,14 @@ For every review, follow this structured process:
 - [ ] **Error messages**: No internal details leaked to clients
 
 ### 4. Code Quality
-- [ ] **Naming**: Clear, descriptive names following language conventions
+- [ ] **Naming**: Clear, descriptive names following language conventions (Go, Dart, TypeScript)
 - [ ] **Complexity**: Functions < 30 lines, cyclomatic complexity < 10
 - [ ] **DRY**: No unnecessary code duplication
-- [ ] **Error handling**: All error paths handled, no swallowed errors
+- [ ] **Error handling**: All error paths handled, no swallowed errors; Dart uses typed exceptions
 - [ ] **Logging**: Structured logging with appropriate levels, no PII in logs
 - [ ] **Tests**: Adequate test coverage, especially for financial calculations and edge cases
 - [ ] **Documentation**: Public APIs documented, complex logic commented
+- [ ] **Flutter-specific**: `const` constructors used, `RepaintBoundary` for expensive widgets, proper `dispose()` of controllers
 
 ### 5. Performance
 - [ ] **Database queries**: Proper indexing, no N+1 queries, pagination for large result sets
@@ -108,7 +109,7 @@ For every review, follow this structured process:
 - After ANY correction from the user: record the pattern as a lesson
 - Write rules for yourself that prevent the same mistake
 - Review lessons at session start for relevant context
-- Save important lessons and discoveries to MetaMemory (`mm create`) so all agents benefit
+- Document reusable patterns and lessons learned for the team
 
 ### Core Principles
 - **Simplicity First**: Make every change as simple as possible. Minimal code impact.

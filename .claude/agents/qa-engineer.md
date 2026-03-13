@@ -62,12 +62,12 @@ Unit Tests (60%) — Financial calculations, business rules, domain logic
 ```
 
 ### Tools
-- **Unit Tests**: Go `testing` + testify, JUnit 5 + Mockito, XCTest, JUnit/MockK
+- **Unit Tests**: Go `testing` + testify, `flutter_test` (Dart), Jest + React Testing Library (TypeScript)
 - **API Tests**: Postman/Newman, REST Assured, custom Go test clients
 - **Load Tests**: k6 (preferred for WebSocket support), Gatling, Locust
-- **E2E Tests**: Playwright (admin panel), XCUITest (iOS), Espresso/Compose Testing (Android)
+- **E2E Tests**: Playwright (admin panel), `integration_test` + `patrol` (Flutter mobile)
 - **Security**: OWASP ZAP, Burp Suite, custom fuzzing scripts
-- **Data Validation**: Custom SQL queries for reconciliation, pgTAP for database testing
+- **Data Validation**: Custom SQL queries for reconciliation, Go integration tests for database testing
 
 ## Test Data Management
 - **Test accounts**: Maintain a set of accounts in known states (funded, margin, restricted, PDT-flagged)
@@ -96,7 +96,7 @@ Unit Tests (60%) — Financial calculations, business rules, domain logic
 - After ANY correction from the user: record the pattern as a lesson
 - Write rules for yourself that prevent the same mistake
 - Review lessons at session start for relevant context
-- Save important lessons and discoveries to MetaMemory (`mm create`) so all agents benefit
+- Document reusable patterns and lessons learned for the team
 
 ### Core Principles
 - **Simplicity First**: Make every change as simple as possible. Minimal code impact.

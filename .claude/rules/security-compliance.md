@@ -18,8 +18,8 @@ These rules apply to all code in the brokerage trading application. They enforce
 
 ### Biometric Authentication
 - Required for: order submission, fund withdrawal, password change, KYC document upload
-- iOS: LAContext with `.biometryCurrentSet` policy (invalidate on biometric change)
-- Android: BiometricPrompt with `BIOMETRIC_STRONG` authenticator type
+- Flutter: `local_auth` package with `biometricOnly: true` for strong biometric enforcement
+- Re-authenticate on biometric enrollment changes (detect via `canCheckBiometrics` state changes)
 
 ## Data Protection
 
@@ -70,21 +70,22 @@ These fields MUST be encrypted at application level (AES-256-GCM) before databas
 ## Mobile Security
 
 ### Certificate Pinning
+- Implement via Dio interceptor with `SecurityContext` or `dio_http2_adapter`
 - Pin the leaf certificate or public key for all API endpoints
 - Include backup pins for certificate rotation
 - Implement pin validation failure reporting (not blocking in first week after rotation)
 
 ### Local Storage
-- iOS: Keychain Services for credentials, encrypted Core Data for cached data
-- Android: Android Keystore for keys, EncryptedSharedPreferences for credentials
-- Never store in: UserDefaults (iOS), SharedPreferences (Android), plain files
+- Flutter: `flutter_secure_storage` for credentials and tokens (uses Keychain on iOS, EncryptedSharedPreferences on Android)
+- Sensitive cached data: encrypt with `encrypt` package (AES-256) before writing to local storage
+- Never store in: plain `SharedPreferences`, unencrypted files, or `path_provider` without encryption
 - Clear cached trading data on logout
 
 ### Anti-Tampering
-- Jailbreak/root detection: warn user, restrict trading functionality
-- Code obfuscation: ProGuard/R8 (Android), bitcode + symbol stripping (iOS)
-- SSL proxy detection: detect and block MitM debugging tools in production builds
-- Prevent screen capture on sensitive screens (account details, KYC, trading)
+- Jailbreak/root detection: `flutter_jailbreak_detection` — warn user, restrict trading functionality
+- Code obfuscation: `flutter build --obfuscate --split-debug-info` for release builds
+- Screen capture prevention: `screen_protector` package for sensitive screens (account details, KYC, trading)
+- SSL proxy detection: detect and block MitM debugging tools in production builds via Dio certificate validation
 
 ## Database Security
 

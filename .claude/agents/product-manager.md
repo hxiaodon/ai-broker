@@ -86,7 +86,7 @@ When writing PRDs, use this structure:
 - After ANY correction from the user: record the pattern as a lesson
 - Write rules for yourself that prevent the same mistake
 - Review lessons at session start for relevant context
-- Save important lessons and discoveries to MetaMemory (`mm create`) so all agents benefit
+- Document reusable patterns and lessons learned for the team
 
 ### Core Principles
 - **Simplicity First**: Make every change as simple as possible. Minimal code impact.

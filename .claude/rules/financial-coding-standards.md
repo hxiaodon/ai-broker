@@ -9,10 +9,9 @@ This is the single most critical rule. Violating it is a CRITICAL bug.
 | Language | Correct Type | Wrong Type |
 |----------|-------------|------------|
 | Go | `shopspring/decimal.Decimal` | `float64`, `float32` |
-| Swift | `Foundation.Decimal` | `Double`, `Float` |
-| Kotlin | `java.math.BigDecimal` | `Double`, `Float` |
+| Dart | `Decimal` from `package:decimal` | `double`, `num` |
 | TypeScript | `big.js` or `decimal.js` | `number` (for calculations) |
-| SQL | `NUMERIC(precision, scale)` | `REAL`, `DOUBLE PRECISION` (for money) |
+| SQL | `DECIMAL(precision, scale)` | `FLOAT`, `DOUBLE` (for money) |
 
 ### Rounding Rules
 - Always specify rounding mode explicitly in decimal operations
@@ -24,11 +23,12 @@ This is the single most critical rule. Violating it is a CRITICAL bug.
 
 ## Rule 2: Timestamps and Time Zones
 
-- **Store**: All timestamps in UTC as `TIMESTAMP WITH TIME ZONE` in PostgreSQL
+- **Store**: All timestamps in UTC as `TIMESTAMP` in MySQL (configure `time_zone = '+00:00'` at session level)
 - **Transmit**: ISO 8601 format (`2024-01-15T09:30:00Z`)
 - **Convert**: Only at the display layer (mobile app / admin panel)
 - **Market hours**: Respect exchange-specific time zones (ET for NYSE/NASDAQ, HKT for HKEX)
 - **Go**: Use `time.Time` with UTC location; never use `time.Now()` without `.UTC()`
+- **Dart**: Use `DateTime.utc()` constructor; never use `DateTime.now()` without `.toUtc()`
 - **Never**: Use unix timestamps for user-facing data (audit, reporting)
 
 ## Rule 3: Error Handling
@@ -47,6 +47,27 @@ if err != nil {
 
 // WRONG: Swallowed error
 result, _ := doSomething()
+```
+
+### Dart
+```dart
+// CORRECT: Use typed exceptions with context
+try {
+  await submitOrder(order);
+} on OrderValidationException catch (e) {
+  logger.warning('Order validation failed: ${e.message}', error: e);
+  rethrow;
+} on NetworkException catch (e) {
+  logger.error('Network error submitting order ${order.id}: ${e.message}', error: e);
+  throw OrderSubmissionException('Failed to submit order: ${e.message}', cause: e);
+}
+
+// WRONG: Generic catch-all
+try {
+  await submitOrder(order);
+} catch (e) {
+  print(e); // Never use print in production
+}
 ```
 
 ## Rule 4: Idempotency

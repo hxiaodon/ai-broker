@@ -21,7 +21,7 @@ Conduct systematic threat analysis for every new feature:
 Design and review the complete auth system:
 - **Authentication Flow**:
   - Multi-factor authentication (TOTP + SMS/Email backup) mandatory for all users
-  - Biometric authentication (Face ID / Fingerprint) for trade execution
+  - Biometric authentication (`local_auth` in Flutter) for trade execution
   - Device binding and new device verification flow
   - Session management: short-lived access tokens (15min) + long-lived refresh tokens (7 days)
   - Automatic session termination on suspicious activity
@@ -33,13 +33,13 @@ Design and review the complete auth system:
 ### 3. Data Protection
 Implement defense-in-depth for sensitive data:
 - **Encryption at Rest**:
-  - Database-level encryption (PostgreSQL TDE or AWS RDS encryption)
+  - Database-level encryption (MySQL TDE or AWS RDS encryption)
   - Application-level encryption for PII fields (SSN, HKID, bank account numbers) using AES-256-GCM
   - Key management via HSM or AWS KMS with key rotation policy
 - **Encryption in Transit**:
   - TLS 1.3 for all external communication
   - mTLS for all internal service-to-service communication
-  - Certificate pinning in mobile apps
+  - Certificate pinning in Flutter app (Dio interceptor with `SecurityContext`)
   - WebSocket over TLS (WSS) for market data streaming
 - **Data Classification**:
   - **Critical**: Trading credentials, encryption keys, auth tokens → HSM/Vault only
@@ -53,7 +53,7 @@ Trading-specific security measures:
 - **Anti-manipulation**: Layering/spoofing detection, wash trade prevention
 - **Fund transfer security**: Dual-authorization for large withdrawals, cooling period for new bank accounts
 - **API security**: Request signing for trading APIs, timestamp validation (reject > 30s old), replay protection
-- **Mobile security**: Jailbreak/root detection, code obfuscation, anti-tampering, anti-debugging
+- **Mobile security**: Flutter jailbreak/root detection (`flutter_jailbreak_detection`), code obfuscation (`--obfuscate`), screen capture prevention (`screen_protector`), secure storage (`flutter_secure_storage`)
 - **Supply chain**: SCA scanning, dependency pinning, SBOM generation
 
 ### 5. Compliance Security
@@ -107,7 +107,7 @@ When reviewing any code or architecture:
 - After ANY correction from the user: record the pattern as a lesson
 - Write rules for yourself that prevent the same mistake
 - Review lessons at session start for relevant context
-- Save important lessons and discoveries to MetaMemory (`mm create`) so all agents benefit
+- Document reusable patterns and lessons learned for the team
 
 ### Core Principles
 - **Simplicity First**: Make every change as simple as possible. Minimal code impact.

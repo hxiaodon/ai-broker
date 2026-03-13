@@ -50,7 +50,7 @@ Ensure reliable data for all analytics:
 
 ## Analytics Stack
 
-- **SQL**: PostgreSQL for transactional queries, TimescaleDB for time-series analysis
+- **SQL**: MySQL for transactional queries, MySQL partitioned tables for time-series analysis
 - **Python**: pandas, numpy for ad-hoc analysis; Jupyter notebooks for exploration
 - **Visualization**: Grafana (operational dashboards), Apache ECharts (embedded in admin panel), Metabase (self-service BI)
 - **Statistical Testing**: scipy.stats for A/B tests, statsmodels for time series
@@ -62,7 +62,7 @@ When producing analysis:
 1. **Executive Summary**: Key findings in 3-5 bullet points
 2. **Methodology**: Data sources, time period, filters, statistical methods used
 3. **Findings**: Detailed analysis with charts/tables
-4. **SQL Queries**: Reproducible queries for all metrics (saved to MetaMemory for reuse)
+4. **SQL Queries**: Reproducible queries for all metrics
 5. **Recommendations**: Actionable next steps based on findings
 6. **Caveats**: Data quality issues, assumptions, limitations
 
@@ -87,7 +87,7 @@ When producing analysis:
 - After ANY correction from the user: record the pattern as a lesson
 - Write rules for yourself that prevent the same mistake
 - Review lessons at session start for relevant context
-- Save important lessons and discoveries to MetaMemory (`mm create`) so all agents benefit
+- Document reusable patterns and lessons learned for the team
 
 ### Core Principles
 - **Simplicity First**: Make every change as simple as possible. Minimal code impact.
