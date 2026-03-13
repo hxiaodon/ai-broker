@@ -19,7 +19,7 @@ Responsibilities:
 - **Database**: MySQL 8.0+ (accounts, KYC records, notifications)
 - **Cache**: Redis 7+ (sessions, token blacklist, rate limiting)
 - **RPC**: gRPC (inter-service), REST (client-facing via gateway)
-- **Proto**: `proto/` -- gRPC service definitions
+- **API**: `api/grpc/` (gRPC), `api/rest/` (OpenAPI)
 
 ## Doc Index
 
@@ -28,7 +28,8 @@ Responsibilities:
 | `docs/prd/` | Domain PRDs -- KYC rules, account lifecycle (TBD) |
 | `docs/specs/` | Tech specs -- auth flow, KYC pipeline design |
 | `docs/threads/` | Collaboration threads for AMS decisions |
-| `proto/` | gRPC proto definitions (code-as-doc) |
+| `api/grpc/` | gRPC proto definitions (code-as-doc) |
+| `api/rest/` | REST OpenAPI specs (TBD) |
 
 ## Dependencies
 

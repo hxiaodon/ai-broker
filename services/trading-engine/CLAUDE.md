@@ -29,7 +29,8 @@ Responsibilities:
 | `docs/prd/` | Domain PRDs -- order lifecycle, risk rules, settlement (TBD) |
 | `docs/specs/trading-system.md` | System architecture and tech design |
 | `docs/threads/` | Collaboration threads for trading decisions |
-| `proto/trading.proto` | gRPC service definitions |
+| `api/grpc/trading.proto` | gRPC service definitions |
+| `api/rest/` | REST OpenAPI specs (TBD) |
 | `migrations/` | MySQL schema migrations |
 | `internal/` | Implementation: order, risk, routing, fix, margin, position, settlement |
 

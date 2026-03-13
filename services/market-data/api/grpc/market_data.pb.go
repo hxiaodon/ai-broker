@@ -2,9 +2,9 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v7.34.0
-// source: proto/market_data.proto
+// source: api/grpc/market_data.proto
 
-package proto
+package grpc
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"

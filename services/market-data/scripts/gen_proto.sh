@@ -16,6 +16,6 @@ fi
 
 # 生成代码
 protoc --go_out=. --go_opt=paths=source_relative \
-    proto/market_data.proto
+    api/grpc/market_data.proto
 
 echo "Protobuf code generated successfully"

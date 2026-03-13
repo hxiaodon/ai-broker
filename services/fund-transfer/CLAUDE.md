@@ -29,7 +29,8 @@ Responsibilities:
 | `docs/prd/` | Domain PRDs -- deposit/withdrawal rules, AML (TBD) |
 | `docs/specs/fund-transfer-system.md` | System architecture and tech design |
 | `docs/threads/` | Collaboration threads |
-| `proto/` | gRPC proto definitions |
+| `api/grpc/` | gRPC proto definitions |
+| `api/rest/` | REST OpenAPI specs (TBD) |
 | `migrations/` | MySQL schema migrations |
 | `internal/` | Implementation: transfer, bank, compliance, ledger, reconciliation |
 

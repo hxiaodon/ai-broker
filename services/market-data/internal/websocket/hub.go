@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	pb "github.com/brokerage/market-service/proto"
+	pb "github.com/brokerage/market-service/api/grpc"
 	"github.com/gorilla/websocket"
 	"github.com/shopspring/decimal"
 	"google.golang.org/protobuf/proto"

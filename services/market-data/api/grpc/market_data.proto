@@ -1,7 +1,7 @@
 syntax = "proto3";
 package marketdata;
 
-option go_package = "github.com/brokerage/market-service/proto";
+option go_package = "github.com/brokerage/market-service/api/grpc";
 
 // 统一行情快照
 message Quote {

@@ -78,7 +78,7 @@ L5  ┌────────────────────────�
 | Cross-Domain Interface Contract | L3 | Architect | `docs/contracts/` |
 | API Specification | L4 | Backend Eng | `<service>/docs/specs/` or `<service>/api/` |
 | Database Schema | L4 | Backend Eng | `<service>/docs/db/` + `<service>/migrations/` |
-| Protocol Definition | L4 | Backend Eng | `<service>/proto/` |
+| Protocol Definition | L4 | Backend Eng | `<service>/api/grpc/` |
 | Test Plan | L4 | QA | `<service>/docs/specs/` or `<service>/test/` |
 | Runbook | L5 | DevOps | `docs/operations/runbooks/` |
 | Monitoring Spec | L5 | SRE | `docs/operations/monitoring/` |
@@ -276,7 +276,7 @@ implements:
 contracts:
   - docs/contracts/trading-to-fund.md
 depends_on:
-  - services/ams/proto/ams.proto
+  - services/ams/api/grpc/ams.proto
 ---
 ```
 
@@ -286,7 +286,7 @@ Contracts are "agreements" between two domains, co-maintained by both.
 
 **Naming:** `<provider>-to-<consumer>.md` (e.g., `ams-to-trading.md`)
 
-**Contract files are ALWAYS the current state** — no v1/v2 file splitting. Version tracked via in-file `version` field + changelog. Actual API versioning lives in proto/OpenAPI code artifacts.
+**Contract files are ALWAYS the current state** — no v1/v2 file splitting. Version tracked via in-file `version` field + changelog. Actual API versioning lives in api/grpc/ and api/rest/ code artifacts.
 
 **Format:**
 ```yaml
@@ -294,7 +294,7 @@ Contracts are "agreements" between two domains, co-maintained by both.
 provider: services/ams
 consumer: services/trading-engine
 protocol: gRPC
-proto_file: services/ams/proto/ams.proto
+proto_file: services/ams/api/grpc/ams.proto
 version: 2
 last_updated: 2026-04-10T11:20+08:00
 last_reviewed: 2026-04-10T11:20+08:00
@@ -310,7 +310,7 @@ last_reviewed: 2026-04-10T11:20+08:00
 **PRD change → contract update workflow:**
 ```
 PRD change → affects interface? → open Thread → provider+consumer agree
-  → update proto/openapi + contract (version+1, changelog) → Thread RESOLVED
+  → update api/grpc or api/rest + contract (version+1, changelog) → Thread RESOLVED
 ```
 
 ### Cross-Domain Knowledge Discovery Order
@@ -320,7 +320,7 @@ When a domain-scoped agent needs info from another domain:
 ```
 1. Check own CLAUDE.md "upstream/downstream dependencies"  → direct pointers
 2. Check docs/contracts/                                    → interface contracts
-3. Check target domain's proto/                             → gRPC definitions (code-as-doc)
+3. Check target domain's api/grpc/                         → gRPC definitions (code-as-doc)
 4. Only then read target domain's docs/                     → PRD or implementation details
 ```
 
@@ -351,12 +351,12 @@ repo-root/
 │   ├── ams/                               # ═══ AMS Domain ═══
 │   │   ├── CLAUDE.md
 │   │   ├── docs/{prd,specs,threads,db}/   # prd/ = Domain PRDs (business rules)
-│   │   ├── proto/ & internal/
+│   │   ├── api/ & internal/
 │   │
 │   ├── trading-engine/                    # ═══ Trading Domain ═══
 │   │   ├── CLAUDE.md
 │   │   ├── docs/{prd,specs,threads,db}/   # prd/ = Domain PRDs (order lifecycle, risk rules, settlement)
-│   │   ├── proto/ & internal/
+│   │   ├── api/ & internal/
 │   │
 │   ├── fund-transfer/                     # ═══ Fund Domain ═══
 │   │   ├── docs/{prd,specs,threads,db}/   # prd/ = Domain PRDs (deposit/withdrawal rules, AML)

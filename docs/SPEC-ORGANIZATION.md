@@ -70,7 +70,9 @@ repo-root/
 │   │   │   ├── specs/                     # 域内技术设计
 │   │   │   ├── threads/                   # 域内讨论
 │   │   │   └── db/                        # 数据模型
-│   │   ├── proto/
+│   │   ├── api/
+│   │   │   ├── grpc/                      # .proto + .pb.go
+│   │   │   └── rest/                      # openapi.yaml
 │   │   └── internal/
 │   │
 │   ├── trading-engine/                    # ═══ 交易域（OMS/路由/风控/清结算）═══
@@ -80,7 +82,9 @@ repo-root/
 │   │   │   ├── specs/
 │   │   │   ├── threads/
 │   │   │   └── db/
-│   │   ├── proto/
+│   │   ├── api/
+│   │   │   ├── grpc/                      # .proto + .pb.go
+│   │   │   └── rest/                      # openapi.yaml
 │   │   └── internal/
 │   │
 │   ├── fund-transfer/                     # ═══ 资金域（出入金/通道/对账）═══
@@ -537,8 +541,8 @@ implements:                                       # 我实现的是哪些 PRD
 contracts:
   - docs/contracts/trading-to-fund.md             # 我对外暴露的接口契约
 depends_on:
-  - services/ams/proto/ams.proto                  # 我依赖谁的接口
-  - services/market-data/proto/market.proto
+  - services/ams/api/grpc/ams.proto                # 我依赖谁的接口
+  - services/market-data/api/grpc/market.proto
 ---
 
 # 订单状态机技术设计
@@ -578,7 +582,7 @@ depends_on:
 provider: services/ams
 consumer: services/trading-engine
 protocol: gRPC
-proto_file: services/ams/proto/ams.proto
+proto_file: services/ams/api/grpc/ams.proto
 last_reviewed: 2026-03-13T15:00+08:00
 ---
 
@@ -610,7 +614,7 @@ Contract 文件**始终反映当前态**（Single Source of Truth），不拆 v1
 provider: services/trading-engine
 consumer: services/fund-transfer
 protocol: gRPC
-proto_file: services/trading-engine/proto/settlement.proto
+proto_file: services/trading-engine/api/grpc/settlement.proto
 version: 3
 last_updated: 2026-05-20T16:30+08:00
 last_reviewed: 2026-05-20T16:30+08:00
@@ -673,10 +677,64 @@ PRD 变更（产品提出需求）
           │
           ▼
   更新制品（并行）
-      ├─ proto/ 或 openapi/：加新字段/方法
+      ├─ api/grpc/ 或 api/rest/：加新字段/方法
       ├─ contract 文件：version +1，更新接口列表，写 changelog
       └─ Thread 标记 RESOLVED
 ```
+
+### 契约索引与全景图（docs/contracts/INDEX.md）
+
+契约目录包含一个 `INDEX.md`，承担**系统全景图**角色：
+
+- **服务拓扑图** — ASCII 依赖关系图，让非技术人员一眼看懂系统结构
+- **契约索引表** — 所有 provider→consumer 关系、协议、状态的汇总
+- **依赖规则** — DAG 无环约束、根节点约定、纯消费者标识
+
+**INDEX.md 的维护时机：**
+
+| 触发事件 | 更新动作 |
+|---------|---------|
+| 新增服务间依赖 | 创建契约文件 + INDEX 表格加行 + 拓扑图加边 |
+| 移除依赖 | 契约状态改 DEPRECATED + INDEX 标注 + 拓扑图删边 |
+| 新增服务域 | INDEX 拓扑图加节点 + 相关契约文件 |
+| 服务拆分 repo | INDEX 标注 repo 归属，契约加 `mirror: true` 标记 |
+
+### 契约演进治理
+
+契约不是静态文档，系统关联关系会随业务演进而变化。SDD 流程必须跟踪这种变化：
+
+**1. 定期健康检查（SDD Expert 驱动）**
+
+```
+每次 SDD 审计（/sdd audit）时：
+  ├─ 检查 INDEX.md 拓扑图是否与各域 CLAUDE.md 的上下游依赖一致
+  ├─ 检查每个 DRAFT 契约是否仍需要（可能设计变更后依赖不存在了）
+  ├─ 检查每个 ACTIVE 契约的 proto/openapi 文件是否实际存在
+  └─ 输出：契约健康报告（缺失、过期、不一致的契约列表）
+```
+
+**2. 新功能驱动的契约变更**
+
+```
+新功能 PRD
+  │
+  ├─ 需要新的跨域依赖？
+  │   → 创建新契约 (DRAFT) + 更新 INDEX
+  │
+  ├─ 修改现有跨域接口？
+  │   → 更新契约 (version +1) + changelog + INDEX 状态
+  │
+  └─ 移除跨域依赖？
+      → 契约标记 DEPRECATED + INDEX 更新
+```
+
+**3. 服务拆分驱动的契约迁移**
+
+当域从 monorepo 拆出独立 repo 时（Phase 2-3）：
+- Provider 域的契约**原件**搬入新 repo 的 `docs/contracts/`
+- 原 monorepo 保留**镜像副本**，frontmatter 加 `mirror: true`
+- INDEX.md 标注每个契约的 repo 归属
+- CI 自动同步 provider repo 的契约变更到 consumer repo
 
 ---
 
@@ -728,8 +786,8 @@ PRD 变更（产品提出需求）
 - App 交易界面: mobile/docs/prd/04-trading.md
 
 ## 上下游依赖
-- ← AMS: 鉴权 (proto: services/ams/proto/ams.proto)
-- ← Market: 实时报价 (proto: services/market-data/proto/market.proto)
+- ← AMS: 鉴权 (proto: services/ams/api/grpc/ams.proto)
+- ← Market: 实时报价 (proto: services/market-data/api/grpc/market.proto)
 - → Fund: 清结算划转 (contract: docs/contracts/trading-to-fund.md)
 
 ## 数据模型
@@ -760,7 +818,7 @@ PRD 变更（产品提出需求）
 ```
 1. 先查本域 CLAUDE.md 中的"上下游依赖"  → 有没有直接指引
 2. 再查 docs/contracts/                  → 有没有现成的接口契约
-3. 再查目标域的 proto/                   → gRPC 接口定义（代码即文档）
+3. 再查目标域的 api/grpc/                   → gRPC 接口定义（代码即文档）
 4. 最后才读目标域的 docs/specs/           → 理解实现细节
 ```
 
@@ -874,9 +932,9 @@ knowledge:
 contracts:
   provides:
     - uri: brokerage://contracts/trading-to-fund
-      proto: proto/settlement.proto
+      proto: api/grpc/settlement.proto
     - uri: brokerage://contracts/trading-to-mobile
-      proto: proto/trading.proto
+      proto: api/grpc/trading.proto
   consumes:
     - uri: brokerage://contracts/ams-to-trading
     - uri: brokerage://contracts/market-to-trading
@@ -977,7 +1035,7 @@ Phase 3: 完全多 Repo
 
 ### 迁移检查清单（域拆出独立 repo 时）
 
-- [ ] 域目录完整搬出（docs/, proto/, internal/, migrations/）
+- [ ] 域目录完整搬出（docs/, api/, internal/, migrations/）
 - [ ] CLAUDE.md 更新：移除对根目录的相对路径依赖，改为 URI 或独立引用
 - [ ] domain.yaml 更新：`repo` 字段改为新 repo 名
 - [ ] 所有 frontmatter 中的 `path` 字段更新为 repo 内路径

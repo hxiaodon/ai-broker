@@ -87,6 +87,7 @@ The main Claude session acts as **tech lead / orchestrator** — analyzing tasks
 │   │   ├── CLAUDE.md
 │   │   ├── .claude/agents/            # trading-engineer
 │   │   ├── docs/specs/                # Trading system architecture
+│   │   ├── api/grpc/                  # gRPC proto definitions
 │   │   ├── internal/                  # OMS, risk, settlement, FIX, margin
 │   │   └── migrations/
 │   │
@@ -94,6 +95,7 @@ The main Claude session acts as **tech lead / orchestrator** — analyzing tasks
 │   │   ├── CLAUDE.md
 │   │   ├── .claude/agents/            # market-data-engineer
 │   │   ├── docs/specs/                # Architecture, API spec, data flow
+│   │   ├── api/grpc/                  # gRPC proto definitions
 │   │   ├── cmd/server/                # Entry point
 │   │   ├── internal/                  # API, service, repository, WebSocket
 │   │   ├── pkg/                       # Database, cache, Kafka, Polygon client
@@ -103,6 +105,7 @@ The main Claude session acts as **tech lead / orchestrator** — analyzing tasks
 │   │   ├── CLAUDE.md
 │   │   ├── .claude/agents/            # fund-engineer
 │   │   ├── docs/specs/                # Fund transfer architecture
+│   │   ├── api/grpc/                  # gRPC proto definitions
 │   │   ├── internal/                  # Bank, compliance, ledger, reconciliation
 │   │   └── migrations/
 │   │

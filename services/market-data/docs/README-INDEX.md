@@ -65,7 +65,7 @@
 ```
 加载顺序:
 1. docs/WEBSOCKET_MOCK.md (协议说明)
-2. proto/market_data.proto (Protobuf 定义)
+2. api/grpc/market_data.proto (Protobuf 定义)
 3. internal/websocket/hub.go (Hub 实现)
 4. internal/websocket/handler.go (Handler 实现)
 5. internal/websocket/mock_pusher.go (Mock 推送器)
@@ -164,7 +164,9 @@ market-service/
 │   ├── kafka/          # Kafka 消费者
 │   ├── cache/          # Redis 缓存
 │   └── database/       # 数据库连接
-├── proto/              # Protobuf 定义
+├── api/
+│   ├── grpc/          # Protobuf/gRPC 定义
+│   └── rest/          # REST OpenAPI specs
 ├── scripts/            # 脚本 (数据库初始化、代码生成)
 ├── docs/               # 文档
 └── examples/           # 示例代码

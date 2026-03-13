@@ -35,7 +35,8 @@ Responsibilities:
 | `docs/specs/websocket-mock.md` | WebSocket protocol and mock data spec |
 | `docs/prd/` | Domain PRDs (TBD) |
 | `docs/threads/` | Collaboration threads |
-| `proto/market_data.proto` | Protobuf message definitions |
+| `api/grpc/market_data.proto` | Protobuf message definitions |
+| `api/rest/` | REST OpenAPI specs (TBD) |
 | `scripts/init_db.sql` | MySQL schema and seed data |
 | `config/config.yaml` | Service configuration |
 

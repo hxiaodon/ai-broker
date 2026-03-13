@@ -221,7 +221,7 @@ type RawMessage struct {
 将不同数据源的私有格式统一为内部标准格式：
 
 ```protobuf
-// proto/market_data.proto
+// api/grpc/market_data.proto
 
 syntax = "proto3";
 package marketdata;

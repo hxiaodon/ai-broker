@@ -28,7 +28,7 @@ Authorization: Bearer <your_jwt_token>
 ### Protobuf 定义
 
 ```protobuf
-// proto/market_data.proto
+// api/grpc/market_data.proto
 
 message Quote {
   string symbol = 1;

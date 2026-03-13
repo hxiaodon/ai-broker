@@ -246,7 +246,7 @@ const (
 
 ## 11. API 设计
 
-见 `services/fund-transfer/proto/fund_transfer.proto`
+见 `api/grpc/fund_transfer.proto`
 
 **核心 RPC**
 - `SubmitDeposit` — 提交入金
