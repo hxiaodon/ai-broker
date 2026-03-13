@@ -38,6 +38,17 @@
 
 ---
 
+## v1.6 — UXUE 适配：v1.4/v1.5 设计稿同步 (2026-03-13)
+
+| 文件 | 修改内容 |
+|------|---------|
+| `profile.html` | 确认 PM v1.4 布局正确，无需变更 |
+| `settings.html` | 退出登录按钮：系统 `confirm()` 替换为自定义 Bottom Sheet（退出图标 + 确认/取消按钮 + 滑入动画）；新增 `sheet-enter`/`sheet-visible`/`overlay-fade` CSS |
+| `portfolio.html` | 持仓股票链接添加 `hover:bg-gray-50 active:bg-gray-100 transition-colors rounded-xl` 交互反馈 |
+| `market.html` | 游客 Tab 拦截：系统 `confirm()` 替换为自定义 Bottom Sheet 登录引导弹窗（锁图标 + 去登录/注册/继续浏览三个按钮） |
+
+---
+
 ## 变更总览
 
 | 页面 | 变更类型 | 优先级 | 影响范围 |

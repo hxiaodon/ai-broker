@@ -25,6 +25,7 @@ A cross-border securities brokerage mobile trading application targeting US and 
 | Security audit, penetration testing, compliance | security-engineer | Threat modeling, encryption, API security, PCI DSS compliance, data protection, vulnerability assessment |
 | Data analysis, metrics, reporting | data-analyst | Trading analytics, user behavior analysis, risk metrics, regulatory reporting, A/B testing |
 | Code review, PR review | code-reviewer | All code changes before merge |
+| **Spec architecture, doc organization, repo structure** | **sdd-expert** | **Spec taxonomy, .claude hierarchy design, legacy doc migration, context isolation audit, multi-product repo planning** |
 
 ### Orchestration Protocol
 
@@ -45,6 +46,7 @@ A cross-border securities brokerage mobile trading application targeting US and 
 - **Infrastructure Change**: you (plan) → devops-engineer → security-engineer (review) → code-reviewer
 - **New Trading Feature**: you (plan) → product-manager (PRD + compliance) → trading-engine-engineer (交易逻辑) → [ios-engineer + android-engineer] (parallel) → security-engineer → qa-engineer → code-reviewer
 - **Fund Transfer Feature**: you (plan) → product-manager (compliance spec) → fund-transfer-engineer (出入金逻辑) → security-engineer (AML review) → qa-engineer → code-reviewer
+- **Spec/Doc Restructure**: you (plan) → sdd-expert (audit + plan) → you (approve) → sdd-expert (execute migration)
 
 ## Tech Stack
 
@@ -197,6 +199,7 @@ mm update <doc-id> -c "New content"  # Update existing doc
 | `/compliance-audit` | Run a compliance audit against SEC/SFC regulatory checklist |
 | `/api-test` | Execute API integration tests against trading and account endpoints |
 | `/review-checklist` | Generate a domain-specific code review checklist for brokerage code |
+| `/sdd` | Specification-Driven Design: audit spec completeness, plan repo structure, migrate docs, scaffold .claude hierarchy |
 
 ## TODO
 - [ ] Configure PostgreSQL MCP server: add your connection string to `.mcp.json` → `mcpServers.postgres.args[2]`

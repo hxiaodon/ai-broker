@@ -10,6 +10,9 @@
         .tab-active { color: #1F2937; border-bottom: 2px solid #3B82F6; }
         .price-up { color: #10B981; }
         .price-down { color: #EF4444; }
+        .sheet-enter { transform: translateY(100%); }
+        .sheet-visible { transform: translateY(0); transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1); }
+        .overlay-fade { transition: opacity 0.25s ease; }
     </style>
 </head>
 <body class="bg-gray-50">
@@ -108,9 +111,7 @@
             document.querySelectorAll('.guest-block').forEach(function(el) {
                 el.addEventListener('click', function(e) {
                     e.preventDefault();
-                    if (confirm('登录后即可使用该功能，现在去登录？')) {
-                        window.location.href = 'login.html';
-                    }
+                    openGuestLoginSheet();
                 });
             });
         }
@@ -182,6 +183,49 @@
         });
 
         renderStocks();
+
+        /* ---- Guest login sheet ---- */
+        function openGuestLoginSheet() {
+            var overlay = document.getElementById('guestLoginSheet');
+            var panel = document.getElementById('guestLoginSheetPanel');
+            overlay.classList.remove('hidden');
+            requestAnimationFrame(function() {
+                panel.classList.remove('sheet-enter');
+                panel.classList.add('sheet-visible');
+            });
+        }
+        function closeGuestLoginSheet() {
+            var overlay = document.getElementById('guestLoginSheet');
+            var panel = document.getElementById('guestLoginSheetPanel');
+            panel.classList.remove('sheet-visible');
+            panel.classList.add('sheet-enter');
+            setTimeout(function() { overlay.classList.add('hidden'); }, 300);
+        }
     </script>
+
+    <!-- Guest Login Bottom Sheet -->
+    <div id="guestLoginSheet" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/50 overlay-fade" onclick="closeGuestLoginSheet()"></div>
+        <div class="absolute bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-2xl sheet-enter" id="guestLoginSheetPanel" onclick="event.stopPropagation()">
+            <div class="flex justify-center pt-3 pb-1">
+                <div class="w-9 h-1 bg-gray-300 rounded-full"></div>
+            </div>
+            <div class="px-5 pt-3 pb-8">
+                <div class="flex flex-col items-center mb-6">
+                    <div class="w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center mb-3">
+                        <svg class="w-7 h-7 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900">登录后即可使用</h3>
+                    <p class="text-sm text-gray-500 text-center mt-1.5">登录账户后可查看订单、持仓等信息</p>
+                </div>
+                <a href="login.html" class="block w-full py-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold rounded-xl text-base text-center mb-3 transition-colors">去登录</a>
+                <a href="login.html" class="block w-full py-3.5 text-blue-600 font-medium text-base text-center mb-3 hover:underline">注册新账户</a>
+                <button onclick="closeGuestLoginSheet()" class="w-full py-3.5 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-600 font-semibold rounded-xl text-base transition-colors">继续浏览行情</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

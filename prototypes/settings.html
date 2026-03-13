@@ -97,6 +97,10 @@
 
         /* Chevron icon */
         .chevron { color: #9CA3AF; }
+        /* Bottom sheet slide-up animation */
+        .sheet-enter { transform: translateY(100%); }
+        .sheet-visible { transform: translateY(0); transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1); }
+        .overlay-fade { transition: opacity 0.25s ease; }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -362,7 +366,7 @@
 
             <!-- Logout -->
             <div class="mt-6 px-4">
-                <button onclick="if(confirm('确认退出登录？')){window.location.href='login.html';}"
+                <button onclick="openLogoutSheet()"
                         class="w-full py-3.5 bg-white border border-gray-200 rounded-xl text-red-500 font-semibold text-base active:bg-gray-50 transition">
                     退出登录
                 </button>
@@ -710,6 +714,38 @@
     </div>
 
     <!-- ============================================================ -->
+    <!-- BOTTOM SHEET: 退出登录确认                                    -->
+    <!-- ============================================================ -->
+    <div id="sheet-logout" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/50 overlay-fade" onclick="closeLogoutSheet()"></div>
+        <div class="absolute bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-2xl sheet-enter" id="logoutSheet" onclick="event.stopPropagation()">
+            <div class="flex justify-center pt-3 pb-1">
+                <div class="w-9 h-1 bg-gray-300 rounded-full"></div>
+            </div>
+            <div class="px-5 pt-3 pb-8">
+                <div class="flex flex-col items-center mb-5">
+                    <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-3">
+                        <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-gray-900">确认退出登录？</h3>
+                    <p class="text-sm text-gray-500 text-center mt-1">退出后需要重新登录才能交易</p>
+                </div>
+                <button onclick="window.location.href='login.html'"
+                        class="w-full py-3.5 bg-red-500 hover:bg-red-600 active:bg-red-700 text-white font-semibold rounded-xl text-base mb-3 transition-colors">
+                    确认退出
+                </button>
+                <button onclick="closeLogoutSheet()"
+                        class="w-full py-3.5 bg-gray-100 hover:bg-gray-200 active:bg-gray-300 text-gray-600 font-semibold rounded-xl text-base transition-colors">
+                    取消
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
     <!-- TOAST                                                        -->
     <!-- ============================================================ -->
     <div id="toast" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 hidden">
@@ -831,6 +867,24 @@
     }
     function hidePDTSheet() {
         document.getElementById('sheet-pdt').classList.add('hidden');
+    }
+
+    /* ---- Logout sheet ---- */
+    function openLogoutSheet() {
+        var overlay = document.getElementById('sheet-logout');
+        var sheet = document.getElementById('logoutSheet');
+        overlay.classList.remove('hidden');
+        requestAnimationFrame(function() {
+            sheet.classList.remove('sheet-enter');
+            sheet.classList.add('sheet-visible');
+        });
+    }
+    function closeLogoutSheet() {
+        var overlay = document.getElementById('sheet-logout');
+        var sheet = document.getElementById('logoutSheet');
+        sheet.classList.remove('sheet-visible');
+        sheet.classList.add('sheet-enter');
+        setTimeout(function() { overlay.classList.add('hidden'); }, 300);
     }
 
     /* ---- Toast ---- */
