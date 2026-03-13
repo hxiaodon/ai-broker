@@ -61,6 +61,14 @@ External
  │
  ├──→ Market Data        [Polygon API (US), HKEX feed (HK)]
  └──→ Fund Transfer      [Bank channels (ACH/Wire/FPS)]
+
+Mobile (Flutter)
+ │
+ ├──◀ AMS               [auth, KYC, profile, notifications]
+ ├──◀ Trading Engine     [orders, positions, P&L, portfolio]
+ ├──◀ Market Data        [quotes, K-line, search, watchlist]
+ ├──◀ Fund Transfer      [balance, deposit/withdrawal, bank accounts]
+ └──→ H5 WebView        [JSBridge: token, camera, biometrics, navigation]
 ```
 
 **箭头方向**: Provider → Consumer（数据/能力的流向）
@@ -78,6 +86,11 @@ External
 | 7 | [trading-to-admin](trading-to-admin.md) | Trading Engine | Admin Panel | REST | DRAFT |
 | 8 | [market-data-to-admin](market-data-to-admin.md) | Market Data | Admin Panel | REST | DRAFT |
 | 9 | [fund-to-admin](fund-to-admin.md) | Fund Transfer | Admin Panel | REST | DRAFT |
+| 10 | [ams-to-mobile](ams-to-mobile.md) | AMS | Mobile | REST | DRAFT |
+| 11 | [trading-to-mobile](trading-to-mobile.md) | Trading Engine | Mobile | REST + WebSocket | DRAFT |
+| 12 | [market-data-to-mobile](market-data-to-mobile.md) | Market Data | Mobile | REST + WebSocket | DRAFT |
+| 13 | [fund-to-mobile](fund-to-mobile.md) | Fund Transfer | Mobile | REST | DRAFT |
+| 14 | [mobile-to-h5](mobile-to-h5.md) | Mobile (Flutter) | H5 WebView | JSBridge | DRAFT |
 
 ### Status Lifecycle
 
