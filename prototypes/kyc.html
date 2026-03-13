@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>开户申请 - 全球股票交易</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #2563EB 0%, #0EA5E9 100%);
+            transition: opacity 0.15s;
+        }
+        .btn-primary:hover {
+            opacity: 0.92;
+        }
+        .btn-primary:active {
+            opacity: 0.85;
+        }
+        .step { display: none; }
+        .step.active { display: block; }
+
+        .form-input {
+            width: 100%;
+            border: 1px solid #D1D5DB;
+            border-radius: 8px;
+            padding: 10px 12px;
+            font-size: 14px;
+            color: #111827;
+            background: #fff;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: #2563EB;
+            box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+        }
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 5px;
+        }
+        .form-label .req {
+            color: #EF4444;
+            margin-left: 2px;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        /* Radio & Checkbox custom */
+        .radio-card {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 12px;
+            border: 1px solid #E5E7EB;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #374151;
+            transition: border-color 0.15s, background 0.15s;
+        }
+        .radio-card input[type="radio"]:checked ~ .radio-label-text {
+            color: #2563EB;
+            font-weight: 500;
+        }
+        .radio-card:has(input:checked) {
+            border-color: #2563EB;
+            background: #EFF6FF;
+        }
+        .checkbox-card {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            padding: 9px 12px;
+            border: 1px solid #E5E7EB;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #374151;
+            transition: border-color 0.15s, background 0.15s;
+        }
+        .checkbox-card:has(input:checked) {
+            border-color: #2563EB;
+            background: #EFF6FF;
+        }
+
+        /* Progress bar */
+        .progress-fill {
+            height: 4px;
+            border-radius: 2px;
+            background: linear-gradient(90deg, #2563EB, #0EA5E9);
+            transition: width 0.4s ease;
+        }
+
+        /* Upload box */
+        .upload-box {
+            border: 2px dashed #D1D5DB;
+            border-radius: 12px;
+            padding: 24px 16px;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+            background: #F9FAFB;
+        }
+        .upload-box:hover {
+            border-color: #2563EB;
+            background: #EFF6FF;
+        }
+        .upload-box.uploaded {
+            border-color: #10B981;
+            background: #ECFDF5;
+        }
+
+        /* OCR result */
+        .ocr-result {
+            display: none;
+            background: #F0FDF4;
+            border: 1px solid #86EFAC;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+        .ocr-result.visible { display: block; }
+
+        /* Accordion */
+        .accordion-content {
+            display: none;
+            padding: 10px 0 4px 0;
+            font-size: 13px;
+            color: #4B5563;
+            line-height: 1.6;
+        }
+        .accordion-content.open { display: block; }
+        .accordion-icon {
+            transition: transform 0.2s;
+        }
+        .accordion-icon.rotated {
+            transform: rotate(180deg);
+        }
+
+        /* Timeline */
+        .timeline-dot-done { background: #2563EB; }
+        .timeline-dot-pending { background: #D1D5DB; }
+        .timeline-line { background: #E5E7EB; }
+
+        /* Section title */
+        .section-title {
+            font-size: 12px;
+            font-weight: 600;
+            color: #6B7280;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 8px;
+            margin-top: 20px;
+        }
+        .section-title:first-of-type { margin-top: 0; }
+
+        select.form-input {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236B7280' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            padding-right: 32px;
+        }
+
+        /* Scroll container */
+        .step-scroll {
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .tag-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+<div class="max-w-md mx-auto min-h-screen bg-white flex flex-col">
+
+    <!-- Fixed Header -->
+    <div class="sticky top-0 z-10 bg-white border-b border-gray-100">
+        <div class="flex items-center px-4 pt-4 pb-2 gap-3">
+            <button id="btn-back" onclick="goBack()" class="text-gray-500 hover:text-gray-800 flex items-center gap-1 text-sm shrink-0">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+                开户
+            </button>
+            <div class="flex-1">
+                <div class="flex items-center justify-between mb-1">
+                    <span id="step-label" class="text-xs font-medium text-blue-600">第 1 步 / 共 7 步</span>
+                    <span id="step-pct" class="text-xs text-gray-400">14%</span>
+                </div>
+                <div class="w-full bg-gray-100 rounded-full" style="height:4px;">
+                    <div id="progress-bar" class="progress-fill" style="width:14%;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Steps Container -->
+    <div class="flex-1 overflow-y-auto px-4 py-4 pb-28">
+
+        <!-- ========== CHECKPOINT RESUME PROMPT ========== -->
+        <div class="step" id="step-resume">
+            <div class="text-center pt-8 pb-4">
+                <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-blue-50 flex items-center justify-center">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="12" y1="18" x2="12" y2="12"/>
+                        <line x1="9" y1="15" x2="15" y2="15"/>
+                    </svg>
+                </div>
+                <h2 class="text-lg font-bold text-gray-900 mb-2">您有未完成的开户申请</h2>
+                <p class="text-sm text-gray-500 mb-1">上次您已完成到第 <span id="resume-step-num" class="font-semibold text-blue-600">4</span> 步</p>
+                <p class="text-xs text-gray-400">已填写信息已自动保存，可从上次位置继续</p>
+            </div>
+
+            <!-- Progress visual -->
+            <div class="bg-gray-50 rounded-2xl p-4 mb-6">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-xs text-gray-500">开户进度</span>
+                    <span class="text-xs font-semibold text-blue-600" id="resume-pct">57%</span>
+                </div>
+                <div class="w-full bg-gray-200 rounded-full" style="height:6px;">
+                    <div id="resume-progress" class="bg-blue-500 rounded-full transition-all" style="height:6px; width:57%;"></div>
+                </div>
+                <div class="flex justify-between mt-3 text-xs">
+                    <span class="text-green-600">1.个人</span>
+                    <span class="text-green-600">2.证件</span>
+                    <span class="text-green-600">3.财务</span>
+                    <span class="text-blue-600 font-semibold">4.评估</span>
+                    <span class="text-gray-300">5.税务</span>
+                    <span class="text-gray-300">6.披露</span>
+                    <span class="text-gray-300">7.签署</span>
+                </div>
+            </div>
+
+            <button onclick="resumeFromStep(4)"
+                class="w-full btn-primary text-white font-semibold py-3.5 rounded-xl text-base transition mb-3">
+                继续申请
+            </button>
+            <button onclick="restartKYC()"
+                class="w-full bg-gray-100 text-gray-600 font-medium py-3 rounded-xl text-sm active:bg-gray-200 transition">
+                重新开始
+            </button>
+            <p class="text-center text-xs text-gray-400 mt-3">已保存的信息可随时修改</p>
+        </div>
+
+        <!-- ========== STEP 1: 个人信息 + 就业状态 ========== -->
+        <div class="step active" id="step-1">
+            <h2 class="text-lg font-semibold text-gray-900 mb-1">个人基本信息</h2>
+            <p class="text-xs text-gray-500 mb-4">请填写与证件一致的信息，用于账户开立及监管合规。</p>
+
+            <div class="section-title">证件姓名</div>
+            <div class="grid grid-cols-2 gap-3">
+                <div class="form-group">
+                    <label class="form-label">姓（英文）<span class="req">*</span></label>
+                    <input type="text" class="form-input" placeholder="e.g. ZHANG" autocomplete="family-name">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">名（英文）<span class="req">*</span></label>
+                    <input type="text" class="form-input" placeholder="e.g. WEI" autocomplete="given-name">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">中文姓名</label>
+                <input type="text" class="form-input" placeholder="张伟（如有）">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">出生日期<span class="req">*</span></label>
+                <input type="date" class="form-input" max="2008-01-01">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">国籍<span class="req">*</span></label>
+                <select class="form-input">
+                    <option value="">请选择</option>
+                    <option value="CN">中国大陆</option>
+                    <option value="HK">中国香港</option>
+                    <option value="TW">中国台湾</option>
+                    <option value="US">美国</option>
+                    <option value="SG">新加坡</option>
+                    <option value="OTHER">其他</option>
+                </select>
+            </div>
+
+            <div class="section-title">证件信息</div>
+            <div class="form-group">
+                <label class="form-label">证件类型<span class="req">*</span></label>
+                <div class="grid grid-cols-3 gap-2 mt-1">
+                    <label class="radio-card">
+                        <input type="radio" name="id-type" value="id-card" class="accent-blue-600" checked>
+                        <span class="radio-label-text">身份证</span>
+                    </label>
+                    <label class="radio-card">
+                        <input type="radio" name="id-type" value="passport" class="accent-blue-600">
+                        <span class="radio-label-text">护照</span>
+                    </label>
+                    <label class="radio-card">
+                        <input type="radio" name="id-type" value="hk-pass" class="accent-blue-600">
+                        <span class="radio-label-text">港澳通行证</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">证件号码<span class="req">*</span></label>
+                <input type="text" class="form-input" placeholder="请输入证件号码">
+            </div>
+
+            <div class="section-title">就业状态</div>
+            <div class="form-group">
+                <label class="form-label">当前就业状态<span class="req">*</span></label>
+                <div class="flex flex-col gap-2 mt-1">
+                    <label class="radio-card">
+                        <input type="radio" name="employment" value="employed" class="accent-blue-600" checked>
+                        <span class="radio-label-text">在职（受雇）</span>
+                    </label>
+                    <label class="radio-card">
+                        <input type="radio" name="employment" value="self-employed" class="accent-blue-600">
+                        <span class="radio-label-text">自雇 / 自营</span>
+                    </label>
+                    <label class="radio-card">
+                        <input type="radio" name="employment" value="retired" class="accent-blue-600">
+                        <span class="radio-label-text">退休</span>
+                    </label>
+                    <label class="radio-card">
+                        <input type="radio" name="employment" value="student" class="accent-blue-600">
+                        <span class="radio-label-text">学生</span>
+                    </label>
+                    <label class="radio-card">
+                        <input type="radio" name="employment" value="unemployed" class="accent-blue-600">
+                        <span class="radio-label-text">无业 / 家庭主妇</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="section-title">合规申报</div>
+            <p class="text-xs text-gray-500 mb-2">以下任一适用请勾选，否则留空。</p>
+            <div class="flex flex-col gap-2">
+                <label class="checkbox-card">
+                    <input type="checkbox" class="accent-blue-600 mt-0.5 shrink-0">
+                    <span>本人为上市公司或其关联公司的<strong>董事、高管或主要股东</strong></span>
+                </label>
+                <label class="checkbox-card">
+                    <input type="checkbox" class="accent-blue-600 mt-0.5 shrink-0">
+                    <span>本人或配偶现为<strong>证券从业人员</strong>（持牌中介机构）</span>
+                </label>
+                <label class="checkbox-card">
+                    <input type="checkbox" class="accent-blue-600 mt-0.5 shrink-0">
+                    <span>本人为<strong>政治敏感人士（PEP）</strong>或其直系亲属</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- ========== STEP 2: 证件上传 ========== -->
+        <div class="step" id="step-2">
+            <h2 class="text-lg font-semibold text-gray-900 mb-1">证件上传</h2>
+            <p class="text-xs text-gray-500 mb-4">请上传清晰的证件照片，四角完整，无反光遮挡。支持 JPG / PNG，文件不超过 10MB。</p>
+
+            <!-- Front -->
+            <div class="form-group">
+                <label class="form-label">证件正面（人像面）<span class="req">*</span></label>
+                <div class="upload-box" id="upload-front" onclick="simulateUpload('front')">
+                    <div id="upload-front-idle">
+                        <svg class="mx-auto mb-2 text-gray-400" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+                            <circle cx="12" cy="13" r="4"/>
+                        </svg>
+                        <p class="text-sm text-gray-500 font-medium">点击拍照或上传</p>
+                        <p class="text-xs text-gray-400 mt-1">建议在充足光线下拍摄</p>
+                    </div>
+                    <div id="upload-front-done" class="hidden">
+                        <svg class="mx-auto mb-1 text-green-500" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+                        <p class="text-sm text-green-600 font-medium">上传成功</p>
+                        <p class="text-xs text-gray-400 mt-0.5">id_front.jpg</p>
+                    </div>
+                </div>
+                <div class="ocr-result" id="ocr-front">
+                    <div class="flex items-center gap-1.5 mb-2">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+                        <span class="text-green-700 font-semibold text-xs">OCR 识别成功</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-1 text-xs text-gray-600">
+                        <span class="text-gray-400">姓名</span><span class="font-medium">张　伟</span>
+                        <span class="text-gray-400">证件号</span><span class="font-medium">110101199001011234</span>
+                        <span class="text-gray-400">出生日期</span><span class="font-medium">1990-01-01</span>
+                        <span class="text-gray-400">性别</span><span class="font-medium">男</span>
+                    </div>
+                    <p class="text-xs text-amber-600 mt-2">* 请核对以上信息是否正确，如有偏差请重新上传。</p>
+                </div>
+            </div>
+
+            <!-- Back -->
+            <div class="form-group mt-4">
+                <label class="form-label">证件背面<span class="req">*</span></label>
+                <div class="upload-box" id="upload-back" onclick="simulateUpload('back')">
+                    <div id="upload-back-idle">
+                        <svg class="mx-auto mb-2 text-gray-400" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+                            <circle cx="12" cy="13" r="4"/>
+                        </svg>
+                        <p class="text-sm text-gray-500 font-medium">点击拍照或上传</p>
+                        <p class="text-xs text-gray-400 mt-1">确保国徽及有效期清晰可见</p>
+                    </div>
+                    <div id="upload-back-done" class="hidden">
+                        <svg class="mx-auto mb-1 text-green-500" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+                        <p class="text-sm text-green-600 font-medium">上传成功</p>
+                        <p class="text-xs text-gray-400 mt-0.5">id_back.jpg</p>
+                    </div>
+                </div>
+                <div class="ocr-result" id="ocr-back">
+                    <div class="flex items-center gap-1.5 mb-2">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+                        <span class="text-green-700 font-semibold text-xs">OCR 识别成功</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-1 text-xs text-gray-600">
+                        <span class="text-gray-400">签发机关</span><span class="font-medium">北京市公安局东城分局</span>
+                        <span class="text-gray-400">有效期</span><span class="font-medium">2020.01.01 — 2030.01.01</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 mt-2">
+                <div class="flex gap-2 items-start">
+                    <svg class="text-blue-500 shrink-0 mt-0.5" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+                    <p class="text-xs text-blue-700">您的证件信息将通过 AES-256 加密存储，仅用于 KYC 核验，符合 SFC 及 SEC 监管要求。</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== STEP 3: 财务状况 ========== -->
+        <div class="step" id="step-3">
+            <h2 class="text-lg font-semibold text-gray-900 mb-1">财务状况</h2>
+            <p class="text-xs text-gray-500 mb-4">以下信息用于评估您的投资能力及合规风险，数据受严格保密。</p>
+
+            <div class="form-group">
+                <label class="form-label">年收入（税前，USD）<span class="req">*</span></label>
+                <div class="flex flex-col gap-2">
+                    <label class="radio-card"><input type="radio" name="income" value="1" class="accent-blue-600"><span class="radio-label-text">< $25,000</span></label>
+                    <label class="radio-card"><input type="radio" name="income" value="2" class="accent-blue-600" checked><span class="radio-label-text">$25,000 — $50,000</span></label>
+                    <label class="radio-card"><input type="radio" name="income" value="3" class="accent-blue-600"><span class="radio-label-text">$50,000 — $100,000</span></label>
+                    <label class="radio-card"><input type="radio" name="income" value="4" class="accent-blue-600"><span class="radio-label-text">$100,000 — $200,000</span></label>
+                    <label class="radio-card"><input type="radio" name="income" value="5" class="accent-blue-600"><span class="radio-label-text">> $200,000</span></label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">总净资产（含房产等，USD）<span class="req">*</span></label>
+                <div class="flex flex-col gap-2">
+                    <label class="radio-card"><input type="radio" name="net-assets" value="1" class="accent-blue-600"><span class="radio-label-text">< $50,000</span></label>
+                    <label class="radio-card"><input type="radio" name="net-assets" value="2" class="accent-blue-600" checked><span class="radio-label-text">$50,000 — $100,000</span></label>
+                    <label class="radio-card"><input type="radio" name="net-assets" value="3" class="accent-blue-600"><span class="radio-label-text">$100,000 — $500,000</span></label>
+                    <label class="radio-card"><input type="radio" name="net-assets" value="4" class="accent-blue-600"><span class="radio-label-text">$500,000 — $1,000,000</span></label>
+                    <label class="radio-card"><input type="radio" name="net-assets" value="5" class="accent-blue-600"><span class="radio-label-text">> $1,000,000</span></label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">流动净资产（可随时变现，USD）<span class="req">*</span></label>
+                <div class="flex flex-col gap-2">
+                    <label class="radio-card"><input type="radio" name="liquid-assets" value="1" class="accent-blue-600"><span class="radio-label-text">< $10,000</span></label>
+                    <label class="radio-card"><input type="radio" name="liquid-assets" value="2" class="accent-blue-600" checked><span class="radio-label-text">$10,000 — $50,000</span></label>
+                    <label class="radio-card"><input type="radio" name="liquid-assets" value="3" class="accent-blue-600"><span class="radio-label-text">$50,000 — $200,000</span></label>
+                    <label class="radio-card"><input type="radio" name="liquid-assets" value="4" class="accent-blue-600"><span class="radio-label-text">> $200,000</span></label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">资金来源<span class="req">*</span></label>
+                <p class="text-xs text-gray-400 mb-2">（可多选）</p>
+                <div class="flex flex-col gap-2">
+                    <label class="checkbox-card"><input type="checkbox" class="accent-blue-600 shrink-0" checked><span>工资薪酬 / 劳务报酬</span></label>
+                    <label class="checkbox-card"><input type="checkbox" class="accent-blue-600 shrink-0"><span>经营所得（自雇 / 企业利润）</span></label>
+                    <label class="checkbox-card"><input type="checkbox" class="accent-blue-600 shrink-0"><span>投资收益（股票、基金、债券等）</span></label>
+                    <label class="checkbox-card"><input type="checkbox" class="accent-blue-600 shrink-0"><span>房产租金 / 出售收益</span></label>
+                    <label class="checkbox-card"><input type="checkbox" class="accent-blue-600 shrink-0"><span>继承或赠与</span></label>
+                    <label class="checkbox-card"><input type="checkbox" class="accent-blue-600 shrink-0"><span>其他（请在下方说明）</span></label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">其他资金来源说明</label>
+                <input type="text" class="form-input" placeholder="如为其他，请简要说明">
+            </div>
+        </div>
+
+        <!-- ========== STEP 4: 投资评估 ========== -->
+        <div class="step" id="step-4">
+            <h2 class="text-lg font-semibold text-gray-900 mb-1">投资经验评估</h2>
+            <p class="text-xs text-gray-500 mb-4">根据 SFC 及 FINRA 要求，我们需要了解您的投资背景以评估适合您的产品。</p>
+
+            <div class="form-group">
+                <label class="form-label">证券投资经验年限<span class="req">*</span></label>
+                <div class="flex flex-col gap-2">
+                    <label class="radio-card"><input type="radio" name="exp-years" value="0" class="accent-blue-600"><span class="radio-label-text">无经验（新手投资者）</span></label>
+                    <label class="radio-card"><input type="radio" name="exp-years" value="1" class="accent-blue-600" checked><span class="radio-label-text">1 — 3 年</span></label>
+                    <label class="radio-card"><input type="radio" name="exp-years" value="2" class="accent-blue-600"><span class="radio-label-text">3 — 5 年</span></label>
+                    <label class="radio-card"><input type="radio" name="exp-years" value="3" class="accent-blue-600"><span class="radio-label-text">5 年以上</span></label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">过去一年平均交易频率<span class="req">*</span></label>
+                <div class="flex flex-col gap-2">
+                    <label class="radio-card"><input type="radio" name="freq" value="0" class="accent-blue-600"><span class="radio-label-text">从未交易</span></label>
+                    <label class="radio-card"><input type="radio" name="freq" value="1" class="accent-blue-600"><span class="radio-label-text">偶尔（每年少于 10 次）</span></label>
+                    <label class="radio-card"><input type="radio" name="freq" value="2" class="accent-blue-600" checked><span class="radio-label-text">一般（每月 1 — 10 次）</span></label>
+                    <label class="radio-card"><input type="radio" name="freq" value="3" class="accent-blue-600"><span class="radio-label-text">频繁（每日多次）</span></label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">曾交易或了解的产品类型<span class="req">*</span></label>
+                <p class="text-xs text-gray-400 mb-2">（可多选）</p>
+                <div class="flex flex-col gap-2">
+                    <label class="checkbox-card"><input type="checkbox" class="accent-blue-600 shrink-0" checked><span>港股 / 美股（现货股票）</span></label>
+                    <label class="checkbox-card"><input type="checkbox" class="accent-blue-600 shrink-0"><span>ETF / 指数基金</span></label>
+                    <label class="checkbox-card"><input type="checkbox" class="accent-blue-600 shrink-0"><span>债券 / 固定收益产品</span></label>
+                    <label class="checkbox-card"><input type="checkbox" class="accent-blue-600 shrink-0"><span>期权（Options）</span></label>
+                    <label class="checkbox-card"><input type="checkbox" class="accent-blue-600 shrink-0"><span>期货 / 衍生品</span></label>
+                    <label class="checkbox-card"><input type="checkbox" class="accent-blue-600 shrink-0"><span>杠杆 / 反向产品</span></label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">主要投资目标<span class="req">*</span></label>
+                <div class="flex flex-col gap-2">
+                    <label class="radio-card"><input type="radio" name="obj" value="0" class="accent-blue-600"><span class="radio-label-text">资本保值（安全为主）</span></label>
+                    <label class="radio-card"><input type="radio" name="obj" value="1" class="accent-blue-600" checked><span class="radio-label-text">稳健增长（兼顾安全与收益）</span></label>
+                    <label class="radio-card"><input type="radio" name="obj" value="2" class="accent-blue-600"><span class="radio-label-text">积极增值（可承受一定波动）</span></label>
+                    <label class="radio-card"><input type="radio" name="obj" value="3" class="accent-blue-600"><span class="radio-label-text">高风险高回报（最大化收益）</span></label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">风险承受能力<span class="req">*</span></label>
+                <div class="flex flex-col gap-2">
+                    <label class="radio-card"><input type="radio" name="risk" value="0" class="accent-blue-600"><span class="radio-label-text"><span class="tag-badge bg-green-100 text-green-700 mr-1">保守</span>不愿承受任何本金损失</span></label>
+                    <label class="radio-card"><input type="radio" name="risk" value="1" class="accent-blue-600"><span class="radio-label-text"><span class="tag-badge bg-blue-100 text-blue-700 mr-1">稳健</span>可接受小幅波动（≤ 10%）</span></label>
+                    <label class="radio-card"><input type="radio" name="risk" value="2" class="accent-blue-600" checked><span class="radio-label-text"><span class="tag-badge bg-yellow-100 text-yellow-700 mr-1">平衡</span>可承受中等波动（≤ 30%）</span></label>
+                    <label class="radio-card"><input type="radio" name="risk" value="3" class="accent-blue-600"><span class="radio-label-text"><span class="tag-badge bg-orange-100 text-orange-700 mr-1">进取</span>可承受较大波动（≤ 50%）</span></label>
+                    <label class="radio-card"><input type="radio" name="risk" value="4" class="accent-blue-600"><span class="radio-label-text"><span class="tag-badge bg-red-100 text-red-700 mr-1">激进</span>可承受大幅本金损失</span></label>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== STEP 5: 税务 W-8BEN ========== -->
+        <div class="step" id="step-5">
+            <h2 class="text-lg font-semibold text-gray-900 mb-1">税务信息申报</h2>
+            <p class="text-xs text-gray-500 mb-4">依据 FATCA 及 CRS 要求，我们需要收集您的税务居住信息。</p>
+
+            <div class="form-group">
+                <label class="form-label">您是否为<strong>美国税务居民</strong>？<span class="req">*</span></label>
+                <p class="text-xs text-gray-400 mb-2">（含美国公民、绿卡持有者、满足实质居留测试者）</p>
+                <div class="flex gap-3">
+                    <label class="radio-card flex-1">
+                        <input type="radio" name="us-tax" value="yes" class="accent-blue-600" onclick="toggleW8BEN(false)">
+                        <span class="radio-label-text">是</span>
+                    </label>
+                    <label class="radio-card flex-1">
+                        <input type="radio" name="us-tax" value="no" class="accent-blue-600" checked onclick="toggleW8BEN(true)">
+                        <span class="radio-label-text">否</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- US Tax Person Warning -->
+            <div id="us-tax-warning" class="hidden bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4">
+                <div class="flex gap-2 items-start">
+                    <svg class="text-amber-500 shrink-0 mt-0.5" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                    <p class="text-xs text-amber-700">作为美国税务居民，您的账户将受到 FATCA 预扣税要求的约束。我们将收集您的 <strong>W-9 表格</strong>信息，并就股息及资本利得进行税务申报。</p>
+                </div>
+            </div>
+
+            <!-- W-8BEN Section -->
+            <div id="w8ben-section">
+                <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 mb-4">
+                    <p class="text-xs text-blue-700 font-semibold mb-1">W-8BEN 表格申报（非美国居民）</p>
+                    <p class="text-xs text-blue-600">以下信息将用于生成您的 W-8BEN 表格，以证明您的非美国纳税人身份，并申请适用的税收协定优惠。</p>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">税务居住国<span class="req">*</span></label>
+                    <select class="form-input">
+                        <option value="">请选择</option>
+                        <option value="CN" selected>中国</option>
+                        <option value="HK">香港</option>
+                        <option value="SG">新加坡</option>
+                        <option value="GB">英国</option>
+                        <option value="AU">澳大利亚</option>
+                        <option value="OTHER">其他</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">纳税人识别号（TIN）</label>
+                    <p class="text-xs text-gray-400 mb-1.5">中国居民填写身份证号；如所在国不颁发 TIN，可留空并勾选下方原因。</p>
+                    <input type="text" class="form-input" placeholder="例：110101199001011234">
+                </div>
+
+                <div class="form-group">
+                    <label class="checkbox-card">
+                        <input type="checkbox" class="accent-blue-600 shrink-0 mt-0.5">
+                        <span class="text-xs">我的税务居住国不颁发 TIN / 免于提供 TIN</span>
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">是否申请税收协定优惠？</label>
+                    <div class="flex gap-3">
+                        <label class="radio-card flex-1">
+                            <input type="radio" name="tax-treaty" value="yes" class="accent-blue-600" checked>
+                            <span class="radio-label-text">是</span>
+                        </label>
+                        <label class="radio-card flex-1">
+                            <input type="radio" name="tax-treaty" value="no" class="accent-blue-600">
+                            <span class="radio-label-text">否</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">适用税收协定条款</label>
+                    <p class="text-xs text-gray-400 mb-1.5">按照中美税收协定第 10 条，股息预扣税率为 10%（标准税率为 30%）。</p>
+                    <input type="text" class="form-input" value="第 10 条（股息）" placeholder="协定条款">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">协定适用税率（股息预扣税）</label>
+                    <input type="text" class="form-input" value="10%" placeholder="例：10%">
+                </div>
+
+                <div class="bg-gray-50 border border-gray-200 rounded-xl p-3 mt-2">
+                    <p class="text-xs text-gray-500">提交本申报即表示您确认所提供信息真实、完整、准确，且您了解故意提供虚假信息可能构成违法行为。W-8BEN 有效期为签署日起三年，或在情况发生变更时需重新提交。</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== STEP 6: 风险披露 ========== -->
+        <div class="step" id="step-6">
+            <h2 class="text-lg font-semibold text-gray-900 mb-1">风险披露书</h2>
+            <p class="text-xs text-gray-500 mb-4">请仔细阅读以下 5 份风险披露文件，逐项确认后方可进入下一步。</p>
+
+            <div class="flex flex-col gap-2 mb-5" id="accordion-list">
+
+                <!-- Accordion Item 1: 证券交易风险揭示书 -->
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <button class="w-full flex items-center justify-between px-4 py-3 text-left bg-white hover:bg-gray-50 transition-colors" onclick="toggleAccordion(1)">
+                        <span class="text-sm font-medium text-gray-800">1. 证券交易风险揭示书</span>
+                        <svg id="acc-icon-1" class="accordion-icon text-gray-400 shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                    </button>
+                    <div class="accordion-content px-4" id="acc-1">
+                        证券价格受市场供需、宏观经济、政策变化、企业业绩等多重因素影响，可能出现剧烈波动。投资者可能损失全部或部分本金。过往业绩不代表未来表现。本揭示书旨在提醒您注意证券投资中固有的各类风险，包括但不限于市场风险、流动性风险、汇率风险及政策风险。请在充分了解风险的前提下，根据自身财务状况审慎做出投资决策。
+                    </div>
+                    <label class="flex items-center gap-2 px-4 py-2.5 bg-gray-50 border-t border-gray-100 cursor-pointer">
+                        <input type="checkbox" class="risk-check accent-blue-600" onchange="updateRiskConfirm()">
+                        <span class="text-xs text-gray-600 font-medium">我已阅读并理解</span>
+                    </label>
+                </div>
+
+                <!-- Accordion Item 2: 美股市场风险声明 -->
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <button class="w-full flex items-center justify-between px-4 py-3 text-left bg-white hover:bg-gray-50 transition-colors" onclick="toggleAccordion(2)">
+                        <span class="text-sm font-medium text-gray-800">2. 美股市场风险声明</span>
+                        <svg id="acc-icon-2" class="accordion-icon text-gray-400 shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                    </button>
+                    <div class="accordion-content px-4" id="acc-2">
+                        美国证券市场不设涨跌幅限制，股票价格可能在单日内出现大幅波动。盘前盘后交易（Extended Hours）流动性较低，价差可能显著扩大。美股采用 T+1 结算制度（自 2024 年 5 月起），资金将在成交后第 1 个交易日完成交割。日内交易者（Pattern Day Trader）须维持账户净值不低于 $25,000 USD。美股以美元计价，人民币/港币投资者将承受汇率波动风险。
+                    </div>
+                    <label class="flex items-center gap-2 px-4 py-2.5 bg-gray-50 border-t border-gray-100 cursor-pointer">
+                        <input type="checkbox" class="risk-check accent-blue-600" onchange="updateRiskConfirm()">
+                        <span class="text-xs text-gray-600 font-medium">我已阅读并理解</span>
+                    </label>
+                </div>
+
+                <!-- Accordion Item 3: 港股市场风险声明 -->
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <button class="w-full flex items-center justify-between px-4 py-3 text-left bg-white hover:bg-gray-50 transition-colors" onclick="toggleAccordion(3)">
+                        <span class="text-sm font-medium text-gray-800">3. 港股市场风险声明</span>
+                        <svg id="acc-icon-3" class="accordion-icon text-gray-400 shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                    </button>
+                    <div class="accordion-content px-4" id="acc-3">
+                        港股实行 T+2 交收制度，交易以"手"（Board Lot）为最小单位，不同股票每手股数不同。港股交易时段分为早市（9:30-12:00）及午市（13:00-16:00 HKT），中午休市。港股交易涉及印花税（0.13%）、交易征费、交收费等多项费用。部分港股流动性较低，可能出现较大买卖价差。港股以港元计价，跨境投资者需关注港元兑本币汇率变动。
+                    </div>
+                    <label class="flex items-center gap-2 px-4 py-2.5 bg-gray-50 border-t border-gray-100 cursor-pointer">
+                        <input type="checkbox" class="risk-check accent-blue-600" onchange="updateRiskConfirm()">
+                        <span class="text-xs text-gray-600 font-medium">我已阅读并理解</span>
+                    </label>
+                </div>
+
+                <!-- Accordion Item 4: PDT 规则说明 -->
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <button class="w-full flex items-center justify-between px-4 py-3 text-left bg-white hover:bg-gray-50 transition-colors" onclick="toggleAccordion(4)">
+                        <span class="text-sm font-medium text-gray-800">4. PDT 规则说明</span>
+                        <svg id="acc-icon-4" class="accordion-icon text-gray-400 shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                    </button>
+                    <div class="accordion-content px-4" id="acc-4">
+                        Pattern Day Trader (PDT) 是指在 5 个连续交易日内，在同一保证金账户中进行 4 次或以上日内交易（当日买入后当日卖出，或当日卖空后当日买回）的交易者。被认定为 PDT 后，FINRA 规则要求账户净资产须维持在 $25,000 USD 以上，否则将被限制日内交易 90 天。现金账户不受 PDT 规则限制，但受 T+1 资金结算约束。本平台将在您触发第 3 次日内交易时予以预警提示。
+                    </div>
+                    <label class="flex items-center gap-2 px-4 py-2.5 bg-gray-50 border-t border-gray-100 cursor-pointer">
+                        <input type="checkbox" class="risk-check accent-blue-600" onchange="updateRiskConfirm()">
+                        <span class="text-xs text-gray-600 font-medium">我已阅读并理解</span>
+                    </label>
+                </div>
+
+                <!-- Accordion Item 5: Best Execution 披露 -->
+                <div class="border border-gray-200 rounded-xl overflow-hidden">
+                    <button class="w-full flex items-center justify-between px-4 py-3 text-left bg-white hover:bg-gray-50 transition-colors" onclick="toggleAccordion(5)">
+                        <span class="text-sm font-medium text-gray-800">5. Best Execution 披露</span>
+                        <svg id="acc-icon-5" class="accordion-icon text-gray-400 shrink-0" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                    </button>
+                    <div class="accordion-content px-4" id="acc-5">
+                        根据 SEC Reg NMS 及 SFC 最佳执行义务要求，本平台致力于为客户订单取得最优执行结果。订单可能被路由至不同交易场所（NYSE、NASDAQ、HKEX 等）以获得最优价格。订单执行价格可能与提交时的报价存在差异（尤其是市价单及盘前盘后交易）。您可在订单详情中查看每笔成交的执行场所、成交价格及 NBBO（全国最优买卖报价）信息。本平台的订单路由政策不涉及 PFOF（Payment for Order Flow）。
+                    </div>
+                    <label class="flex items-center gap-2 px-4 py-2.5 bg-gray-50 border-t border-gray-100 cursor-pointer">
+                        <input type="checkbox" class="risk-check accent-blue-600" onchange="updateRiskConfirm()">
+                        <span class="text-xs text-gray-600 font-medium">我已阅读并理解</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4">
+                <p class="text-xs text-amber-700">证券投资涉及风险，过往业绩不代表未来表现。请在充分理解上述风险后，根据自身财务状况及风险承受能力审慎投资。</p>
+            </div>
+
+            <div id="risk-all-hint" class="text-xs text-red-500 mb-2 hidden">请逐项阅读并勾选上方所有风险披露确认</div>
+        </div>
+
+        <!-- ========== STEP 7: 协议签署 ========== -->
+        <div class="step" id="step-7">
+            <h2 class="text-lg font-semibold text-gray-900 mb-1">协议签署</h2>
+            <p class="text-xs text-gray-500 mb-4">请阅读并同意以下所有协议，然后以电子签名方式确认您的开户申请。</p>
+
+            <div class="flex flex-col gap-2 mb-5">
+                <label class="checkbox-card">
+                    <input type="checkbox" class="agreement-check accent-blue-600 shrink-0 mt-0.5">
+                    <span class="text-sm">我已阅读并同意 <a href="#" class="text-blue-600 underline" onclick="return false;">《客户协议》</a>，包括账户条款、费率表及订单执行政策。</span>
+                </label>
+                <label class="checkbox-card">
+                    <input type="checkbox" class="agreement-check accent-blue-600 shrink-0 mt-0.5">
+                    <span class="text-sm">我已阅读并同意 <a href="#" class="text-blue-600 underline" onclick="return false;">《隐私政策》</a>，了解平台如何收集、使用和保护我的个人信息。</span>
+                </label>
+                <label class="checkbox-card">
+                    <input type="checkbox" class="agreement-check accent-blue-600 shrink-0 mt-0.5">
+                    <span class="text-sm">我已阅读并同意 <a href="#" class="text-blue-600 underline" onclick="return false;">《电子通讯同意书》</a>，同意通过电子方式接收账户通知、交易确认及合规文件。</span>
+                </label>
+                <label class="checkbox-card">
+                    <input type="checkbox" class="agreement-check accent-blue-600 shrink-0 mt-0.5">
+                    <span class="text-sm">我已阅读并同意 <a href="#" class="text-blue-600 underline" onclick="return false;">《交易所数据使用协议》</a>，了解行情数据的使用限制及许可条款。</span>
+                </label>
+                <label class="checkbox-card">
+                    <input type="checkbox" class="agreement-check accent-blue-600 shrink-0 mt-0.5">
+                    <span class="text-sm">我已阅读并同意 <a href="#" class="text-blue-600 underline" onclick="return false;">《反洗钱声明》</a>，同意平台对我的账户及交易进行合规审查。</span>
+                </label>
+            </div>
+
+            <!-- E-Signature -->
+            <div class="form-group">
+                <label class="form-label">电子签名<span class="req">*</span></label>
+                <p class="text-xs text-gray-400 mb-2">请输入您的全名（与证件姓名一致）以完成电子签署</p>
+                <input type="text" id="esig-input" class="form-input" placeholder="请输入姓名以签署" oninput="updateSubmitBtn()">
+            </div>
+
+            <div class="bg-gray-50 border border-gray-200 rounded-xl p-3 mt-1 mb-2">
+                <p class="text-xs text-gray-500">签署时间：<span id="sign-time"></span></p>
+                <p class="text-xs text-gray-500 mt-0.5">本电子签名具有与手写签名同等的法律效力，符合《电子交易条例》（香港）及《ESIGN Act》（美国）的相关规定。</p>
+            </div>
+
+            <button id="submit-btn" onclick="submitForm()" disabled
+                class="w-full btn-primary text-white py-3.5 rounded-xl font-semibold text-base disabled:opacity-40 disabled:cursor-not-allowed transition-opacity">
+                提交开户申请
+            </button>
+            <p class="text-center text-xs text-gray-400 mt-3">提交后，我们将在 1 — 2 个工作日内完成审核</p>
+        </div>
+
+        <!-- ========== REVIEW PAGE ========== -->
+        <div class="step" id="step-review">
+            <div class="text-center pt-4 pb-6">
+                <!-- Hourglass icon -->
+                <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-blue-50 flex items-center justify-center">
+                    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M5 22h14"/>
+                        <path d="M5 2h14"/>
+                        <path d="M17 22v-4.172a2 2 0 00-.586-1.414L12 12l-4.414 4.414A2 2 0 007 17.828V22"/>
+                        <path d="M7 2v4.172a2 2 0 00.586 1.414L12 12l4.414-4.414A2 2 0 0017 6.172V2"/>
+                    </svg>
+                </div>
+                <h2 class="text-xl font-bold text-gray-900 mb-2">申请已提交</h2>
+                <p class="text-sm text-gray-500 mb-1">开户审核进行中，预计 <strong class="text-gray-700">1 — 2 个工作日</strong> 完成</p>
+                <p class="text-xs text-gray-400 mb-6">申请编号：<span class="font-mono text-gray-600">KYC-2026-031200482</span></p>
+            </div>
+
+            <!-- Progress Timeline -->
+            <div class="mb-6">
+                <h3 class="text-sm font-semibold text-gray-700 mb-4">审核进度</h3>
+                <div class="relative pl-8">
+                    <!-- Line -->
+                    <div class="absolute left-3 top-2 bottom-2 w-0.5 bg-gray-200 rounded"></div>
+
+                    <!-- Step 1: Done -->
+                    <div class="relative mb-5">
+                        <div class="absolute -left-8 top-0.5 w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center">
+                            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>
+                        </div>
+                        <p class="text-sm font-medium text-gray-800">资料提交完成</p>
+                        <p class="text-xs text-gray-400 mt-0.5">2026-03-12 14:23</p>
+                    </div>
+
+                    <!-- Step 2: In Progress -->
+                    <div class="relative mb-5">
+                        <div class="absolute -left-8 top-0.5 w-5 h-5 rounded-full bg-blue-600 flex items-center justify-center">
+                            <div class="w-2.5 h-2.5 rounded-full bg-white animate-pulse"></div>
+                        </div>
+                        <p class="text-sm font-medium text-gray-800">KYC 身份核验</p>
+                        <p class="text-xs text-blue-600 mt-0.5 font-medium">进行中…</p>
+                        <p class="text-xs text-gray-400">系统自动比对证件及人脸信息</p>
+                    </div>
+
+                    <!-- Step 3: Pending -->
+                    <div class="relative mb-5">
+                        <div class="absolute -left-8 top-0.5 w-5 h-5 rounded-full bg-gray-200 border-2 border-white"></div>
+                        <p class="text-sm font-medium text-gray-400">合规审核</p>
+                        <p class="text-xs text-gray-400 mt-0.5">AML 筛查及风险评估</p>
+                    </div>
+
+                    <!-- Step 4: Pending -->
+                    <div class="relative mb-5">
+                        <div class="absolute -left-8 top-0.5 w-5 h-5 rounded-full bg-gray-200 border-2 border-white"></div>
+                        <p class="text-sm font-medium text-gray-400">账户开立</p>
+                        <p class="text-xs text-gray-400 mt-0.5">分配账号及交易权限</p>
+                    </div>
+
+                    <!-- Step 5: Pending -->
+                    <div class="relative">
+                        <div class="absolute -left-8 top-0.5 w-5 h-5 rounded-full bg-gray-200 border-2 border-white"></div>
+                        <p class="text-sm font-medium text-gray-400">通知确认</p>
+                        <p class="text-xs text-gray-400 mt-0.5">短信及邮件告知审核结果</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notification methods -->
+            <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-5">
+                <h3 class="text-sm font-semibold text-gray-700 mb-2">审核结果通知方式</h3>
+                <div class="flex flex-col gap-2">
+                    <div class="flex items-center gap-2 text-sm text-gray-600">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.7 10.5a19.79 19.79 0 01-3.07-8.67A2 2 0 012.62 0h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L6.91 6.64a16 16 0 006.29 6.29l.94-1.87a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 13.92z"/></svg>
+                        短信至 +86 138 **** 8888
+                    </div>
+                    <div class="flex items-center gap-2 text-sm text-gray-600">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                        邮件至 zh***@example.com
+                    </div>
+                    <div class="flex items-center gap-2 text-sm text-gray-600">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2"><path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg>
+                        APP 内推送通知
+                    </div>
+                </div>
+            </div>
+
+            <!-- CTA -->
+            <a href="market.html" class="block w-full btn-primary text-white py-3.5 rounded-xl font-semibold text-base text-center">
+                先去浏览行情 &gt;
+            </a>
+            <p class="text-center text-xs text-gray-400 mt-3">账户审核通过前，您可以浏览行情，开户审核通过后即可交易。</p>
+
+            <!-- Result preview buttons (prototype only) -->
+            <div class="mt-6 pt-4 border-t border-dashed border-gray-300">
+                <p class="text-xs text-gray-400 text-center mb-3">原型演示：点击预览审核结果页面</p>
+                <div class="flex gap-2">
+                    <button onclick="showStep('result-approved')" class="flex-1 text-xs py-2 bg-green-50 text-green-700 rounded-lg border border-green-200 active:bg-green-100">审核通过</button>
+                    <button onclick="showStep('result-need-docs')" class="flex-1 text-xs py-2 bg-amber-50 text-amber-700 rounded-lg border border-amber-200 active:bg-amber-100">需补材料</button>
+                    <button onclick="showStep('result-rejected')" class="flex-1 text-xs py-2 bg-red-50 text-red-700 rounded-lg border border-red-200 active:bg-red-100">审核拒绝</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ========== RESULT: 审核通过 ========== -->
+        <div class="step" id="step-result-approved">
+            <div class="text-center pt-6 pb-4">
+                <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-green-50 flex items-center justify-center">
+                    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+                        <polyline points="22 4 12 14.01 9 11.01"/>
+                    </svg>
+                </div>
+                <h2 class="text-xl font-bold text-gray-900 mb-2">恭喜，您的账户已开通！</h2>
+                <p class="text-sm text-gray-500 mb-1">您已完成身份认证，可以开始交易</p>
+                <p class="text-xs text-gray-400 mb-6">证券账号：<span class="font-mono text-gray-700 font-semibold">A-886012345</span></p>
+            </div>
+
+            <div class="bg-green-50 border border-green-200 rounded-xl p-4 mb-4">
+                <h3 class="text-sm font-semibold text-green-800 mb-2">账户信息</h3>
+                <div class="space-y-1.5 text-sm text-green-700">
+                    <div class="flex justify-between"><span>账户类型</span><span class="font-medium">现金账户 (Cash)</span></div>
+                    <div class="flex justify-between"><span>KYC 等级</span><span class="font-medium">Tier 2</span></div>
+                    <div class="flex justify-between"><span>可交易市场</span><span class="font-medium">NYSE / NASDAQ / HKEX</span></div>
+                    <div class="flex justify-between"><span>开通时间</span><span class="font-medium">2026-03-13</span></div>
+                </div>
+            </div>
+
+            <a href="funding.html" class="block w-full bg-green-600 hover:bg-green-700 active:bg-green-800 text-white py-3.5 rounded-xl font-semibold text-base text-center transition mb-3">
+                立即入金，开始交易
+            </a>
+            <a href="market.html" class="block w-full bg-gray-100 text-gray-700 py-3.5 rounded-xl font-semibold text-base text-center active:bg-gray-200 transition">
+                先浏览行情
+            </a>
+        </div>
+
+        <!-- ========== RESULT: 需补材料 ========== -->
+        <div class="step" id="step-result-need-docs">
+            <div class="text-center pt-6 pb-4">
+                <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-amber-50 flex items-center justify-center">
+                    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                        <line x1="12" y1="9" x2="12" y2="13"/>
+                        <line x1="12" y1="17" x2="12.01" y2="17"/>
+                    </svg>
+                </div>
+                <h2 class="text-xl font-bold text-gray-900 mb-2">需要补充材料</h2>
+                <p class="text-sm text-gray-500 mb-1">您的开户申请尚需补充以下资料</p>
+                <p class="text-xs text-gray-400 mb-6">请在 <strong class="text-gray-700">7 天内</strong> 完成补充，超时将需要重新提交申请</p>
+            </div>
+
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+                <h3 class="text-sm font-semibold text-amber-800 mb-3">需补充的材料</h3>
+                <div class="space-y-3">
+                    <div class="flex items-start gap-3">
+                        <div class="w-6 h-6 rounded-full bg-amber-200 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span class="text-xs font-bold text-amber-800">1</span>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-amber-900">证件照片不清晰</p>
+                            <p class="text-xs text-amber-700 mt-0.5">身份证正面文字模糊，请重新拍摄上传，确保文字清晰可辨、四角完整。</p>
+                        </div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div class="w-6 h-6 rounded-full bg-amber-200 flex items-center justify-center flex-shrink-0 mt-0.5">
+                            <span class="text-xs font-bold text-amber-800">2</span>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-amber-900">地址证明缺失</p>
+                            <p class="text-xs text-amber-700 mt-0.5">请提供近 3 个月内的银行账单、水电费账单或政府信函作为地址证明。</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="showStep(2)" class="w-full btn-primary text-white py-3.5 rounded-xl font-semibold text-base transition mb-3">
+                重新上传材料
+            </button>
+            <p class="text-center text-xs text-gray-400">如有疑问，请联系客服 400-XXX-XXXX</p>
+        </div>
+
+        <!-- ========== RESULT: 审核拒绝 ========== -->
+        <div class="step" id="step-result-rejected">
+            <div class="text-center pt-6 pb-4">
+                <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-red-50 flex items-center justify-center">
+                    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="15" y1="9" x2="9" y2="15"/>
+                        <line x1="9" y1="9" x2="15" y2="15"/>
+                    </svg>
+                </div>
+                <h2 class="text-xl font-bold text-gray-900 mb-2">开户申请未通过</h2>
+                <p class="text-sm text-gray-500 mb-6">很抱歉，我们无法批准您的开户申请</p>
+            </div>
+
+            <div class="bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
+                <h3 class="text-sm font-semibold text-red-800 mb-2">拒绝原因</h3>
+                <p class="text-sm text-red-700">根据我们的合规审核结果，您当前不符合平台的开户条件。可能的原因包括但不限于：</p>
+                <ul class="mt-2 space-y-1 text-xs text-red-600">
+                    <li>- 身份信息无法通过验证</li>
+                    <li>- 所在地区/国籍暂不支持开户</li>
+                    <li>- AML/KYC 合规审查未通过</li>
+                </ul>
+            </div>
+
+            <div class="bg-gray-50 border border-gray-200 rounded-xl p-3 mb-5">
+                <p class="text-xs text-gray-500">如果您认为审核结果有误，可联系客服进行申诉。申诉处理周期一般为 3-5 个工作日。</p>
+            </div>
+
+            <button onclick="window.location.href='mailto:support@example.com'" class="w-full bg-gray-800 text-white py-3.5 rounded-xl font-semibold text-base active:bg-gray-900 transition mb-3">
+                联系客服
+            </button>
+            <a href="market.html" class="block w-full bg-gray-100 text-gray-700 py-3.5 rounded-xl font-semibold text-base text-center active:bg-gray-200 transition">
+                以游客身份浏览
+            </a>
+        </div>
+
+    </div>
+
+    <!-- Fixed Bottom Button (for steps 1-6) -->
+    <div id="footer-btn-area" class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md bg-white border-t border-gray-100 px-4 py-4">
+        <button id="next-btn" onclick="nextStep()"
+            class="w-full btn-primary text-white py-3.5 rounded-xl font-semibold text-base">
+            下一步
+        </button>
+    </div>
+
+</div>
+
+<script>
+    // ── State ──────────────────────────────────────────
+    let currentStep = 1;
+    const totalSteps = 7;
+
+    const stepMeta = [
+        { n: 1, pct: 14,  label: '第 1 步 / 共 7 步' },
+        { n: 2, pct: 28,  label: '第 2 步 / 共 7 步' },
+        { n: 3, pct: 42,  label: '第 3 步 / 共 7 步' },
+        { n: 4, pct: 57,  label: '第 4 步 / 共 7 步' },
+        { n: 5, pct: 71,  label: '第 5 步 / 共 7 步' },
+        { n: 6, pct: 85,  label: '第 6 步 / 共 7 步' },
+        { n: 7, pct: 99,  label: '第 7 步 / 共 7 步' },
+    ];
+
+    // ── Navigation ─────────────────────────────────────
+    function showStep(n) {
+        document.querySelectorAll('.step').forEach(el => el.classList.remove('active'));
+
+        // Handle special views (resume, review, result pages)
+        if (typeof n === 'string') {
+            document.getElementById('step-' + n).classList.add('active');
+            document.getElementById('footer-btn-area').style.display = 'none';
+            if (n === 'review' || n.startsWith('result-')) {
+                document.getElementById('step-label').textContent = n === 'review' ? '审核中' : '审核结果';
+                document.getElementById('step-pct').textContent = '100%';
+                document.getElementById('progress-bar').style.width = '100%';
+                document.getElementById('btn-back').style.display = 'none';
+            } else if (n === 'resume') {
+                document.getElementById('step-label').textContent = '继续开户';
+                document.getElementById('step-pct').textContent = '';
+                document.getElementById('progress-bar').style.width = '0%';
+                document.getElementById('btn-back').style.display = 'block';
+            }
+            document.querySelector('.flex-1.overflow-y-auto').scrollTop = 0;
+            return;
+        }
+
+        document.getElementById('step-' + n).classList.add('active');
+        const meta = stepMeta[n - 1];
+        document.getElementById('step-label').textContent = meta.label;
+        document.getElementById('step-pct').textContent = meta.pct + '%';
+        document.getElementById('progress-bar').style.width = meta.pct + '%';
+        document.getElementById('footer-btn-area').style.display = 'block';
+        document.getElementById('btn-back').style.display = 'block';
+
+        // Scroll top
+        document.querySelector('.flex-1.overflow-y-auto').scrollTop = 0;
+    }
+
+    function nextStep() {
+        // Step 6: validate all per-card risk checkboxes are checked
+        if (currentStep === 6) {
+            const allRiskChecked = [...document.querySelectorAll('.risk-check')].every(cb => cb.checked);
+            if (!allRiskChecked) {
+                document.getElementById('risk-all-hint').classList.remove('hidden');
+                return;
+            }
+        }
+        if (currentStep < totalSteps) {
+            currentStep++;
+            showStep(currentStep);
+        }
+    }
+
+    function goBack() {
+        if (currentStep > 1) {
+            currentStep--;
+            showStep(currentStep);
+        }
+    }
+
+    // ── Step 2: Simulated Upload ────────────────────────
+    const uploadState = { front: false, back: false };
+
+    function simulateUpload(side) {
+        if (uploadState[side]) return; // already uploaded
+
+        const box = document.getElementById('upload-' + side);
+        const idle = document.getElementById('upload-' + side + '-idle');
+        const done = document.getElementById('upload-' + side + '-done');
+        const ocr  = document.getElementById('ocr-' + side);
+
+        // Show loading state
+        idle.innerHTML = `
+            <svg class="animate-spin mx-auto mb-2 text-blue-400" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12a9 9 0 11-6.219-8.56"/>
+            </svg>
+            <p class="text-sm text-blue-500">上传中…</p>
+        `;
+
+        setTimeout(() => {
+            idle.classList.add('hidden');
+            done.classList.remove('hidden');
+            box.classList.add('uploaded');
+            uploadState[side] = true;
+
+            // Show OCR result after short delay
+            setTimeout(() => {
+                ocr.classList.add('visible');
+            }, 400);
+        }, 1500);
+    }
+
+    // ── Step 5: W-8BEN Toggle ─────────────────────────
+    function toggleW8BEN(show) {
+        document.getElementById('w8ben-section').style.display = show ? 'block' : 'none';
+        document.getElementById('us-tax-warning').classList.toggle('hidden', show);
+    }
+
+    // ── Step 6: Accordion ──────────────────────────────
+    function toggleAccordion(n) {
+        const content = document.getElementById('acc-' + n);
+        const icon = document.getElementById('acc-icon-' + n);
+        const isOpen = content.classList.contains('open');
+        content.classList.toggle('open', !isOpen);
+        icon.classList.toggle('rotated', !isOpen);
+    }
+
+    function updateRiskConfirm() {
+        const allChecked = [...document.querySelectorAll('.risk-check')].every(cb => cb.checked);
+        if (allChecked) {
+            document.getElementById('risk-all-hint').classList.add('hidden');
+        }
+    }
+
+    // ── Step 7: Submit Button ──────────────────────────
+    function updateSubmitBtn() {
+        const allChecked = [...document.querySelectorAll('.agreement-check')].every(cb => cb.checked);
+        const hasSig = document.getElementById('esig-input').value.trim().length > 0;
+        document.getElementById('submit-btn').disabled = !(allChecked && hasSig);
+    }
+
+    // Enable checkbox change listeners for step 7
+    document.addEventListener('change', function(e) {
+        if (e.target.classList.contains('agreement-check')) {
+            updateSubmitBtn();
+        }
+    });
+
+    // ── Submit ─────────────────────────────────────────
+    function submitForm() {
+        currentStep = 'review';
+        showStep('review');
+    }
+
+    // ── Checkpoint resume ──────────────────────────────
+    function resumeFromStep(step) {
+        currentStep = step;
+        showStep(step);
+    }
+
+    function restartKYC() {
+        currentStep = 1;
+        showStep(1);
+    }
+
+    // ── Init ───────────────────────────────────────────
+    document.getElementById('sign-time').textContent = new Date().toLocaleString('zh-CN', {
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hour12: false
+    });
+
+    // Check URL params for routing
+    var urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('status') === 'review') {
+        // Coming from login routing: show review page directly
+        currentStep = 'review';
+        showStep('review');
+    } else if (urlParams.get('resume') === '1') {
+        // Simulate checkpoint resume (prototype: always show resume at step 4)
+        showStep('resume');
+    } else {
+        showStep(1);
+    }
+</script>
+</body>
+</html>

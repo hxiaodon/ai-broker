@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>登录 - 券商交易</title>
+    <title>登录 - 全球股票交易</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
@@ -11,138 +11,456 @@
         }
         .input-focus:focus {
             outline: none;
-            border-color: #3B82F6;
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+            border-color: #2563EB;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+        }
+        .brand-gradient {
+            background: linear-gradient(135deg, #1D4ED8 0%, #2563EB 50%, #0EA5E9 100%);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #2563EB 0%, #0EA5E9 100%);
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #1D4ED8 0%, #0284C7 100%);
+        }
+        .btn-primary:disabled {
+            background: #D1D5DB;
+            cursor: not-allowed;
+        }
+        .view {
+            display: none;
+        }
+        .view.active {
+            display: flex;
+        }
+        select {
+            -webkit-appearance: none;
+            appearance: none;
         }
     </style>
 </head>
 <body class="bg-gray-50">
-    <div class="max-w-md mx-auto min-h-screen bg-white flex flex-col">
-        <!-- Logo Area -->
-        <div class="flex-1 flex flex-col justify-center px-6 pb-8">
-            <div class="text-center mb-12">
-                <div class="w-20 h-20 bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl mx-auto mb-4 flex items-center justify-center">
-                    <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
-                    </svg>
-                </div>
-                <h1 class="text-2xl font-bold text-gray-900">欢迎回来</h1>
-                <p class="text-gray-500 mt-2">登录您的交易账户</p>
+<div class="max-w-md mx-auto min-h-screen bg-white flex flex-col">
+
+    <!-- ═══════════════════════════════════════════
+         VIEW 1: LANDING
+    ═══════════════════════════════════════════ -->
+    <div id="view-landing" class="view active flex-col min-h-screen">
+
+        <!-- Top spacer -->
+        <div class="flex-1"></div>
+
+        <!-- Brand block -->
+        <div class="flex flex-col items-center px-8 pb-10">
+            <!-- Logo -->
+            <div class="brand-gradient w-24 h-24 rounded-3xl flex items-center justify-center shadow-lg mb-6">
+                <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 17l4-5 4 3 4-6 4 4"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 17h18"/>
+                </svg>
             </div>
+            <!-- App name -->
+            <h1 class="text-3xl font-bold text-gray-900 tracking-tight">环球通</h1>
+            <!-- Slogan -->
+            <p class="text-base text-gray-500 mt-2 text-center">美港股 · 一键直达全球市场</p>
+        </div>
 
-            <!-- Login Form -->
-            <form id="loginForm" class="space-y-4">
-                <!-- Phone/Email Input -->
+        <!-- Actions -->
+        <div class="px-6 space-y-3 pb-6">
+            <!-- Primary: phone login -->
+            <button
+                onclick="showView('login')"
+                class="btn-primary w-full text-white font-semibold py-3.5 rounded-xl text-base transition-all shadow-sm"
+            >
+                手机号登录
+            </button>
+            <!-- Outline: register -->
+            <button
+                onclick="startRegister()"
+                class="w-full border-2 border-blue-600 text-blue-600 font-semibold py-3.5 rounded-xl text-base hover:bg-blue-50 transition-colors"
+            >
+                注册新账户
+            </button>
+            <!-- Text link: browse market -->
+            <div class="text-center pt-1">
+                <a href="market.html?guest=1" class="text-sm text-gray-500 hover:text-blue-600 transition-colors">
+                    先浏览行情 <span class="text-blue-500">&gt;</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Bottom legal links -->
+        <div class="px-6 pb-8 text-center">
+            <p class="text-xs text-gray-400 space-x-1">
+                <a href="#" class="hover:text-gray-600 transition-colors">用户协议</a>
+                <span>|</span>
+                <a href="#" class="hover:text-gray-600 transition-colors">隐私政策</a>
+                <span>|</span>
+                <a href="#" class="hover:text-gray-600 transition-colors">免责声明</a>
+            </p>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+         VIEW 2: OTP LOGIN
+    ═══════════════════════════════════════════ -->
+    <div id="view-login" class="view flex-col min-h-screen">
+
+        <!-- Header: back arrow + title -->
+        <div class="flex items-center px-4 pt-14 pb-2">
+            <button
+                onclick="backToLanding()"
+                class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors -ml-1"
+                aria-label="返回"
+            >
+                <svg class="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </button>
+            <h2 class="text-xl font-bold text-gray-900 ml-2">登录</h2>
+        </div>
+
+        <!-- Form body -->
+        <div class="flex-1 px-6 pt-6">
+            <form id="loginForm" class="space-y-5" novalidate>
+
+                <!-- Phone field: country code + number -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">手机号/邮箱</label>
-                    <input
-                        type="text"
-                        id="username"
-                        class="input-focus w-full px-4 py-3 border border-gray-300 rounded-lg text-base"
-                        placeholder="请输入手机号或邮箱"
-                        required
-                    >
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">手机号</label>
+                    <div class="flex border border-gray-300 rounded-xl overflow-hidden focus-within:border-blue-500 focus-within:ring-3 focus-within:ring-blue-100 transition-all">
+                        <!-- Country code selector -->
+                        <div class="relative flex-shrink-0">
+                            <select
+                                id="countryCode"
+                                class="h-full pl-3 pr-7 py-3 bg-gray-50 text-gray-800 text-sm font-medium border-r border-gray-300 cursor-pointer focus:outline-none"
+                                aria-label="国家/地区代码"
+                            >
+                                <option value="+86">+86 中国大陆</option>
+                                <option value="+852">+852 香港</option>
+                            </select>
+                            <div class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2">
+                                <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <!-- Phone number -->
+                        <input
+                            type="tel"
+                            id="phone"
+                            class="flex-1 px-4 py-3 text-base bg-white focus:outline-none placeholder-gray-400"
+                            placeholder="请输入手机号"
+                            maxlength="15"
+                            inputmode="numeric"
+                            autocomplete="tel-national"
+                        >
+                    </div>
                 </div>
 
-                <!-- Password Input -->
+                <!-- OTP field: input + send button -->
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">密码</label>
-                    <div class="relative">
+                    <label class="block text-sm font-medium text-gray-700 mb-1.5">验证码</label>
+                    <div class="flex gap-2">
                         <input
-                            type="password"
-                            id="password"
-                            class="input-focus w-full px-4 py-3 border border-gray-300 rounded-lg text-base pr-12"
-                            placeholder="请输入密码"
-                            required
+                            type="text"
+                            id="otp"
+                            class="input-focus flex-1 px-4 py-3 border border-gray-300 rounded-xl text-base text-center tracking-widest font-mono placeholder-gray-400"
+                            placeholder="- - - - - -"
+                            maxlength="6"
+                            inputmode="numeric"
+                            autocomplete="one-time-code"
                         >
-                        <button type="button" id="togglePassword" class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                            </svg>
+                        <button
+                            type="button"
+                            id="sendOtpBtn"
+                            onclick="startOtpCountdown()"
+                            class="flex-shrink-0 px-4 py-3 bg-blue-50 text-blue-600 font-medium text-sm rounded-xl border border-blue-200 hover:bg-blue-100 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                            style="min-width: 7.5rem;"
+                        >
+                            获取验证码
                         </button>
                     </div>
                 </div>
 
-                <!-- Remember & Forgot -->
-                <div class="flex items-center justify-between text-sm">
-                    <label class="flex items-center">
-                        <input type="checkbox" class="w-4 h-4 text-blue-600 border-gray-300 rounded">
-                        <span class="ml-2 text-gray-600">记住我</span>
-                    </label>
-                    <a href="#" class="text-blue-600 hover:text-blue-700">忘记密码？</a>
-                </div>
-
-                <!-- Login Button -->
+                <!-- Login button -->
                 <button
                     type="submit"
-                    class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition mt-6"
+                    id="loginBtn"
+                    class="btn-primary w-full text-white font-semibold py-3.5 rounded-xl text-base transition-all shadow-sm mt-2"
+                    disabled
                 >
                     登录
                 </button>
             </form>
 
-            <!-- Biometric Login -->
-            <div class="mt-6">
-                <div class="relative">
-                    <div class="absolute inset-0 flex items-center">
-                        <div class="w-full border-t border-gray-200"></div>
-                    </div>
-                    <div class="relative flex justify-center text-sm">
-                        <span class="px-4 bg-white text-gray-500">或使用</span>
-                    </div>
+            <!-- Divider: other login methods -->
+            <div class="mt-8 relative">
+                <div class="absolute inset-0 flex items-center">
+                    <div class="w-full border-t border-gray-200"></div>
                 </div>
+                <div class="relative flex justify-center">
+                    <span class="px-4 bg-white text-xs text-gray-400">其他登录方式</span>
+                </div>
+            </div>
 
-                <div class="mt-6 flex justify-center space-x-4">
-                    <button class="flex flex-col items-center p-4 hover:bg-gray-50 rounded-lg transition">
-                        <div class="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-2">
-                            <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"/>
-                            </svg>
+            <!-- Face ID login -->
+            <div class="mt-6 flex justify-center">
+                <button
+                    type="button"
+                    class="flex flex-col items-center gap-1.5 group"
+                    aria-label="使用 Face ID 登录"
+                    onclick="handleFaceId()"
+                >
+                    <div class="w-14 h-14 rounded-full bg-gray-100 group-hover:bg-blue-50 border border-gray-200 group-hover:border-blue-200 flex items-center justify-center transition-colors">
+                        <svg class="w-7 h-7 text-gray-600 group-hover:text-blue-600 transition-colors" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                            <!-- Face ID icon: corner marks -->
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 9V5.5A2.5 2.5 0 015.5 3H9"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 9V5.5A2.5 2.5 0 0018.5 3H15"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 15v3.5A2.5 2.5 0 005.5 21H9"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 15v3.5A2.5 2.5 0 0118.5 21H15"/>
+                            <!-- Eyes -->
+                            <circle cx="9" cy="10" r="1" fill="currentColor" stroke="none"/>
+                            <circle cx="15" cy="10" r="1" fill="currentColor" stroke="none"/>
+                            <!-- Smile -->
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 15a3.5 3.5 0 006 0"/>
+                        </svg>
+                    </div>
+                    <span class="text-xs text-gray-500 group-hover:text-blue-600 transition-colors font-medium">Face ID 登录</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Register link at bottom -->
+        <div class="px-6 py-8 text-center">
+            <span class="text-sm text-gray-500">还没有账号？</span>
+            <button onclick="startRegister()" class="text-sm text-blue-600 font-semibold hover:text-blue-700 transition-colors ml-0.5">
+                立即注册 &gt;
+            </button>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════
+         VIEW 3: POST-LOGIN ROUTING (prototype demo)
+    ═══════════════════════════════════════════ -->
+    <div id="view-routing" class="view flex-col min-h-screen justify-center items-center px-8">
+        <div class="text-center">
+            <div class="w-16 h-16 mx-auto mb-6 rounded-full bg-blue-50 flex items-center justify-center animate-pulse">
+                <svg class="w-8 h-8 text-blue-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14M12 5l7 7-7 7"/>
+                </svg>
+            </div>
+            <p id="routing-msg" class="text-sm text-gray-500 mb-8">正在跳转…</p>
+
+            <!-- Prototype routing demo buttons -->
+            <div class="bg-gray-50 rounded-2xl p-5 text-left">
+                <p class="text-xs text-gray-400 mb-3 text-center">原型演示：选择登录后的账户状态</p>
+                <div class="space-y-2.5">
+                    <button onclick="routeTo('new')"
+                        class="w-full flex items-center gap-3 px-4 py-3 bg-white border border-gray-200 rounded-xl text-left active:bg-gray-50 transition">
+                        <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
                         </div>
-                        <span class="text-xs text-gray-600">指纹</span>
+                        <div>
+                            <div class="text-sm font-medium text-gray-800">新用户（未开户）</div>
+                            <div class="text-xs text-gray-400">→ 引导进入 KYC 开户</div>
+                        </div>
                     </button>
-
-                    <button class="flex flex-col items-center p-4 hover:bg-gray-50 rounded-lg transition">
-                        <div class="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-2">
-                            <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
-                            </svg>
+                    <button onclick="routeTo('pending')"
+                        class="w-full flex items-center gap-3 px-4 py-3 bg-white border border-gray-200 rounded-xl text-left active:bg-gray-50 transition">
+                        <div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         </div>
-                        <span class="text-xs text-gray-600">Face ID</span>
+                        <div>
+                            <div class="text-sm font-medium text-gray-800">KYC 审核中</div>
+                            <div class="text-xs text-gray-400">→ 跳转审核状态页</div>
+                        </div>
+                    </button>
+                    <button onclick="routeTo('approved')"
+                        class="w-full flex items-center gap-3 px-4 py-3 bg-white border border-gray-200 rounded-xl text-left active:bg-gray-50 transition">
+                        <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                            <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        </div>
+                        <div>
+                            <div class="text-sm font-medium text-gray-800">已通过（正常用户）</div>
+                            <div class="text-xs text-gray-400">→ 进入行情首页</div>
+                        </div>
                     </button>
                 </div>
             </div>
         </div>
-
-        <!-- Register Link -->
-        <div class="px-6 py-6 border-t border-gray-100 text-center">
-            <span class="text-gray-600">还没有账户？</span>
-            <a href="#" class="text-blue-600 hover:text-blue-700 font-medium ml-1">立即注册</a>
-        </div>
     </div>
 
-    <script>
-        // Toggle password visibility
-        document.getElementById('togglePassword').addEventListener('click', function() {
-            const passwordInput = document.getElementById('password');
-            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-            passwordInput.setAttribute('type', type);
+</div>
+
+<script>
+    // ─── View switching ────────────────────────────────────────────────────────
+    var isRegisterMode = false;
+
+    function showView(name) {
+        document.querySelectorAll('.view').forEach(function(el) {
+            el.classList.remove('active');
         });
+        document.getElementById('view-' + name).classList.add('active');
+    }
 
-        // Form submission
-        document.getElementById('loginForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
+    // ─── Register flow: show OTP view in register context ───────────────────
+    function startRegister() {
+        isRegisterMode = true;
+        // Update the OTP view to show "注册" context
+        document.querySelector('#view-login h2').textContent = '注册';
+        document.getElementById('loginBtn').textContent = '注册并登录';
+        showView('login');
+    }
 
-            if (username && password) {
-                // Simulate login success
-                alert('登录成功！');
-                window.location.href = 'market.html';
+    // Reset to login context when going back
+    function backToLanding() {
+        isRegisterMode = false;
+        document.querySelector('#view-login h2').textContent = '登录';
+        document.getElementById('loginBtn').textContent = '登录';
+        showView('landing');
+    }
+
+    // ─── OTP countdown ────────────────────────────────────────────────────────
+    var otpTimer = null;
+
+    function startOtpCountdown() {
+        var phone = document.getElementById('phone').value.trim();
+        if (!phone || phone.length < 6) {
+            showToast('请先输入正确的手机号');
+            return;
+        }
+
+        var btn = document.getElementById('sendOtpBtn');
+        var seconds = 60;
+
+        btn.disabled = true;
+        btn.textContent = seconds + 's 后重发';
+
+        clearInterval(otpTimer);
+        otpTimer = setInterval(function() {
+            seconds -= 1;
+            if (seconds <= 0) {
+                clearInterval(otpTimer);
+                btn.disabled = false;
+                btn.textContent = '重新获取';
+            } else {
+                btn.textContent = seconds + 's 后重发';
             }
-        });
-    </script>
+        }, 1000);
+
+        // Simulate OTP send (prototype)
+        showToast('验证码已发送（模拟：123456）');
+    }
+
+    // ─── Enable/disable login button based on field completion ────────────────
+    function checkFormReady() {
+        var phone = document.getElementById('phone').value.trim();
+        var otp = document.getElementById('otp').value.trim();
+        var loginBtn = document.getElementById('loginBtn');
+        loginBtn.disabled = !(phone.length >= 6 && otp.length === 6);
+    }
+
+    document.getElementById('phone').addEventListener('input', checkFormReady);
+    document.getElementById('otp').addEventListener('input', checkFormReady);
+
+    // Only allow digits in OTP field
+    document.getElementById('otp').addEventListener('keypress', function(e) {
+        if (!/[0-9]/.test(e.key)) e.preventDefault();
+    });
+
+    // ─── Form submit (login / register) ────────────────────────────────────────
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        var otp = document.getElementById('otp').value.trim();
+
+        // Prototype: accept any 6-digit code
+        if (otp.length === 6) {
+            if (isRegisterMode) {
+                showToast('注册成功，自动登录中…');
+                setTimeout(function() {
+                    // Register always routes to KYC
+                    window.location.href = 'kyc.html';
+                }, 1000);
+            } else {
+                showToast('登录成功');
+                // Show routing view to demo post-login account status routing
+                setTimeout(function() {
+                    showView('routing');
+                }, 600);
+            }
+        } else {
+            showToast('请输入6位验证码');
+        }
+    });
+
+    // ─── Post-login routing ─────────────────────────────────────────────────
+    function routeTo(status) {
+        switch (status) {
+            case 'new':
+                // New user → KYC guide
+                showToast('新用户，引导开户…');
+                setTimeout(function() { window.location.href = 'kyc.html'; }, 600);
+                break;
+            case 'pending':
+                // KYC pending → review status page (step-review in kyc.html)
+                showToast('KYC 审核中…');
+                setTimeout(function() { window.location.href = 'kyc.html?status=review'; }, 600);
+                break;
+            case 'approved':
+                // Approved → market
+                setTimeout(function() { window.location.href = 'market.html'; }, 300);
+                break;
+        }
+    }
+
+    // ─── Face ID (prototype simulation) ───────────────────────────────────────
+    function handleFaceId() {
+        showToast('Face ID 验证中…');
+        setTimeout(function() {
+            showView('routing');
+        }, 1200);
+    }
+
+    // ─── Toast notification ───────────────────────────────────────────────────
+    var toastEl = null;
+    var toastTimeout = null;
+
+    function showToast(msg) {
+        if (toastEl) {
+            clearTimeout(toastTimeout);
+            document.body.removeChild(toastEl);
+        }
+        toastEl = document.createElement('div');
+        toastEl.textContent = msg;
+        toastEl.style.cssText = [
+            'position:fixed',
+            'bottom:5rem',
+            'left:50%',
+            'transform:translateX(-50%)',
+            'background:rgba(17,24,39,0.88)',
+            'color:#fff',
+            'padding:0.6rem 1.25rem',
+            'border-radius:2rem',
+            'font-size:0.875rem',
+            'white-space:nowrap',
+            'z-index:9999',
+            'pointer-events:none',
+            'box-shadow:0 4px 12px rgba(0,0,0,0.2)',
+            'transition:opacity 0.3s'
+        ].join(';');
+        document.body.appendChild(toastEl);
+        toastTimeout = setTimeout(function() {
+            if (toastEl) {
+                toastEl.style.opacity = '0';
+                setTimeout(function() {
+                    if (toastEl && toastEl.parentNode) {
+                        document.body.removeChild(toastEl);
+                        toastEl = null;
+                    }
+                }, 300);
+            }
+        }, 2000);
+    }
+</script>
 </body>
 </html>

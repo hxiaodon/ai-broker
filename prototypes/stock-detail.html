@@ -17,7 +17,7 @@
         <!-- Header -->
         <div class="flex items-center justify-between px-4 py-3 border-b border-gray-200">
             <div class="flex items-center">
-                <a href="market.html" class="mr-3">
+                <a href="market.html" id="backBtn" class="mr-3">
                     <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                     </svg>
@@ -37,10 +37,20 @@
             </button>
         </div>
 
+        <!-- Guest Mode: Delayed Data Banner -->
+        <div id="guestBanner" class="bg-amber-50 border-b border-amber-200 px-4 py-2 flex items-center justify-between hidden">
+            <div class="flex items-center gap-2 text-xs text-amber-800">
+                <span class="bg-amber-200 text-amber-900 font-bold px-1.5 py-0.5 rounded text-[10px]">延迟</span>
+                <span>行情延迟 15 分钟，登录获取实时行情</span>
+            </div>
+            <a href="login.html" class="text-xs text-blue-600 font-medium whitespace-nowrap ml-2">去登录</a>
+        </div>
+
         <!-- Price Info -->
         <div class="px-4 py-4 border-b border-gray-100">
             <div class="flex items-baseline">
                 <span class="text-3xl font-bold price-up">$175.23</span>
+                <span id="delayBadge" class="hidden ml-2 bg-amber-200 text-amber-900 font-bold px-1.5 py-0.5 rounded text-[10px]">延迟</span>
             </div>
             <div class="flex items-center mt-1">
                 <span class="price-up text-lg font-medium">+2.34 (+1.35%)</span>
@@ -172,7 +182,7 @@
 
         <!-- Action Buttons -->
         <div class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3">
-            <div class="max-w-md mx-auto flex space-x-3">
+            <div id="tradeButtons" class="max-w-md mx-auto flex space-x-3">
                 <a href="trade.html?symbol=AAPL&action=buy" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg text-center">
                     买入
                 </a>
@@ -180,10 +190,36 @@
                     卖出
                 </a>
             </div>
+            <!-- Guest mode: login prompt (hidden by default) -->
+            <div id="guestTradePrompt" class="max-w-md mx-auto hidden">
+                <div class="text-center text-sm text-gray-500 mb-2">登录后即可交易</div>
+                <div class="flex space-x-3">
+                    <a href="login.html" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg text-center">
+                        手机号登录
+                    </a>
+                    <a href="login.html" class="flex-1 border-2 border-blue-600 text-blue-600 font-semibold py-3 rounded-lg text-center">
+                        注册新账户
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
+        // Guest mode detection
+        const urlParams = new URLSearchParams(window.location.search);
+        const isGuest = urlParams.get('guest') === '1';
+
+        if (isGuest) {
+            // Show delayed data banner and badge
+            document.getElementById('guestBanner').classList.remove('hidden');
+            document.getElementById('delayBadge').classList.remove('hidden');
+            document.getElementById('backBtn').href = 'market.html?guest=1';
+            // Swap trade buttons for login prompt
+            document.getElementById('tradeButtons').classList.add('hidden');
+            document.getElementById('guestTradePrompt').classList.remove('hidden');
+        }
+
         // Tab switching
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.addEventListener('click', function() {

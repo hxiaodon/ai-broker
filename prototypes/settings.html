@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>设置 - 券商交易</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+
+        /* iOS-style pill toggle */
+        .toggle-switch {
+            position: relative;
+            width: 51px;
+            height: 31px;
+            flex-shrink: 0;
+        }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-track {
+            position: absolute;
+            inset: 0;
+            border-radius: 999px;
+            background: #E5E7EB;
+            transition: background 0.2s;
+            cursor: pointer;
+        }
+        .toggle-thumb {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 27px;
+            height: 27px;
+            border-radius: 50%;
+            background: white;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.25);
+            transition: transform 0.2s;
+            pointer-events: none;
+        }
+        .toggle-switch input:checked + .toggle-track { background: #3B82F6; }
+        .toggle-switch input:checked ~ .toggle-thumb { transform: translateX(20px); }
+
+        /* Radio option card selected */
+        .color-card.selected { border-color: #3B82F6; background: #EFF6FF; }
+        .color-card.selected .radio-dot { background: #3B82F6; border-color: #3B82F6; }
+        .color-card.selected .radio-dot::after { opacity: 1; }
+
+        /* Radio dot */
+        .radio-dot {
+            width: 20px; height: 20px;
+            border-radius: 50%;
+            border: 2px solid #D1D5DB;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+            transition: all 0.15s;
+        }
+        .radio-dot::after {
+            content: '';
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: white;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+
+        /* Order confirmation radio */
+        .conf-option.selected { border-color: #3B82F6; }
+        .conf-option.selected .conf-dot { background: #3B82F6; border-color: #3B82F6; }
+        .conf-option.selected .conf-dot::after { opacity: 1; }
+        .conf-dot {
+            width: 18px; height: 18px;
+            border-radius: 50%;
+            border: 2px solid #D1D5DB;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+            transition: all 0.15s;
+        }
+        .conf-dot::after {
+            content: '';
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: white;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+
+        /* View transitions */
+        .view { display: none; }
+        .view.active { display: block; }
+
+        /* Cache clear flash */
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        .flash-msg { animation: fadeOut 2s forwards; }
+
+        /* Chevron icon */
+        .chevron { color: #9CA3AF; }
+    </style>
+</head>
+<body class="bg-gray-100">
+<div class="max-w-md mx-auto min-h-screen bg-gray-100">
+
+    <!-- ============================================================ -->
+    <!-- MAIN SETTINGS VIEW                                           -->
+    <!-- ============================================================ -->
+    <div id="view-main" class="view active">
+
+        <!-- Header -->
+        <div class="bg-white px-4 pt-12 pb-3 flex items-center border-b border-gray-200 sticky top-0 z-10">
+            <a href="profile.html" class="flex items-center text-blue-500 text-sm font-medium mr-4">
+                <svg class="w-5 h-5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/>
+                </svg>
+                返回
+            </a>
+            <h1 class="text-lg font-semibold text-gray-900">设置</h1>
+        </div>
+
+        <div class="pb-10">
+
+            <!-- ---- 通用设置 ---- -->
+            <div class="mt-6">
+                <div class="px-4 pb-1.5">
+                    <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">通用设置</span>
+                </div>
+                <div class="bg-white divide-y divide-gray-100 border-y border-gray-200">
+
+                    <!-- 语言 -->
+                    <div class="flex items-center justify-between px-4 py-3.5 opacity-50">
+                        <span class="text-sm text-gray-700">语言</span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-sm text-gray-400">简体中文</span>
+                            <span class="text-xs text-gray-300 bg-gray-100 px-1.5 py-0.5 rounded">Phase 1 不可改</span>
+                        </div>
+                    </div>
+
+                    <!-- 涨跌颜色 -->
+                    <button onclick="showView('view-color')" class="w-full flex items-center justify-between px-4 py-3.5 active:bg-gray-50">
+                        <span class="text-sm text-gray-900">涨跌颜色</span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-sm text-gray-400">红涨绿跌（中国大陆）</span>
+                            <svg class="w-4 h-4 chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </div>
+                    </button>
+
+                    <!-- 默认市场 -->
+                    <div class="flex items-center justify-between px-4 py-3.5">
+                        <span class="text-sm text-gray-900">默认市场</span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-sm text-gray-400">美股</span>
+                            <svg class="w-4 h-4 chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- 资产显示货币 -->
+                    <div class="flex items-center justify-between px-4 py-3.5">
+                        <span class="text-sm text-gray-900">资产显示货币</span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-sm text-gray-400">USD</span>
+                            <svg class="w-4 h-4 chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- 推送通知 -->
+                    <button onclick="showView('view-notification')" class="w-full flex items-center justify-between px-4 py-3.5 active:bg-gray-50">
+                        <span class="text-sm text-gray-900">推送通知</span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-sm text-green-500 font-medium">已开启</span>
+                            <svg class="w-4 h-4 chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </div>
+                    </button>
+
+                    <!-- 清除缓存 -->
+                    <div class="flex items-center justify-between px-4 py-3.5">
+                        <div>
+                            <span class="text-sm text-gray-900">清除缓存</span>
+                            <span id="cache-size" class="ml-2 text-xs text-gray-400">当前 23.5 MB</span>
+                        </div>
+                        <button onclick="clearCache()" id="cache-btn"
+                            class="text-sm text-blue-500 font-medium bg-blue-50 px-3 py-1 rounded-full active:bg-blue-100 transition">
+                            清除
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ---- 安全设置 ---- -->
+            <div class="mt-6">
+                <div class="px-4 pb-1.5">
+                    <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">安全设置</span>
+                </div>
+                <div class="bg-white divide-y divide-gray-100 border-y border-gray-200">
+
+                    <!-- Face ID -->
+                    <div class="flex items-center justify-between px-4 py-3.5">
+                        <div>
+                            <div class="text-sm text-gray-900">Face ID / Touch ID</div>
+                            <div class="text-xs text-gray-400 mt-0.5">用于登录与交易确认</div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" checked id="faceid-toggle" onchange="updateToggle(this)">
+                            <div class="toggle-track"></div>
+                            <div class="toggle-thumb"></div>
+                        </label>
+                    </div>
+
+                    <!-- 已登录设备 -->
+                    <button class="w-full flex items-center justify-between px-4 py-3.5 active:bg-gray-50">
+                        <span class="text-sm text-gray-900">已登录设备</span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-sm text-gray-400">iPhone 16 Pro</span>
+                            <svg class="w-4 h-4 chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </div>
+                    </button>
+
+                    <!-- 修改手机号 -->
+                    <button class="w-full flex items-center justify-between px-4 py-3.5 active:bg-gray-50">
+                        <span class="text-sm text-gray-900">修改手机号</span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-sm text-gray-400">+852****5678</span>
+                            <svg class="w-4 h-4 chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </div>
+                    </button>
+
+                    <!-- 注销账户 -->
+                    <button onclick="showDeregisterAlert()" class="w-full flex items-center justify-between px-4 py-3.5 active:bg-gray-50">
+                        <div>
+                            <div class="text-sm text-red-500 font-medium">注销账户</div>
+                            <div class="text-xs text-gray-400 mt-0.5">注销前需清仓并出金全部资金</div>
+                        </div>
+                        <svg class="w-4 h-4 chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ---- 交易设置 ---- -->
+            <div class="mt-6">
+                <div class="px-4 pb-1.5">
+                    <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">交易设置</span>
+                </div>
+                <div class="bg-white divide-y divide-gray-100 border-y border-gray-200">
+
+                    <!-- 默认订单类型 -->
+                    <div class="flex items-center justify-between px-4 py-3.5">
+                        <span class="text-sm text-gray-900">默认订单类型</span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-sm text-gray-400">限价单</span>
+                            <svg class="w-4 h-4 chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- 默认有效期 -->
+                    <div class="flex items-center justify-between px-4 py-3.5">
+                        <span class="text-sm text-gray-900">默认有效期</span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-sm text-gray-400">当日有效</span>
+                            <svg class="w-4 h-4 chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- 下单确认方式 -->
+                    <div class="px-4 py-3.5">
+                        <div class="text-sm text-gray-900 mb-3">下单确认方式</div>
+                        <div class="space-y-2">
+                            <button onclick="selectConf(0)" class="conf-option selected w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border border-gray-200 active:bg-gray-50" data-idx="0">
+                                <div class="conf-dot"></div>
+                                <div class="text-left">
+                                    <div class="text-sm text-gray-900 font-medium">滑动确认 + 生物识别</div>
+                                    <div class="text-xs text-gray-400 mt-0.5">滑动滑块后进行 Face ID / Touch ID 验证</div>
+                                </div>
+                            </button>
+                            <button onclick="selectConf(1)" class="conf-option w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border border-gray-200 active:bg-gray-50" data-idx="1">
+                                <div class="conf-dot"></div>
+                                <div class="text-left">
+                                    <div class="text-sm text-gray-900 font-medium">滑动确认（无生物识别）</div>
+                                    <div class="text-xs text-gray-400 mt-0.5">仅滑动滑块即可完成下单</div>
+                                </div>
+                            </button>
+                            <button onclick="selectConf(2)" class="conf-option w-full flex items-center gap-3 px-3 py-2.5 rounded-lg border border-gray-200 active:bg-gray-50" data-idx="2">
+                                <div class="conf-dot"></div>
+                                <div class="text-left">
+                                    <div class="text-sm text-gray-900 font-medium">直接提交</div>
+                                    <div class="text-xs text-gray-400 mt-0.5">点击确认按钮直接下单（仅限限价单）</div>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 大额交易二次确认 -->
+                    <div class="flex items-center justify-between px-4 py-3.5">
+                        <div>
+                            <div class="text-sm text-gray-900">大额交易二次确认</div>
+                            <div class="text-xs text-gray-400 mt-0.5">单笔订单超过以下金额时弹出确认</div>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-sm text-gray-400">&gt; $10,000</span>
+                            <svg class="w-4 h-4 chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </div>
+                    </div>
+
+                    <!-- 盘前盘后交易 -->
+                    <div class="flex items-center justify-between px-4 py-3.5">
+                        <div>
+                            <div class="text-sm text-gray-900">盘前盘后交易</div>
+                            <div class="text-xs text-gray-400 mt-0.5">允许在美股正式开盘前/后下单</div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="extended-toggle" onchange="handleExtendedToggle(this)">
+                            <div class="toggle-track"></div>
+                            <div class="toggle-thumb"></div>
+                        </label>
+                    </div>
+
+                    <!-- PDT规则说明 -->
+                    <button onclick="showPDTSheet()" class="w-full flex items-center justify-between px-4 py-3.5 active:bg-gray-50">
+                        <div>
+                            <div class="text-sm text-blue-500 font-medium">PDT 规则说明</div>
+                            <div class="text-xs text-gray-400 mt-0.5">Pattern Day Trader 规则介绍</div>
+                        </div>
+                        <svg class="w-4 h-4 chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
+                        </svg>
+                    </button>
+
+                    <!-- 价格偏离提醒 -->
+                    <div class="flex items-center justify-between px-4 py-3.5">
+                        <div>
+                            <div class="text-sm text-gray-900">价格偏离提醒</div>
+                            <div class="text-xs text-gray-400 mt-0.5">限价单价格偏离市价超阈值时提示</div>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-sm text-gray-400">&gt; 5%</span>
+                            <svg class="w-4 h-4 chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Logout -->
+            <div class="mt-6 px-4">
+                <button onclick="if(confirm('确认退出登录？')){window.location.href='login.html';}"
+                        class="w-full py-3.5 bg-white border border-gray-200 rounded-xl text-red-500 font-semibold text-base active:bg-gray-50 transition">
+                    退出登录
+                </button>
+            </div>
+
+            <!-- Version -->
+            <div class="mt-8 mb-4 text-center text-xs text-gray-400">当前版本 v1.0.0</div>
+
+        </div><!-- /pb-10 -->
+    </div><!-- /view-main -->
+
+
+    <!-- ============================================================ -->
+    <!-- SUB-VIEW: 涨跌颜色                                           -->
+    <!-- ============================================================ -->
+    <div id="view-color" class="view">
+
+        <!-- Header -->
+        <div class="bg-white px-4 pt-12 pb-3 flex items-center border-b border-gray-200 sticky top-0 z-10">
+            <button onclick="showView('view-main')" class="flex items-center text-blue-500 text-sm font-medium mr-4">
+                <svg class="w-5 h-5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/>
+                </svg>
+                设置
+            </button>
+            <h1 class="text-lg font-semibold text-gray-900">涨跌颜色</h1>
+        </div>
+
+        <div class="p-4 space-y-3 mt-2">
+
+            <!-- Option A: 红涨绿跌 -->
+            <button onclick="selectColor('china')" class="color-card selected w-full text-left rounded-2xl border-2 p-4 transition" data-scheme="china">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="radio-dot"></div>
+                    <div>
+                        <div class="text-sm font-semibold text-gray-900">红涨绿跌（中国大陆）</div>
+                        <div class="text-xs text-gray-400 mt-0.5">A 股、沪深港通默认配色</div>
+                    </div>
+                </div>
+                <!-- Preview -->
+                <div class="bg-white rounded-xl px-3 py-2.5 border border-gray-100 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-gray-800 bg-gray-100 px-1.5 py-0.5 rounded">AAPL</span>
+                            <span class="text-xs text-gray-500">苹果公司</span>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm font-semibold text-gray-900">$185.40</div>
+                            <div class="text-xs font-medium" style="color:#EF4444">+2.35%</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-gray-800 bg-gray-100 px-1.5 py-0.5 rounded">TSLA</span>
+                            <span class="text-xs text-gray-500">特斯拉</span>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm font-semibold text-gray-900">$248.70</div>
+                            <div class="text-xs font-medium" style="color:#10B981">-1.20%</div>
+                        </div>
+                    </div>
+                </div>
+            </button>
+
+            <!-- Option B: 绿涨红跌 -->
+            <button onclick="selectColor('intl')" class="color-card w-full text-left rounded-2xl border-2 border-gray-200 p-4 transition" data-scheme="intl">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="radio-dot"></div>
+                    <div>
+                        <div class="text-sm font-semibold text-gray-900">绿涨红跌（香港/国际）</div>
+                        <div class="text-xs text-gray-400 mt-0.5">港股、美股、欧洲市场默认配色</div>
+                    </div>
+                </div>
+                <!-- Preview -->
+                <div class="bg-white rounded-xl px-3 py-2.5 border border-gray-100 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-gray-800 bg-gray-100 px-1.5 py-0.5 rounded">AAPL</span>
+                            <span class="text-xs text-gray-500">苹果公司</span>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm font-semibold text-gray-900">$185.40</div>
+                            <div class="text-xs font-medium" style="color:#10B981">+2.35%</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-bold text-gray-800 bg-gray-100 px-1.5 py-0.5 rounded">TSLA</span>
+                            <span class="text-xs text-gray-500">特斯拉</span>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-sm font-semibold text-gray-900">$248.70</div>
+                            <div class="text-xs font-medium" style="color:#EF4444">-1.20%</div>
+                        </div>
+                    </div>
+                </div>
+            </button>
+
+            <!-- Hint -->
+            <div class="flex items-center gap-2 px-1 mt-1">
+                <svg class="w-4 h-4 text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <span class="text-xs text-gray-400">修改后即时生效，全部页面同步更新</span>
+            </div>
+        </div>
+    </div><!-- /view-color -->
+
+
+    <!-- ============================================================ -->
+    <!-- SUB-VIEW: 推送通知                                           -->
+    <!-- ============================================================ -->
+    <div id="view-notification" class="view">
+
+        <!-- Header -->
+        <div class="bg-white px-4 pt-12 pb-3 flex items-center border-b border-gray-200 sticky top-0 z-10">
+            <button onclick="showView('view-main')" class="flex items-center text-blue-500 text-sm font-medium mr-4">
+                <svg class="w-5 h-5 mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/>
+                </svg>
+                设置
+            </button>
+            <h1 class="text-lg font-semibold text-gray-900">推送通知</h1>
+        </div>
+
+        <div class="mt-4 pb-10">
+
+            <!-- Master toggle -->
+            <div class="bg-white border-y border-gray-200 px-4 py-3.5 flex items-center justify-between">
+                <div>
+                    <div class="text-sm font-semibold text-gray-900">允许推送通知</div>
+                    <div class="text-xs text-gray-400 mt-0.5">关闭后所有通知均不推送</div>
+                </div>
+                <label class="toggle-switch">
+                    <input type="checkbox" checked id="master-notif" onchange="toggleMasterNotif(this)">
+                    <div class="toggle-track"></div>
+                    <div class="toggle-thumb"></div>
+                </label>
+            </div>
+
+            <!-- Notification categories -->
+            <div class="mt-6" id="notif-categories">
+                <div class="px-4 pb-1.5">
+                    <span class="text-xs font-medium text-gray-400 uppercase tracking-wide">通知类别</span>
+                </div>
+                <div class="bg-white border-y border-gray-200 divide-y divide-gray-100">
+
+                    <!-- 交易通知 -->
+                    <div class="flex items-center justify-between px-4 py-3.5">
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                                <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="text-sm font-medium text-gray-900">交易通知</div>
+                                <div class="text-xs text-gray-400 mt-0.5">成交、撤单、拒绝等订单状态更新</div>
+                            </div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" checked class="notif-child" onchange="updateToggle(this)">
+                            <div class="toggle-track"></div>
+                            <div class="toggle-thumb"></div>
+                        </label>
+                    </div>
+
+                    <!-- 资金通知 -->
+                    <div class="flex items-center justify-between px-4 py-3.5">
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                                <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="text-sm font-medium text-gray-900">资金通知</div>
+                                <div class="text-xs text-gray-400 mt-0.5">入金到账、出金成功、余额变动</div>
+                            </div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" checked class="notif-child" onchange="updateToggle(this)">
+                            <div class="toggle-track"></div>
+                            <div class="toggle-thumb"></div>
+                        </label>
+                    </div>
+
+                    <!-- 行情提醒 -->
+                    <div class="flex items-center justify-between px-4 py-3.5">
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 bg-orange-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                                <svg class="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="text-sm font-medium text-gray-900">行情提醒</div>
+                                <div class="text-xs text-gray-400 mt-0.5">价格突破预警、涨跌幅提醒</div>
+                            </div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" checked class="notif-child" onchange="updateToggle(this)">
+                            <div class="toggle-track"></div>
+                            <div class="toggle-thumb"></div>
+                        </label>
+                    </div>
+
+                    <!-- 系统公告 -->
+                    <div class="flex items-center justify-between px-4 py-3.5">
+                        <div class="flex items-center gap-3">
+                            <div class="w-9 h-9 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                                <svg class="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
+                                </svg>
+                            </div>
+                            <div>
+                                <div class="text-sm font-medium text-gray-900">系统公告</div>
+                                <div class="text-xs text-gray-400 mt-0.5">维护公告、重要政策更新、KYC 审核结果</div>
+                            </div>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" checked class="notif-child" onchange="updateToggle(this)">
+                            <div class="toggle-track"></div>
+                            <div class="toggle-thumb"></div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Hint -->
+            <div class="px-4 mt-4">
+                <div class="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+                    <svg class="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                    <span class="text-xs text-amber-700">关闭交易通知可能导致您错过重要的成交提醒，请谨慎操作</span>
+                </div>
+            </div>
+        </div>
+    </div><!-- /view-notification -->
+
+
+    <!-- ============================================================ -->
+    <!-- MODAL: 注销账户警告                                          -->
+    <!-- ============================================================ -->
+    <div id="modal-deregister" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/50" onclick="hideDeregisterAlert()"></div>
+        <div class="absolute bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-2xl p-6">
+            <div class="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+            </div>
+            <h3 class="text-base font-semibold text-gray-900 text-center mb-2">确认注销账户？</h3>
+            <div class="text-sm text-gray-500 text-center mb-1">注销后将永久删除您的账户，且无法恢复。</div>
+            <div class="text-xs text-gray-400 text-center mb-5">请确保账户内无持仓及余额，否则无法完成注销。</div>
+            <div class="space-y-2.5">
+                <button onclick="hideDeregisterAlert()" class="w-full py-3 bg-gray-100 text-gray-800 text-sm font-medium rounded-xl active:bg-gray-200 transition">取消</button>
+                <button class="w-full py-3 bg-red-500 text-white text-sm font-medium rounded-xl active:bg-red-600 transition">继续注销</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- BOTTOM SHEET: PDT 规则说明                                   -->
+    <!-- ============================================================ -->
+    <div id="sheet-pdt" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/50" onclick="hidePDTSheet()"></div>
+        <div class="absolute bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-2xl">
+            <div class="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
+                <h3 class="text-base font-semibold text-gray-900">PDT 规则说明</h3>
+                <button onclick="hidePDTSheet()" class="text-gray-400 active:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="px-5 py-4 space-y-3 text-sm text-gray-700 pb-8">
+                <div class="bg-blue-50 rounded-xl p-3.5">
+                    <div class="font-semibold text-blue-800 mb-1">什么是 Pattern Day Trader (PDT)？</div>
+                    <div class="text-blue-700 text-xs leading-relaxed">PDT 是指在 5 个连续交易日内，同一保证金账户中进行 4 次或以上日内交易（当日买入后当日卖出，或当日卖出后当日买回）的交易者。</div>
+                </div>
+                <div>
+                    <div class="font-medium text-gray-900 mb-1">最低权益要求</div>
+                    <div class="text-xs text-gray-500 leading-relaxed">被认定为 PDT 后，账户净资产必须维持在 <span class="font-semibold text-gray-800">$25,000 USD</span> 以上，否则账户将被限制进行日内交易 <span class="font-semibold text-gray-800">90 天</span>。</div>
+                </div>
+                <div>
+                    <div class="font-medium text-gray-900 mb-1">适用范围</div>
+                    <div class="text-xs text-gray-500 leading-relaxed">仅适用于美股保证金账户（Margin Account）。现金账户（Cash Account）不受 PDT 规则限制，但受 T+1 资金结算规则约束。</div>
+                </div>
+                <div class="bg-amber-50 rounded-xl px-3.5 py-3 text-xs text-amber-700 leading-relaxed">
+                    本平台会在您触发第 3 次日内交易时给予预警提示，帮助您规避 PDT 风险。
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- BOTTOM SHEET: 盘前盘后交易风险披露                              -->
+    <!-- ============================================================ -->
+    <div id="sheet-extended" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/50" onclick="cancelExtendedHours()"></div>
+        <div class="absolute bottom-0 left-0 right-0 max-w-md mx-auto bg-white rounded-t-2xl">
+            <div class="flex items-center justify-between px-5 pt-5 pb-3 border-b border-gray-100">
+                <h3 class="text-base font-semibold text-gray-900">延时交易风险披露</h3>
+                <button onclick="cancelExtendedHours()" class="text-gray-400 active:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="px-5 py-4 space-y-3 text-sm text-gray-700 pb-6 max-h-[60vh] overflow-y-auto">
+                <div class="bg-amber-50 rounded-xl p-3.5">
+                    <div class="font-semibold text-amber-800 mb-1">重要风险提示</div>
+                    <div class="text-amber-700 text-xs leading-relaxed">盘前盘后交易（Extended Hours Trading）与正常交易时段相比存在额外风险，请在充分了解以下风险后再决定是否开启。</div>
+                </div>
+                <div>
+                    <div class="font-medium text-gray-900 mb-1">1. 流动性风险</div>
+                    <div class="text-xs text-gray-500 leading-relaxed">盘前盘后时段参与者较少，可能导致买卖价差较大、成交困难或部分成交。</div>
+                </div>
+                <div>
+                    <div class="font-medium text-gray-900 mb-1">2. 价格波动风险</div>
+                    <div class="text-xs text-gray-500 leading-relaxed">盘前盘后时段价格波动可能显著高于正常交易时段，且可能无法反映开盘价格。</div>
+                </div>
+                <div>
+                    <div class="font-medium text-gray-900 mb-1">3. 订单限制</div>
+                    <div class="text-xs text-gray-500 leading-relaxed">盘前盘后时段仅支持<span class="font-semibold text-gray-800">限价单</span>，不支持市价单、止损单等其他订单类型。</div>
+                </div>
+                <div>
+                    <div class="font-medium text-gray-900 mb-1">4. 信息不对称</div>
+                    <div class="text-xs text-gray-500 leading-relaxed">盘前盘后时段可能受到重大新闻或公告影响，机构投资者可能具有信息优势。</div>
+                </div>
+                <div class="pt-2 border-t border-gray-100">
+                    <label class="flex items-start gap-2.5 cursor-pointer">
+                        <input type="checkbox" id="extended-ack" onchange="updateExtendedAck()" class="mt-0.5 w-4 h-4 accent-blue-600 rounded">
+                        <span class="text-xs text-gray-600 leading-relaxed">我已阅读并充分理解延时交易的风险，自愿承担由此可能产生的损失</span>
+                    </label>
+                </div>
+                <button id="extended-confirm-btn" onclick="confirmExtendedHours()" disabled
+                    class="w-full py-3 bg-blue-600 text-white text-sm font-semibold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed active:bg-blue-700 transition">
+                    确认开启
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- TOAST                                                        -->
+    <!-- ============================================================ -->
+    <div id="toast" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 hidden">
+        <div class="bg-gray-900/90 text-white text-sm px-4 py-2.5 rounded-full shadow-lg whitespace-nowrap" id="toast-msg"></div>
+    </div>
+
+</div><!-- /max-w-md -->
+
+<script>
+    /* ---- View switching ---- */
+    function showView(id) {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        window.scrollTo(0, 0);
+    }
+
+    /* ---- Toggle visual update (toggles are purely visual in prototype) ---- */
+    function updateToggle(input) {
+        // The CSS handles checked state already; this is a hook for future logic
+    }
+
+    /* ---- Master notification toggle ---- */
+    function toggleMasterNotif(input) {
+        const cats = document.getElementById('notif-categories');
+        if (input.checked) {
+            cats.style.opacity = '1';
+            cats.style.pointerEvents = 'auto';
+        } else {
+            cats.style.opacity = '0.4';
+            cats.style.pointerEvents = 'none';
+            // Uncheck all children
+            document.querySelectorAll('.notif-child').forEach(c => { c.checked = false; });
+        }
+    }
+
+    /* ---- Color scheme selection ---- */
+    function selectColor(scheme) {
+        document.querySelectorAll('.color-card').forEach(card => {
+            if (card.dataset.scheme === scheme) {
+                card.classList.add('selected');
+            } else {
+                card.classList.remove('selected');
+            }
+        });
+        showToast('已切换配色方案，即时生效');
+        // Auto-return to settings after selection (per spec: "选择后即时生效, 返回上一页")
+        setTimeout(() => showView('view-main'), 800);
+    }
+
+    /* ---- Order confirmation radio ---- */
+    function selectConf(idx) {
+        document.querySelectorAll('.conf-option').forEach((opt, i) => {
+            if (i === idx) {
+                opt.classList.add('selected');
+                opt.classList.remove('border-gray-200');
+            } else {
+                opt.classList.remove('selected');
+                opt.classList.add('border-gray-200');
+            }
+        });
+    }
+
+    /* ---- Clear cache ---- */
+    function clearCache() {
+        const btn = document.getElementById('cache-btn');
+        const sizeEl = document.getElementById('cache-size');
+        btn.textContent = '清除中…';
+        btn.disabled = true;
+        btn.classList.add('opacity-50');
+        setTimeout(() => {
+            sizeEl.textContent = '当前 0 KB';
+            btn.textContent = '已清除';
+            btn.classList.remove('opacity-50');
+            showToast('缓存已清除');
+            setTimeout(() => {
+                btn.textContent = '清除';
+                btn.disabled = false;
+                sizeEl.textContent = '当前 0 KB';
+            }, 3000);
+        }, 1200);
+    }
+
+    /* ---- Deregister modal ---- */
+    function showDeregisterAlert() {
+        document.getElementById('modal-deregister').classList.remove('hidden');
+    }
+    function hideDeregisterAlert() {
+        document.getElementById('modal-deregister').classList.add('hidden');
+    }
+
+    /* ---- Extended hours risk disclosure ---- */
+    var extendedAcknowledged = false;
+    function handleExtendedToggle(input) {
+        if (input.checked && !extendedAcknowledged) {
+            // First time enabling: show risk disclosure
+            input.checked = false; // Revert toggle until disclosure is confirmed
+            document.getElementById('sheet-extended').classList.remove('hidden');
+            document.getElementById('extended-ack').checked = false;
+            document.getElementById('extended-confirm-btn').disabled = true;
+        }
+    }
+    function updateExtendedAck() {
+        document.getElementById('extended-confirm-btn').disabled = !document.getElementById('extended-ack').checked;
+    }
+    function confirmExtendedHours() {
+        extendedAcknowledged = true;
+        document.getElementById('extended-toggle').checked = true;
+        document.getElementById('sheet-extended').classList.add('hidden');
+        showToast('已开启盘前盘后交易');
+    }
+    function cancelExtendedHours() {
+        document.getElementById('sheet-extended').classList.add('hidden');
+        document.getElementById('extended-toggle').checked = false;
+    }
+
+    /* ---- PDT sheet ---- */
+    function showPDTSheet() {
+        document.getElementById('sheet-pdt').classList.remove('hidden');
+    }
+    function hidePDTSheet() {
+        document.getElementById('sheet-pdt').classList.add('hidden');
+    }
+
+    /* ---- Toast ---- */
+    let toastTimer = null;
+    function showToast(msg) {
+        const toast = document.getElementById('toast');
+        document.getElementById('toast-msg').textContent = msg;
+        toast.classList.remove('hidden');
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toast.classList.add('hidden'), 2200);
+    }
+</script>
+</body>
+</html>

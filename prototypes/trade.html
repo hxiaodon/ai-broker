@@ -3,250 +3,943 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>交易下单 - 券商交易</title>
+    <title>交易下单</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
-        .slider-container { position: relative; height: 50px; background: #3B82F6; border-radius: 8px; overflow: hidden; }
-        .slider-track { position: absolute; left: 0; top: 0; height: 100%; background: #2563EB; transition: width 0.1s; }
-        .slider-button { position: absolute; left: 0; top: 0; width: 60px; height: 50px; background: white; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
-        .slider-text { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); color: white; font-weight: 600; pointer-events: none; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Slider */
+        .slider-container {
+            position: relative;
+            height: 52px;
+            border-radius: 12px;
+            overflow: hidden;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .slider-track {
+            position: absolute;
+            left: 0; top: 0;
+            height: 100%;
+            transition: width 0.08s linear;
+            border-radius: 12px;
+        }
+        .slider-button {
+            position: absolute;
+            left: 4px; top: 4px;
+            width: 44px; height: 44px;
+            background: white;
+            border-radius: 9px;
+            cursor: grab;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+            transition: left 0.08s linear;
+            z-index: 2;
+        }
+        .slider-button:active { cursor: grabbing; }
+        .slider-label {
+            position: absolute;
+            left: 50%; top: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-weight: 600;
+            font-size: 15px;
+            pointer-events: none;
+            white-space: nowrap;
+            letter-spacing: 0.02em;
+        }
+
+        /* Buy theme */
+        .theme-buy .slider-container { background: #16a34a; }
+        .theme-buy .slider-track { background: #15803d; }
+        .theme-buy .order-type-active { background: white; color: #16a34a; }
+        .theme-buy .accent-color { color: #16a34a; }
+        .theme-buy .accent-bg { background: #f0fdf4; border-color: #bbf7d0; }
+        .theme-buy .stepper-btn { background: #dcfce7; color: #16a34a; }
+        .theme-buy .stepper-btn:hover { background: #bbf7d0; }
+        .theme-buy .qty-quick-btn { background: #f0fdf4; color: #16a34a; border: 1px solid #bbf7d0; }
+        .theme-buy .qty-quick-btn:hover { background: #dcfce7; }
+        .theme-buy .tif-active { border-color: #16a34a; color: #16a34a; background: #f0fdf4; }
+        .theme-buy .confirm-btn-text { color: #16a34a; }
+
+        /* Sell theme */
+        .theme-sell .slider-container { background: #dc2626; }
+        .theme-sell .slider-track { background: #b91c1c; }
+        .theme-sell .order-type-active { background: white; color: #dc2626; }
+        .theme-sell .accent-color { color: #dc2626; }
+        .theme-sell .accent-bg { background: #fff1f2; border-color: #fecdd3; }
+        .theme-sell .stepper-btn { background: #fee2e2; color: #dc2626; }
+        .theme-sell .stepper-btn:hover { background: #fecdd3; }
+        .theme-sell .qty-quick-btn { background: #fff1f2; color: #dc2626; border: 1px solid #fecdd3; }
+        .theme-sell .qty-quick-btn:hover { background: #fee2e2; }
+        .theme-sell .tif-active { border-color: #dc2626; color: #dc2626; background: #fff1f2; }
+        .theme-sell .confirm-btn-text { color: #dc2626; }
+
+        /* Disabled slider */
+        .slider-disabled .slider-container { background: #9ca3af !important; pointer-events: none; }
+
+        /* Stepper */
+        .price-stepper {
+            display: flex;
+            align-items: center;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .price-stepper input {
+            border: none;
+            outline: none;
+            text-align: center;
+            font-size: 18px;
+            font-weight: 700;
+            width: 100%;
+            padding: 10px 0;
+            background: transparent;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 50;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+        }
+        .modal-sheet {
+            background: white;
+            border-radius: 20px 20px 0 0;
+            width: 100%;
+            max-width: 448px;
+            padding: 24px 20px 40px;
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+        .modal-sheet.open { transform: translateY(0); }
+
+        /* Success page */
+        #successPage {
+            display: none;
+            position: fixed; inset: 0;
+            background: white;
+            z-index: 60;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        #successPage.show { display: flex; }
+
+        /* Fade animations */
+        .fade-section { transition: opacity 0.2s; }
+
+        /* Tab */
+        .order-type-tab {
+            flex: 1;
+            padding: 7px 0;
+            font-size: 13px;
+            font-weight: 500;
+            color: #6b7280;
+            text-align: center;
+            border-radius: 7px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        /* TIF radio */
+        .tif-btn {
+            flex: 1;
+            padding: 6px 2px;
+            font-size: 12px;
+            text-align: center;
+            border: 1px solid #e5e7eb;
+            border-radius: 7px;
+            cursor: pointer;
+            color: #374151;
+            transition: all 0.15s;
+        }
+
+        /* Divider row */
+        .fee-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            padding: 4px 0;
+        }
+
+        /* Pill */
+        .session-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+            color: #374151;
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 20px;
+            padding: 3px 10px;
+        }
+        .green-dot {
+            width: 7px; height: 7px;
+            background: #22c55e;
+            border-radius: 50%;
+            flex-shrink: 0;
+            box-shadow: 0 0 0 2px rgba(34,197,94,0.25);
+        }
+
+        /* Position card */
+        .position-card {
+            border-radius: 12px;
+            border: 1px solid #fecdd3;
+            background: #fff1f2;
+            padding: 12px 14px;
+            margin-bottom: 14px;
+            font-size: 13px;
+        }
+
+        /* Scrollable body */
+        .scroll-body {
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Number up/dn color */
+        .up { color: #16a34a; }
+        .dn { color: #dc2626; }
     </style>
 </head>
-<body class="bg-gray-50">
-    <div class="max-w-md mx-auto min-h-screen bg-white">
-        <!-- Header -->
-        <div class="flex items-center px-4 py-3 border-b border-gray-200">
-            <a href="stock-detail.html" class="mr-3">
-                <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-                </svg>
-            </a>
-            <h1 class="text-lg font-semibold" id="pageTitle">买入 AAPL</h1>
-        </div>
+<body class="bg-gray-100">
 
-        <div class="p-4">
-            <!-- Current Price -->
-            <div class="bg-blue-50 rounded-lg p-4 mb-4">
-                <div class="flex justify-between items-center">
-                    <span class="text-sm text-gray-600">当前价格</span>
-                    <span class="text-xl font-bold text-blue-600" id="currentPrice">$175.23</span>
-                </div>
-                <div class="flex justify-between items-center mt-2">
-                    <span class="text-sm text-gray-600">可用资金</span>
-                    <span class="text-lg font-semibold" id="availableFunds">$10,000.00</span>
-                </div>
-            </div>
+<!-- ─── Main page ─────────────────────────────────────────────────────────── -->
+<div class="max-w-md mx-auto min-h-screen bg-white flex flex-col" id="mainPage">
 
-            <!-- Order Type Tabs -->
-            <div class="flex bg-gray-100 rounded-lg p-1 mb-4">
-                <button class="flex-1 py-2 bg-white rounded-md shadow-sm font-medium text-sm">市价单</button>
-                <button class="flex-1 py-2 text-gray-600 font-medium text-sm">限价单</button>
-                <button class="flex-1 py-2 text-gray-600 font-medium text-sm">止损单</button>
-            </div>
-
-            <!-- Price Input -->
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-2">限价</label>
-                <div class="relative">
-                    <span class="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                    <input type="number" value="175.00" step="0.01" class="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg text-lg font-semibold focus:outline-none focus:border-blue-500">
-                </div>
-            </div>
-
-            <!-- Quantity Input -->
-            <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-2">数量</label>
-                <input type="number" id="quantity" value="100" min="1" class="w-full px-4 py-3 border border-gray-300 rounded-lg text-lg font-semibold focus:outline-none focus:border-blue-500">
-                <div class="flex space-x-2 mt-2">
-                    <button class="flex-1 py-2 bg-gray-100 rounded-lg text-sm font-medium hover:bg-gray-200" onclick="setQuantity(10)">10</button>
-                    <button class="flex-1 py-2 bg-gray-100 rounded-lg text-sm font-medium hover:bg-gray-200" onclick="setQuantity(50)">50</button>
-                    <button class="flex-1 py-2 bg-gray-100 rounded-lg text-sm font-medium hover:bg-gray-200" onclick="setQuantity(100)">100</button>
-                    <button class="flex-1 py-2 bg-gray-100 rounded-lg text-sm font-medium hover:bg-gray-200" onclick="setQuantity('max')">全部</button>
-                </div>
-            </div>
-
-            <!-- Cost Summary -->
-            <div class="bg-gray-50 rounded-lg p-4 mb-4">
-                <div class="flex justify-between text-sm mb-2">
-                    <span class="text-gray-600">预估成本</span>
-                    <span class="font-semibold" id="estimatedCost">$17,500.00</span>
-                </div>
-                <div class="flex justify-between text-sm mb-2">
-                    <span class="text-gray-600">手续费</span>
-                    <span class="font-semibold">$5.00</span>
-                </div>
-                <div class="flex justify-between pt-2 border-t border-gray-200">
-                    <span class="font-medium">合计</span>
-                    <span class="font-bold text-lg" id="totalCost">$17,505.00</span>
-                </div>
-                <div class="flex justify-between text-sm mt-2" id="positionRatio">
-                    <span class="text-gray-600">买入后持仓占比</span>
-                    <span class="font-semibold text-orange-600">35%</span>
-                </div>
-            </div>
-
-            <!-- Risk Warning -->
-            <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-6" id="riskWarning">
-                <div class="flex items-start">
-                    <svg class="w-5 h-5 text-yellow-600 mt-0.5 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"/>
-                    </svg>
-                    <div class="text-sm text-yellow-800">
-                        <div class="font-medium mb-1">风险提示</div>
-                        <ul class="space-y-1 text-xs" id="warningList">
-                            <li id="warningInsufficientFunds" style="display: none;">• 可用资金不足</li>
-                            <li id="warningHighRatio" style="display: none;">• 持仓占比过高（建议不超过 20%）</li>
-                            <li>• 限价单可能无法成交</li>
-                            <li>• 市场波动风险</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Slide to Confirm -->
-            <div class="slider-container" id="sliderContainer">
-                <div class="slider-track" id="sliderTrack"></div>
-                <div class="slider-button" id="sliderButton">
-                    <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-                    </svg>
-                </div>
-                <div class="slider-text">滑动确认买入 →</div>
+    <!-- Header -->
+    <div class="flex items-center px-4 py-3 border-b border-gray-100 flex-shrink-0">
+        <a href="stock-detail.html" class="mr-3 p-1 -ml-1" id="backBtn">
+            <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"/>
+            </svg>
+        </a>
+        <div>
+            <h1 class="text-base font-bold leading-tight" id="pageTitle">买入 AAPL</h1>
+            <div class="flex items-center gap-2 mt-0.5">
+                <span class="text-sm font-bold" id="headerPrice">$175.23</span>
+                <span class="text-xs font-medium" id="headerChange">+2.34(+1.35%)▲</span>
+                <span class="text-xs text-gray-400" id="headerName">Apple Inc.</span>
             </div>
         </div>
     </div>
 
-    <script>
-        const availableFunds = 10000;
-        const currentPrice = 175.23;
-        const fee = 5.00;
-        let lastSubmitTime = 0;
+    <!-- Trading session bar -->
+    <div class="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-100 flex-shrink-0">
+        <div class="session-pill">
+            <span class="green-dot"></span>
+            <span id="sessionLabel">盘中 · NYSE · 09:30-16:00 ET</span>
+        </div>
+        <span class="text-xs text-gray-400" id="availableFundsLabel">可用 <span class="font-semibold text-gray-700" id="availableFundsDisplay">$10,000.00 USD</span></span>
+    </div>
 
-        function setQuantity(qty) {
-            const input = document.getElementById('quantity');
-            if (qty === 'max') {
-                const maxQty = Math.floor((availableFunds - fee) / currentPrice);
-                input.value = maxQty;
-            } else {
-                input.value = qty;
-            }
-            updateCost();
+    <!-- Scrollable form body -->
+    <div class="scroll-body flex-1 px-4 pt-4 pb-2" id="formBody">
+
+        <!-- Sell: position card -->
+        <div class="position-card" id="positionCard" style="display:none">
+            <div class="flex justify-between items-center mb-2">
+                <span class="font-semibold text-gray-800">持仓明细</span>
+                <span class="text-xs text-gray-500" id="posSymbol">AAPL</span>
+            </div>
+            <div class="grid grid-cols-2 gap-x-4 gap-y-1.5">
+                <div>
+                    <div class="text-gray-500 text-xs">持有股数</div>
+                    <div class="font-bold text-gray-800" id="posShares">100 股</div>
+                </div>
+                <div>
+                    <div class="text-gray-500 text-xs">持仓均价</div>
+                    <div class="font-bold text-gray-800" id="posAvgPrice">$170.00</div>
+                </div>
+                <div>
+                    <div class="text-gray-500 text-xs">持仓市值</div>
+                    <div class="font-bold text-gray-800" id="posMarketValue">$17,523.00</div>
+                </div>
+                <div>
+                    <div class="text-gray-500 text-xs">浮动盈亏</div>
+                    <div class="font-bold" id="posFloatPnl">+$523.00</div>
+                </div>
+                <div>
+                    <div class="text-gray-500 text-xs">可卖 (已结算)</div>
+                    <div class="font-bold text-gray-800" id="posAvailSell">80 股</div>
+                </div>
+                <div>
+                    <div class="text-gray-500 text-xs">待结算 (T+1)</div>
+                    <div class="font-bold text-gray-500" id="posUnsettled">20 股</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Order type tabs -->
+        <div class="flex bg-gray-100 rounded-xl p-1 mb-4 gap-0.5" id="orderTypeTabs">
+            <div class="order-type-tab order-type-active" data-type="market" onclick="setOrderType('market')">市价</div>
+            <div class="order-type-tab" data-type="limit" onclick="setOrderType('limit')">限价</div>
+            <div class="order-type-tab" data-type="stop" onclick="setOrderType('stop')">止损</div>
+            <div class="order-type-tab" data-type="stop_limit" onclick="setOrderType('stop_limit')">止损限价</div>
+        </div>
+
+        <!-- Market order notice -->
+        <div class="fade-section bg-gray-50 rounded-xl px-4 py-3 mb-4 text-sm text-gray-600" id="marketNotice">
+            以市场最优价格立即执行，不保证成交价格。当前最优买价 <span class="font-semibold text-gray-800">$175.20</span>，最优卖价 <span class="font-semibold text-gray-800">$175.26</span>。
+        </div>
+
+        <!-- Limit price stepper -->
+        <div class="fade-section mb-4" id="limitSection" style="display:none">
+            <div class="flex justify-between items-center mb-2">
+                <label class="text-sm font-medium text-gray-700">限价</label>
+                <div class="flex gap-3 text-xs text-gray-500">
+                    <span>买一 <span class="font-semibold text-gray-700">$175.20</span></span>
+                    <span>卖一 <span class="font-semibold text-gray-700">$175.26</span></span>
+                </div>
+            </div>
+            <div class="price-stepper">
+                <button class="stepper-btn w-12 h-12 flex items-center justify-center text-xl font-bold flex-shrink-0" onclick="stepPrice(-0.01)">−</button>
+                <input type="number" id="limitPriceInput" value="175.00" step="0.01" min="0.01"
+                    class="accent-color" style="font-size:20px;font-weight:700;text-align:center;border:none;outline:none;width:100%;padding:10px 0;background:transparent;"
+                    oninput="recalc()">
+                <button class="stepper-btn w-12 h-12 flex items-center justify-center text-xl font-bold flex-shrink-0" onclick="stepPrice(+0.01)">+</button>
+            </div>
+        </div>
+
+        <!-- Stop trigger price -->
+        <div class="fade-section mb-4" id="stopSection" style="display:none">
+            <label class="text-sm font-medium text-gray-700 mb-2 block">触发价格 (止损价)</label>
+            <div class="price-stepper mb-2">
+                <button class="stepper-btn w-12 h-12 flex items-center justify-center text-xl font-bold flex-shrink-0" onclick="stepStop(-0.01)">−</button>
+                <input type="number" id="stopPriceInput" value="170.00" step="0.01" min="0.01"
+                    style="font-size:20px;font-weight:700;text-align:center;border:none;outline:none;width:100%;padding:10px 0;background:transparent;"
+                    oninput="recalc()">
+                <button class="stepper-btn w-12 h-12 flex items-center justify-center text-xl font-bold flex-shrink-0" onclick="stepStop(+0.01)">+</button>
+            </div>
+            <div class="text-xs text-gray-500 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                当股价跌至触发价时，系统自动提交<span id="stopTypeLabel">市价</span>卖单。止损单不保证以触发价成交，实际成交价可能低于触发价。
+            </div>
+        </div>
+
+        <!-- Stop-limit: limit price after stop -->
+        <div class="fade-section mb-4" id="stopLimitSection" style="display:none">
+            <label class="text-sm font-medium text-gray-700 mb-2 block">限价 (止损触发后)</label>
+            <div class="price-stepper">
+                <button class="stepper-btn w-12 h-12 flex items-center justify-center text-xl font-bold flex-shrink-0" onclick="stepStopLimit(-0.01)">−</button>
+                <input type="number" id="stopLimitPriceInput" value="169.50" step="0.01" min="0.01"
+                    style="font-size:20px;font-weight:700;text-align:center;border:none;outline:none;width:100%;padding:10px 0;background:transparent;"
+                    oninput="recalc()">
+                <button class="stepper-btn w-12 h-12 flex items-center justify-center text-xl font-bold flex-shrink-0" onclick="stepStopLimit(+0.01)">+</button>
+            </div>
+        </div>
+
+        <!-- Quantity -->
+        <div class="mb-4">
+            <div class="flex justify-between items-center mb-2">
+                <label class="text-sm font-medium text-gray-700">数量 (股)</label>
+                <span class="text-xs text-gray-500" id="maxSharesHint">最多可买 <span id="maxSharesCount">57</span> 股</span>
+            </div>
+            <input type="number" id="quantityInput" value="10" min="1"
+                class="w-full px-4 py-3 border border-gray-200 rounded-xl text-xl font-bold focus:outline-none text-center"
+                style="letter-spacing:0.02em;"
+                oninput="recalc()">
+            <div class="flex gap-2 mt-2">
+                <button class="qty-quick-btn flex-1 py-2 rounded-lg text-sm font-semibold" onclick="setQty(25)">25</button>
+                <button class="qty-quick-btn flex-1 py-2 rounded-lg text-sm font-semibold" onclick="setQty(50)">50</button>
+                <button class="qty-quick-btn flex-1 py-2 rounded-lg text-sm font-semibold" onclick="setQty(100)">100</button>
+                <button class="qty-quick-btn flex-1 py-2 rounded-lg text-sm font-semibold" id="maxQtyBtn" onclick="setQty('max')">最大:57股</button>
+            </div>
+        </div>
+
+        <!-- Time in Force -->
+        <div class="mb-4">
+            <label class="text-sm font-medium text-gray-700 mb-2 block">有效期</label>
+            <div class="flex gap-1.5" id="tifGroup">
+                <div class="tif-btn tif-active" data-tif="DAY" onclick="setTif('DAY')">当日有效<br><span class="text-gray-400 font-normal text-xs">DAY</span></div>
+                <div class="tif-btn" data-tif="GTC" onclick="setTif('GTC')">撤销前有效<br><span class="text-gray-400 font-normal text-xs">GTC</span></div>
+                <div class="tif-btn" data-tif="IOC" onclick="setTif('IOC')">立即成交<br><span class="text-gray-400 font-normal text-xs">IOC</span></div>
+                <div class="tif-btn" data-tif="FOK" onclick="setTif('FOK')">全额成交<br><span class="text-gray-400 font-normal text-xs">FOK</span></div>
+            </div>
+        </div>
+
+        <!-- Fee breakdown -->
+        <div class="bg-gray-50 rounded-xl p-4 mb-4 border border-gray-100">
+            <div class="fee-row">
+                <span class="text-gray-500" id="feeOrderLabel">订单金额</span>
+                <span class="font-medium text-gray-800" id="feeOrderAmt">—</span>
+            </div>
+            <div class="fee-row">
+                <span class="text-gray-500">佣金</span>
+                <span class="font-medium up">$0 免佣</span>
+            </div>
+            <div class="fee-row">
+                <span class="text-gray-500">交易所费</span>
+                <span class="font-medium text-gray-700" id="feeExchange">~$0.30</span>
+            </div>
+            <!-- Sell-only rows -->
+            <div class="fee-row" id="feeSecRow" style="display:none">
+                <span class="text-gray-500">SEC 费用</span>
+                <span class="font-medium text-gray-700" id="feeSecAmt">—</span>
+            </div>
+            <div class="fee-row" id="feeTafRow" style="display:none">
+                <span class="text-gray-500">FINRA TAF</span>
+                <span class="font-medium text-gray-700" id="feeTafAmt">—</span>
+            </div>
+            <div class="border-t border-gray-200 mt-2 pt-2 fee-row">
+                <span class="font-semibold text-gray-800" id="feeTotalLabel">预估合计</span>
+                <span class="font-bold text-base text-gray-900" id="feeTotalAmt">—</span>
+            </div>
+            <!-- Sell: P&L estimate -->
+            <div class="fee-row" id="pnlRow" style="display:none">
+                <span class="text-gray-500">盈亏预估</span>
+                <span class="font-semibold" id="pnlEst">—</span>
+            </div>
+        </div>
+
+        <!-- Risk warnings -->
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4" id="riskBox">
+            <div class="flex items-start gap-2">
+                <svg class="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"/>
+                </svg>
+                <ul class="text-xs text-amber-800 space-y-0.5" id="riskList">
+                    <li>· 投资有风险，入市需谨慎</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Slide to confirm -->
+        <div class="mb-6" id="sliderWrapper">
+            <div class="slider-container" id="sliderContainer">
+                <div class="slider-track" id="sliderTrack"></div>
+                <div class="slider-button" id="sliderButton">
+                    <svg class="w-5 h-5" id="sliderIcon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </div>
+                <div class="slider-label" id="sliderLabel">滑动确认买入 →</div>
+            </div>
+        </div>
+
+        <!-- bottom spacer -->
+        <div class="h-4"></div>
+    </div>
+</div>
+
+<!-- ─── Confirm Modal (bottom sheet) ─────────────────────────────────────── -->
+<div class="modal-overlay" id="modalOverlay" style="display:none" onclick="closeModal(event)">
+    <div class="modal-sheet" id="modalSheet">
+        <div class="w-10 h-1 bg-gray-200 rounded-full mx-auto mb-5"></div>
+        <h2 class="text-base font-bold text-gray-900 mb-4" id="modalTitle">确认买入</h2>
+
+        <!-- Order summary -->
+        <div class="bg-gray-50 rounded-xl p-4 mb-4 space-y-2.5">
+            <div class="flex justify-between text-sm">
+                <span class="text-gray-500">标的</span>
+                <span class="font-semibold text-gray-900" id="modalSymbol">AAPL · Apple Inc.</span>
+            </div>
+            <div class="flex justify-between text-sm">
+                <span class="text-gray-500">方向</span>
+                <span class="font-semibold" id="modalSide">买入</span>
+            </div>
+            <div class="flex justify-between text-sm">
+                <span class="text-gray-500">订单类型</span>
+                <span class="font-semibold text-gray-900" id="modalOrderType">市价单</span>
+            </div>
+            <div class="flex justify-between text-sm" id="modalPriceRow">
+                <span class="text-gray-500">价格</span>
+                <span class="font-semibold text-gray-900" id="modalPrice">市价</span>
+            </div>
+            <div class="flex justify-between text-sm">
+                <span class="text-gray-500">数量</span>
+                <span class="font-semibold text-gray-900" id="modalQty">10 股</span>
+            </div>
+            <div class="flex justify-between text-sm">
+                <span class="text-gray-500">有效期</span>
+                <span class="font-semibold text-gray-900" id="modalTif">当日有效 (DAY)</span>
+            </div>
+            <div class="border-t border-gray-200 pt-2 flex justify-between text-sm">
+                <span class="text-gray-600 font-medium" id="modalTotalLabel">预估金额</span>
+                <span class="font-bold text-gray-900" id="modalTotal">—</span>
+            </div>
+        </div>
+
+        <!-- Best Execution info -->
+        <div class="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2.5 mb-5 leading-relaxed">
+            <span class="font-medium text-gray-500">最优执行声明</span><br>
+            本平台依据 Reg NMS 最优执行义务，将订单路由至 NYSE、NASDAQ、CBOE 等交易所及 ATS，选择最有利的执行场所。市价单通常在毫秒级别内成交。
+        </div>
+
+        <!-- FaceID confirm button -->
+        <button class="w-full py-4 rounded-xl font-bold text-white text-base flex items-center justify-center gap-2" id="modalConfirmBtn" onclick="submitOrder()">
+            <span>🔐</span>
+            <span>确认下单 (Face ID)</span>
+        </button>
+        <button class="w-full py-3 mt-2 text-sm text-gray-400 font-medium" onclick="closeModal()">取消</button>
+    </div>
+</div>
+
+<!-- ─── Success Page ───────────────────────────────────────────────────────── -->
+<div id="successPage">
+    <div class="text-center px-8">
+        <div class="text-6xl mb-4">✅</div>
+        <h2 class="text-2xl font-bold text-gray-900 mb-2">订单已提交</h2>
+        <p class="text-gray-500 mb-1">您的订单已成功提交至交易所</p>
+        <p class="text-sm text-gray-400 mb-6">订单编号: <span class="font-mono font-semibold text-gray-600" id="orderNumber"></span></p>
+        <div class="bg-gray-50 rounded-xl p-4 text-left mb-6 w-full max-w-xs mx-auto">
+            <div class="text-sm space-y-1.5">
+                <div class="flex justify-between"><span class="text-gray-500">标的</span><span class="font-semibold" id="sucSymbol"></span></div>
+                <div class="flex justify-between"><span class="text-gray-500">方向</span><span class="font-semibold" id="sucSide"></span></div>
+                <div class="flex justify-between"><span class="text-gray-500">类型</span><span class="font-semibold" id="sucType"></span></div>
+                <div class="flex justify-between"><span class="text-gray-500">数量</span><span class="font-semibold" id="sucQty"></span></div>
+                <div class="flex justify-between"><span class="text-gray-500">状态</span><span class="text-amber-600 font-semibold">待成交</span></div>
+            </div>
+        </div>
+        <p class="text-xs text-gray-400 mb-4" id="redirectCountdown">3秒后自动跳转至订单列表…</p>
+        <a href="orders.html" class="text-sm font-semibold" id="goOrdersLink">查看订单</a>
+    </div>
+</div>
+
+<script>
+// ─── State ─────────────────────────────────────────────────────────────────
+const STOCK = {
+    symbol: 'AAPL',
+    name: 'Apple Inc.',
+    price: 175.23,
+    change: 2.34,
+    changePct: 1.35,
+    ask1: 175.26,
+    bid1: 175.20,
+};
+// Position (for sell mode)
+const POSITION = {
+    shares: 100,
+    avgPrice: 170.00,
+    availSell: 80,   // settled
+    unsettled: 20,
+};
+const AVAILABLE_FUNDS = 10000.00;
+const SEC_FEE_RATE = 0.0000278;   // $27.80 per $1M (2024)
+const FINRA_TAF_RATE = 0.000166;  // per share, max $8.30
+const EXCHANGE_FEE = 0.30;        // flat ~estimate
+
+let action = 'buy';
+let symbol = STOCK.symbol;
+let orderType = 'market';
+let tif = 'DAY';
+let lastSubmitTime = 0;
+let recalcDebounceTimer = null;
+
+// ─── Init ───────────────────────────────────────────────────────────────────
+(function init() {
+    const params = new URLSearchParams(window.location.search);
+    action = (params.get('action') || 'buy').toLowerCase();
+    symbol = (params.get('symbol') || 'AAPL').toUpperCase();
+
+    applyTheme();
+    document.getElementById('backBtn').href = 'stock-detail.html?symbol=' + symbol;
+    renderHeader();
+    renderSessionBar();
+    renderPositionCard();
+    updateMaxShares();
+    setOrderType('market');
+    recalc();
+})();
+
+function applyTheme() {
+    document.getElementById('mainPage').classList.add(action === 'sell' ? 'theme-sell' : 'theme-buy');
+}
+
+function renderHeader() {
+    document.title = `${action === 'sell' ? '卖出' : '买入'} ${symbol}`;
+    document.getElementById('pageTitle').textContent = `${action === 'sell' ? '卖出' : '买入'} ${symbol}`;
+
+    const price = fmt2(STOCK.price);
+    const chg = (STOCK.change >= 0 ? '+' : '') + fmt2(STOCK.change);
+    const pct = (STOCK.changePct >= 0 ? '+' : '') + STOCK.changePct.toFixed(2) + '%';
+    const arrow = STOCK.change >= 0 ? '▲' : '▼';
+    const cls = STOCK.change >= 0 ? 'up' : 'dn';
+
+    document.getElementById('headerPrice').textContent = '$' + price;
+    document.getElementById('headerPrice').className = 'text-sm font-bold ' + cls;
+    document.getElementById('headerChange').textContent = `${chg}(${pct})${arrow}`;
+    document.getElementById('headerChange').className = 'text-xs font-medium ' + cls;
+    document.getElementById('headerName').textContent = STOCK.name;
+}
+
+function renderSessionBar() {
+    const sessionText = symbol.endsWith('.HK')
+        ? '盘中 · HKEX · 09:30-16:00 HKT'
+        : '盘中 · NYSE · 09:30-16:00 ET';
+    document.getElementById('sessionLabel').textContent = sessionText;
+    document.getElementById('availableFundsDisplay').textContent = '$' + fmtMoney(AVAILABLE_FUNDS) + ' USD';
+}
+
+function renderPositionCard() {
+    if (action !== 'sell') return;
+    document.getElementById('positionCard').style.display = 'block';
+    document.getElementById('maxSharesHint').innerHTML =
+        '最多可卖 <span id="maxSharesCount">' + POSITION.availSell + '</span> 股 (已结算)';
+    document.getElementById('posSymbol').textContent = symbol;
+    document.getElementById('posShares').textContent = POSITION.shares + ' 股';
+    document.getElementById('posAvgPrice').textContent = '$' + fmt2(POSITION.avgPrice);
+    const mv = POSITION.shares * STOCK.price;
+    document.getElementById('posMarketValue').textContent = '$' + fmtMoney(mv);
+    const pnl = (STOCK.price - POSITION.avgPrice) * POSITION.shares;
+    const pnlEl = document.getElementById('posFloatPnl');
+    pnlEl.textContent = (pnl >= 0 ? '+' : '') + '$' + fmtMoney(Math.abs(pnl));
+    pnlEl.className = 'font-bold ' + (pnl >= 0 ? 'up' : 'dn');
+    document.getElementById('posAvailSell').textContent = POSITION.availSell + ' 股';
+    document.getElementById('posUnsettled').textContent = POSITION.unsettled + ' 股';
+
+    // Sell fee rows
+    document.getElementById('feeSecRow').style.display = '';
+    document.getElementById('feeTafRow').style.display = '';
+    document.getElementById('pnlRow').style.display = '';
+    document.getElementById('feeOrderLabel').textContent = '成交金额';
+    document.getElementById('feeTotalLabel').textContent = '实际到账';
+    document.getElementById('maxQtyBtn').textContent = `最大:${POSITION.availSell}股`;
+    document.getElementById('sliderLabel').textContent = '滑动确认卖出 →';
+    document.getElementById('sliderIcon').querySelector('path').setAttribute('stroke', '#dc2626');
+}
+
+// ─── Order type ─────────────────────────────────────────────────────────────
+function setOrderType(type) {
+    orderType = type;
+    document.querySelectorAll('[data-type]').forEach(el => {
+        el.classList.remove('order-type-active');
+    });
+    document.querySelector(`[data-type="${type}"]`).classList.add('order-type-active');
+
+    document.getElementById('marketNotice').style.display = type === 'market' ? '' : 'none';
+    document.getElementById('limitSection').style.display = (type === 'limit' || type === 'stop_limit') ? '' : 'none';
+    document.getElementById('stopSection').style.display = (type === 'stop' || type === 'stop_limit') ? '' : 'none';
+    document.getElementById('stopLimitSection').style.display = type === 'stop_limit' ? '' : 'none';
+    if (type === 'stop') {
+        document.getElementById('stopTypeLabel').textContent = '市价';
+    }
+    if (type === 'stop_limit') {
+        document.getElementById('stopTypeLabel').textContent = '限价';
+    }
+    recalc();
+}
+
+// ─── TIF ────────────────────────────────────────────────────────────────────
+function setTif(val) {
+    tif = val;
+    document.querySelectorAll('[data-tif]').forEach(el => {
+        el.classList.remove('tif-active');
+    });
+    document.querySelector(`[data-tif="${val}"]`).classList.add('tif-active');
+}
+
+// ─── Steppers ───────────────────────────────────────────────────────────────
+function stepPrice(delta) {
+    const inp = document.getElementById('limitPriceInput');
+    const v = parseFloat(inp.value) || STOCK.price;
+    inp.value = Math.max(0.01, v + delta).toFixed(2);
+    recalc();
+}
+function stepStop(delta) {
+    const inp = document.getElementById('stopPriceInput');
+    const v = parseFloat(inp.value) || STOCK.price;
+    inp.value = Math.max(0.01, v + delta).toFixed(2);
+    recalc();
+}
+function stepStopLimit(delta) {
+    const inp = document.getElementById('stopLimitPriceInput');
+    const v = parseFloat(inp.value) || STOCK.price;
+    inp.value = Math.max(0.01, v + delta).toFixed(2);
+    recalc();
+}
+
+// ─── Quantity ───────────────────────────────────────────────────────────────
+function updateMaxShares() {
+    let maxQty;
+    if (action === 'sell') {
+        maxQty = POSITION.availSell;
+    } else {
+        const execPrice = getExecPrice();
+        maxQty = Math.floor((AVAILABLE_FUNDS - EXCHANGE_FEE) / execPrice);
+        maxQty = Math.max(0, maxQty);
+    }
+    const el = document.getElementById('maxSharesCount');
+    if (el) el.textContent = maxQty;
+    document.getElementById('maxQtyBtn').textContent = `最大:${maxQty}股`;
+    return maxQty;
+}
+
+function setQty(val) {
+    const maxQty = updateMaxShares();
+    let qty;
+    if (val === 'max') {
+        qty = maxQty;
+    } else {
+        qty = Math.min(val, maxQty);
+    }
+    document.getElementById('quantityInput').value = qty;
+    recalc();
+}
+
+// ─── Recalculate (debounced) ─────────────────────────────────────────────────
+function recalc() {
+    clearTimeout(recalcDebounceTimer);
+    recalcDebounceTimer = setTimeout(_doRecalc, 80);
+}
+
+function getExecPrice() {
+    if (orderType === 'market') return STOCK.price;
+    if (orderType === 'limit') return parseFloat(document.getElementById('limitPriceInput').value) || STOCK.price;
+    if (orderType === 'stop') return parseFloat(document.getElementById('stopPriceInput').value) || STOCK.price;
+    if (orderType === 'stop_limit') return parseFloat(document.getElementById('limitPriceInput').value) || STOCK.price;
+    return STOCK.price;
+}
+
+function _doRecalc() {
+    const qty = parseInt(document.getElementById('quantityInput').value) || 0;
+    const execPrice = getExecPrice();
+    const orderAmt = qty * execPrice;
+
+    // Exchange fee: $0.000119/share (SEC) + $0.00013/share (FINRA) + routing ~flat
+    let secFee = 0, tafFee = 0;
+    let totalFees = EXCHANGE_FEE;
+    let netTotal;
+
+    if (action === 'sell') {
+        secFee = Math.max(0.01, orderAmt * SEC_FEE_RATE);
+        tafFee = Math.min(8.30, qty * FINRA_TAF_RATE);
+        totalFees = EXCHANGE_FEE + secFee + tafFee;
+        netTotal = orderAmt - totalFees; // seller receives this
+        document.getElementById('feeSecAmt').textContent = '$' + secFee.toFixed(4);
+        document.getElementById('feeTafAmt').textContent = '$' + tafFee.toFixed(4);
+
+        // P&L estimate
+        const pnl = (execPrice - POSITION.avgPrice) * qty - totalFees;
+        const pnlEl = document.getElementById('pnlEst');
+        pnlEl.textContent = (pnl >= 0 ? '+$' : '-$') + fmtMoney(Math.abs(pnl));
+        pnlEl.className = 'font-semibold ' + (pnl >= 0 ? 'up' : 'dn');
+    } else {
+        netTotal = orderAmt + totalFees;
+    }
+
+    document.getElementById('feeOrderAmt').textContent = qty > 0 ? '$' + fmtMoney(orderAmt) : '—';
+    document.getElementById('feeExchange').textContent = '~$' + EXCHANGE_FEE.toFixed(2);
+    document.getElementById('feeTotalAmt').textContent = qty > 0 ? '$' + fmtMoney(Math.abs(netTotal)) : '—';
+
+    updateMaxShares();
+    validateAndSetSlider(qty, orderAmt, netTotal);
+}
+
+function validateAndSetSlider(qty, orderAmt, netTotal) {
+    const risks = ['· 投资有风险，入市需谨慎'];
+    let hasError = false;
+
+    if (qty <= 0) {
+        risks.push('· 请输入有效股数');
+        hasError = true;
+    }
+
+    if (action === 'buy') {
+        const totalCost = orderAmt + EXCHANGE_FEE;
+        if (totalCost > AVAILABLE_FUNDS) {
+            risks.push('· 可用资金不足，请减少购买数量');
+            hasError = true;
         }
-
-        function updateCost() {
-            const qty = parseInt(document.getElementById('quantity').value) || 0;
-            const cost = qty * currentPrice;
-            const total = cost + fee;
-
-            document.getElementById('estimatedCost').textContent = `$${cost.toFixed(2)}`;
-            document.getElementById('totalCost').textContent = `$${total.toFixed(2)}`;
-
-            // Calculate position ratio (假设当前持仓 $15,340)
-            const currentHoldings = 15340;
-            const totalAssets = availableFunds + currentHoldings;
-            const newHoldings = currentHoldings + cost;
-            const ratio = ((newHoldings / (totalAssets + cost)) * 100).toFixed(0);
-            document.getElementById('positionRatio').querySelector('span:last-child').textContent = ratio + '%';
-
-            // Risk validation
-            validateOrder(total, ratio);
+        const positionRatio = (orderAmt / (AVAILABLE_FUNDS + orderAmt)) * 100;
+        if (positionRatio > 30) {
+            risks.push('· 单只股票持仓占比超过30%，注意集中度风险');
         }
-
-        function validateOrder(total, ratio) {
-            const warningInsufficientFunds = document.getElementById('warningInsufficientFunds');
-            const warningHighRatio = document.getElementById('warningHighRatio');
-            const container = document.getElementById('sliderContainer');
-
-            let hasError = false;
-
-            // Check insufficient funds
-            if (total > availableFunds) {
-                warningInsufficientFunds.style.display = 'list-item';
-                container.style.background = '#9CA3AF';
-                container.style.pointerEvents = 'none';
-                hasError = true;
-            } else {
-                warningInsufficientFunds.style.display = 'none';
-            }
-
-            // Check high position ratio
-            if (ratio > 20) {
-                warningHighRatio.style.display = 'list-item';
-            } else {
-                warningHighRatio.style.display = 'none';
-            }
-
-            // Enable/disable slider
-            if (!hasError) {
-                container.style.background = '#3B82F6';
-                container.style.pointerEvents = 'auto';
-            }
+        if (orderType === 'limit') {
+            const lp = parseFloat(document.getElementById('limitPriceInput').value) || 0;
+            if (lp > STOCK.ask1 * 1.05) risks.push('· 限价远高于卖一价，可能立即以市价成交');
+            if (lp < STOCK.bid1 * 0.9) risks.push('· 限价远低于市价，可能长时间无法成交');
         }
-
-        // Slider logic
-        const container = document.getElementById('sliderContainer');
-        const button = document.getElementById('sliderButton');
-        const track = document.getElementById('sliderTrack');
-        let isDragging = false;
-        let startX = 0;
-        let currentX = 0;
-
-        button.addEventListener('mousedown', startDrag);
-        button.addEventListener('touchstart', startDrag);
-
-        function startDrag(e) {
-            isDragging = true;
-            startX = e.type === 'mousedown' ? e.clientX : e.touches[0].clientX;
-            document.addEventListener('mousemove', drag);
-            document.addEventListener('touchmove', drag);
-            document.addEventListener('mouseup', endDrag);
-            document.addEventListener('touchend', endDrag);
+    } else {
+        const maxSell = POSITION.availSell;
+        if (qty > maxSell) {
+            risks.push(`· 超出可卖数量（已结算 ${maxSell} 股）`);
+            hasError = true;
         }
-
-        function drag(e) {
-            if (!isDragging) return;
-            e.preventDefault();
-            const clientX = e.type === 'mousemove' ? e.clientX : e.touches[0].clientX;
-            currentX = Math.max(0, Math.min(clientX - startX, container.offsetWidth - 60));
-            button.style.left = currentX + 'px';
-            track.style.width = currentX + 'px';
-
-            if (currentX >= container.offsetWidth - 60) {
-                confirmOrder();
-            }
+        if (qty > POSITION.shares) {
+            risks.push('· 超出持仓总数量');
+            hasError = true;
         }
+    }
 
-        function endDrag() {
-            if (!isDragging) return;
-            isDragging = false;
-            if (currentX < container.offsetWidth - 60) {
-                button.style.left = '0px';
-                track.style.width = '0px';
-                currentX = 0;
-            }
-            document.removeEventListener('mousemove', drag);
-            document.removeEventListener('touchmove', drag);
-            document.removeEventListener('mouseup', endDrag);
-            document.removeEventListener('touchend', endDrag);
+    document.getElementById('riskList').innerHTML = risks.map(r => `<li>${r}</li>`).join('');
+    document.getElementById('riskBox').style.display = risks.length ? '' : 'none';
+
+    const wrapper = document.getElementById('sliderWrapper');
+    if (hasError) {
+        wrapper.classList.add('slider-disabled');
+    } else {
+        wrapper.classList.remove('slider-disabled');
+    }
+}
+
+// ─── Slider ──────────────────────────────────────────────────────────────────
+(function initSlider() {
+    const container = document.getElementById('sliderContainer');
+    const button = document.getElementById('sliderButton');
+    const track = document.getElementById('sliderTrack');
+    let isDragging = false;
+    let startX = 0;
+    let currentX = 0;
+    const BUTTON_W = 52; // button width including margin
+
+    function getPos(e) {
+        return e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+    }
+
+    function startDrag(e) {
+        if (document.getElementById('sliderWrapper').classList.contains('slider-disabled')) return;
+        isDragging = true;
+        startX = getPos(e) - currentX;
+        document.addEventListener('mousemove', onDrag, { passive: false });
+        document.addEventListener('touchmove', onDrag, { passive: false });
+        document.addEventListener('mouseup', endDrag);
+        document.addEventListener('touchend', endDrag);
+    }
+
+    function onDrag(e) {
+        if (!isDragging) return;
+        e.preventDefault();
+        const maxX = container.offsetWidth - BUTTON_W - 8;
+        currentX = Math.max(0, Math.min(getPos(e) - startX, maxX));
+        button.style.left = (4 + currentX) + 'px';
+        track.style.width = (currentX + BUTTON_W) + 'px';
+
+        if (currentX >= maxX) {
+            endDrag();
+            openModal();
         }
+    }
 
-        function confirmOrder() {
-            // Prevent double submit (2 seconds debounce)
-            const now = Date.now();
-            if (now - lastSubmitTime < 2000) {
-                return;
-            }
-            lastSubmitTime = now;
-
-            alert('订单提交成功！\n\n正在进行生物识别验证...');
+    function endDrag() {
+        if (!isDragging) return;
+        isDragging = false;
+        document.removeEventListener('mousemove', onDrag);
+        document.removeEventListener('touchmove', onDrag);
+        document.removeEventListener('mouseup', endDrag);
+        document.removeEventListener('touchend', endDrag);
+        // Snap back if not completed
+        if (currentX < (container.offsetWidth - BUTTON_W - 8)) {
+            currentX = 0;
+            button.style.transition = 'left 0.3s cubic-bezier(0.32,0.72,0,1)';
+            track.style.transition = 'width 0.3s cubic-bezier(0.32,0.72,0,1)';
+            button.style.left = '4px';
+            track.style.width = '0px';
             setTimeout(() => {
-                window.location.href = 'orders.html';
-            }, 500);
+                button.style.transition = '';
+                track.style.transition = '';
+            }, 320);
         }
+    }
 
-        document.getElementById('quantity').addEventListener('input', updateCost);
-        updateCost(); // Initial calculation
-    </script>
+    button.addEventListener('mousedown', startDrag);
+    button.addEventListener('touchstart', startDrag, { passive: true });
+})();
+
+// ─── Modal ───────────────────────────────────────────────────────────────────
+function openModal() {
+    const qty = parseInt(document.getElementById('quantityInput').value) || 0;
+    const execPrice = getExecPrice();
+    const orderAmt = qty * execPrice;
+
+    const typeMap = { market: '市价单', limit: '限价单', stop: '止损单', stop_limit: '止损限价单' };
+    const tifMap = { DAY: '当日有效 (DAY)', GTC: '撤销前有效 (GTC)', IOC: '立即成交 (IOC)', FOK: '全额成交 (FOK)' };
+
+    document.getElementById('modalTitle').textContent = (action === 'sell' ? '确认卖出' : '确认买入');
+    document.getElementById('modalTitle').className = 'text-base font-bold mb-4 ' + (action === 'sell' ? 'dn' : 'up');
+    document.getElementById('modalSymbol').textContent = symbol + ' · ' + STOCK.name;
+    const sideEl = document.getElementById('modalSide');
+    sideEl.textContent = action === 'sell' ? '卖出' : '买入';
+    sideEl.className = 'font-semibold ' + (action === 'sell' ? 'dn' : 'up');
+    document.getElementById('modalOrderType').textContent = typeMap[orderType] || orderType;
+    document.getElementById('modalPrice').textContent = orderType === 'market' ? '市价' : '$' + fmt2(execPrice);
+    document.getElementById('modalQty').textContent = qty + ' 股';
+    document.getElementById('modalTif').textContent = tifMap[tif] || tif;
+    document.getElementById('modalTotalLabel').textContent = action === 'sell' ? '预估到账' : '预估金额';
+    document.getElementById('modalTotal').textContent = '$' + fmtMoney(orderAmt);
+
+    const btnEl = document.getElementById('modalConfirmBtn');
+    btnEl.className = 'w-full py-4 rounded-xl font-bold text-white text-base flex items-center justify-center gap-2 ' +
+        (action === 'sell' ? 'bg-red-600 active:bg-red-700' : 'bg-green-600 active:bg-green-700');
+
+    const overlay = document.getElementById('modalOverlay');
+    overlay.style.display = 'flex';
+    requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+            document.getElementById('modalSheet').classList.add('open');
+        });
+    });
+}
+
+function closeModal(e) {
+    if (e && e.target !== document.getElementById('modalOverlay')) return;
+    _closeModal();
+}
+
+function _closeModal() {
+    document.getElementById('modalSheet').classList.remove('open');
+    setTimeout(() => {
+        document.getElementById('modalOverlay').style.display = 'none';
+        // Reset slider
+        document.getElementById('sliderButton').style.left = '4px';
+        document.getElementById('sliderTrack').style.width = '0px';
+    }, 300);
+}
+
+// ─── Submit ───────────────────────────────────────────────────────────────────
+function submitOrder() {
+    const now = Date.now();
+    if (now - lastSubmitTime < 2000) return;
+    lastSubmitTime = now;
+
+    const qty = parseInt(document.getElementById('quantityInput').value) || 0;
+    const typeMap = { market: '市价单', limit: '限价单', stop: '止损单', stop_limit: '止损限价单' };
+    const orderNum = 'ORD-' + Date.now().toString(36).toUpperCase();
+
+    _closeModal();
+    setTimeout(() => {
+        document.getElementById('orderNumber').textContent = orderNum;
+        document.getElementById('sucSymbol').textContent = symbol;
+        document.getElementById('sucSide').textContent = action === 'sell' ? '卖出' : '买入';
+        document.getElementById('sucType').textContent = typeMap[orderType] || orderType;
+        document.getElementById('sucQty').textContent = qty + ' 股';
+        document.getElementById('successPage').classList.add('show');
+        startRedirectCountdown();
+    }, 350);
+}
+
+function startRedirectCountdown() {
+    let secs = 3;
+    const el = document.getElementById('redirectCountdown');
+    const interval = setInterval(() => {
+        secs--;
+        if (secs <= 0) {
+            clearInterval(interval);
+            el.textContent = '正在跳转…';
+            window.location.href = 'orders.html';
+        } else {
+            el.textContent = `${secs}秒后自动跳转至订单列表…`;
+        }
+    }, 1000);
+}
+
+// ─── Formatting helpers ────────────────────────────────────────────────────
+function fmt2(n) {
+    return Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtMoney(n) {
+    return Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+</script>
 </body>
 </html>

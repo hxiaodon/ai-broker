@@ -56,3 +56,6 @@ credentials.json
 # Logs
 *.log
 logs/
+
+# Playwright MCP (local test artifacts)
+.playwright-mcp/
