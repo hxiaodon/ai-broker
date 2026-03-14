@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>[低保真] 02-KYC — 开户流程</title>
+<link rel="stylesheet" href="../_shared/proto-base.css">
+<style>
+  .kyc-step-content { display: none; }
+  .kyc-step-content.active { display: flex; flex-direction: column; gap: 16px; }
+  .upload-box {
+    border: 2px dashed var(--gray-300);
+    border-radius: var(--radius-md);
+    padding: 32px 16px;
+    text-align: center;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    cursor: pointer; background: var(--gray-50);
+    color: var(--gray-500);
+  }
+  .upload-box:hover { border-color: var(--gray-500); }
+  .upload-icon { font-size: 32px; }
+  .radio-group { display: flex; flex-direction: column; gap: 8px; }
+  .radio-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px; border: var(--border); border-radius: var(--radius-md);
+    cursor: pointer; background: var(--gray-50);
+  }
+  .radio-item.selected { border-color: var(--gray-700); background: var(--gray-100); }
+  .radio-dot {
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 2px solid var(--gray-400); flex-shrink: 0;
+  }
+  .radio-item.selected .radio-dot { border-color: var(--gray-800); background: var(--gray-800); }
+  .status-card {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 16px; padding: 32px; text-align: center;
+  }
+  .status-icon {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: var(--gray-200); border: 3px solid var(--gray-400);
+    display: flex; align-items: center; justify-content: center; font-size: 28px;
+  }
+  .sign-area {
+    border: 2px dashed var(--gray-300); border-radius: var(--radius-md);
+    height: 120px; display: flex; align-items: center; justify-content: center;
+    color: var(--gray-400); font-size: var(--font-size-sm); cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>02-KYC 低保真原型</strong> — 7步开户流程 |
+  <a href="../01-auth/index.html">← 登录页</a> |
+  <a href="../03-market/index.html">开户完成 →</a>
+  <br>步骤：
+  <a href="#" onclick="gotoStep(1);return false;">1-基本信息</a> |
+  <a href="#" onclick="gotoStep(2);return false;">2-身份证件</a> |
+  <a href="#" onclick="gotoStep(3);return false;">3-地址证明</a> |
+  <a href="#" onclick="gotoStep(4);return false;">4-财务背景</a> |
+  <a href="#" onclick="gotoStep(5);return false;">5-投资经验</a> |
+  <a href="#" onclick="gotoStep(6);return false;">6-税务申报</a> |
+  <a href="#" onclick="gotoStep(7);return false;">7-协议签署</a> |
+  <a href="#" onclick="gotoStep(8);return false;">审核状态</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar">
+    <span>9:41</span><span>●●● WiFi 100%</span>
+  </div>
+
+  <!-- 顶部进度 -->
+  <div style="background: var(--gray-50); border-bottom: var(--border); padding: 12px 16px 0;">
+    <div class="flex justify-between items-center mb-8" id="kyc-header">
+      <button class="nav-back" id="kyc-back-btn" onclick="prevStep()">← 返回</button>
+      <span class="text-sm text-muted" id="kyc-step-label">步骤 1 / 7</span>
+      <button class="nav-back" onclick="showToast('草稿已保存')">保存草稿</button>
+    </div>
+    <div class="steps" id="kyc-steps">
+      <div class="step done"><div class="step-dot">✓</div><div class="step-label">基本</div></div>
+      <div class="step done"><div class="step-dot">✓</div><div class="step-label">证件</div></div>
+      <div class="step done"><div class="step-dot">✓</div><div class="step-label">地址</div></div>
+      <div class="step active"><div class="step-dot">4</div><div class="step-label">财务</div></div>
+      <div class="step"><div class="step-dot">5</div><div class="step-label">经验</div></div>
+      <div class="step"><div class="step-dot">6</div><div class="step-label">税务</div></div>
+      <div class="step"><div class="step-dot">7</div><div class="step-label">签署</div></div>
+    </div>
+  </div>
+
+  <!-- 内容区 -->
+  <div class="screen" id="kyc-screen">
+
+    <!-- Step 1: 基本信息 -->
+    <div id="step-1" class="kyc-step-content">
+      <div class="font-semi text-lg">基本个人信息</div>
+      <div class="form-group">
+        <div class="form-label">法定姓名（与证件一致）</div>
+        <input class="form-input" placeholder="姓名（中文）" value="张三">
+      </div>
+      <div class="form-group">
+        <div class="form-label">英文姓名</div>
+        <input class="form-input" placeholder="Full Name in English" value="ZHANG SAN">
+      </div>
+      <div class="form-group">
+        <div class="form-label">出生日期</div>
+        <input class="form-input" type="date" value="1990-01-15">
+      </div>
+      <div class="form-group">
+        <div class="form-label">国籍</div>
+        <div class="form-input" style="display:flex; align-items:center; justify-content:space-between;">
+          <span>中国大陆</span><span>▾</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="form-label">居住地区</div>
+        <div class="form-input" style="display:flex; align-items:center; justify-content:space-between;">
+          <span>广东省 · 深圳市</span><span>▾</span>
+        </div>
+      </div>
+      <div class="proto-note">美国公民/绿卡持有者需额外填写 SSN，并触发 W-9 表格。</div>
+      <button class="btn btn-primary" onclick="nextStep()">下一步</button>
+    </div>
+
+    <!-- Step 2: 身份证件 -->
+    <div id="step-2" class="kyc-step-content">
+      <div class="font-semi text-lg">身份证件上传</div>
+      <div class="form-group">
+        <div class="form-label">证件类型</div>
+        <div class="radio-group">
+          <div class="radio-item selected" onclick="selectRadio(this)">
+            <div class="radio-dot"></div>
+            <div>中国居民身份证（推荐）</div>
+          </div>
+          <div class="radio-item" onclick="selectRadio(this)">
+            <div class="radio-dot"></div>
+            <div>香港身份证（HKID）</div>
+          </div>
+          <div class="radio-item" onclick="selectRadio(this)">
+            <div class="radio-dot"></div>
+            <div>护照</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <div class="form-label">证件正面</div>
+        <div class="upload-box" onclick="simulateOCR('front')">
+          <div class="upload-icon">📷</div>
+          <div>拍照 / 上传正面</div>
+          <div class="text-xs">支持 JPG、PNG，最大 10MB</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="form-label">证件背面</div>
+        <div class="upload-box" onclick="showToast('相机已调起（模拟）')">
+          <div class="upload-icon">📷</div>
+          <div>拍照 / 上传背面</div>
+        </div>
+      </div>
+
+      <!-- OCR 识别结果（模拟已识别状态）-->
+      <div class="card" id="ocr-result" style="display:none;">
+        <div class="card-title">OCR 自动识别结果</div>
+        <div class="text-sm" style="display:flex; flex-direction:column; gap:6px;">
+          <div class="flex justify-between"><span class="text-muted">姓名</span><span>张三</span></div>
+          <div class="flex justify-between"><span class="text-muted">证件号</span><span>440***198801011234</span></div>
+          <div class="flex justify-between"><span class="text-muted">有效期</span><span>2025-01-01 至 2035-01-01</span></div>
+        </div>
+        <div class="form-hint mt-8">OCR 识别仅作参考，请核对无误后继续</div>
+      </div>
+
+      <div class="proto-note">OCR 调用第三方服务（如 Mindee）。识别失败时允许手动输入。证件须在有效期内。</div>
+      <button class="btn btn-primary" onclick="nextStep()">下一步</button>
+    </div>
+
+    <!-- Step 3: 地址证明 -->
+    <div id="step-3" class="kyc-step-content">
+      <div class="font-semi text-lg">地址证明</div>
+      <div class="form-group">
+        <div class="form-label">常驻地址（英文）</div>
+        <input class="form-input" placeholder="Street Address">
+        <input class="form-input mt-8" placeholder="City, Province">
+        <input class="form-input mt-8" placeholder="Postal Code">
+      </div>
+      <div class="form-group">
+        <div class="form-label">上传地址证明文件</div>
+        <div class="upload-box" onclick="showToast('文件选择器已调起（模拟）')">
+          <div class="upload-icon">📄</div>
+          <div>上传近 3 个月银行账单 / 水电费账单</div>
+          <div class="text-xs">支持 PDF、JPG，最大 10MB</div>
+        </div>
+      </div>
+      <div class="proto-note">地址证明须为近 3 个月内。地址须与常驻国/地区一致（SFC KYC 要求）。</div>
+      <button class="btn btn-primary" onclick="nextStep()">下一步</button>
+    </div>
+
+    <!-- Step 4: 财务背景 -->
+    <div id="step-4" class="kyc-step-content active">
+      <div class="font-semi text-lg">财务背景</div>
+      <div class="form-group">
+        <div class="form-label">年收入（USD）</div>
+        <div class="radio-group">
+          <div class="radio-item" onclick="selectRadio(this)"><div class="radio-dot"></div><div>&lt; $30,000</div></div>
+          <div class="radio-item selected" onclick="selectRadio(this)"><div class="radio-dot"></div><div>$30,000 – $100,000</div></div>
+          <div class="radio-item" onclick="selectRadio(this)"><div class="radio-dot"></div><div>$100,000 – $500,000</div></div>
+          <div class="radio-item" onclick="selectRadio(this)"><div class="radio-dot"></div><div>&gt; $500,000</div></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="form-label">净资产（USD，不含主要住所）</div>
+        <div class="radio-group">
+          <div class="radio-item" onclick="selectRadio(this)"><div class="radio-dot"></div><div>&lt; $50,000</div></div>
+          <div class="radio-item" onclick="selectRadio(this)"><div class="radio-dot"></div><div>$50,000 – $200,000</div></div>
+          <div class="radio-item selected" onclick="selectRadio(this)"><div class="radio-dot"></div><div>$200,000 – $1,000,000</div></div>
+          <div class="radio-item" onclick="selectRadio(this)"><div class="radio-dot"></div><div>&gt; $1,000,000</div></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="form-label">资金来源（可多选）</div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+          <div class="badge badge-success" style="cursor:pointer; padding:8px 12px;">薪资收入 ✓</div>
+          <div class="badge badge-pending" style="cursor:pointer; padding:8px 12px;">经营所得</div>
+          <div class="badge badge-pending" style="cursor:pointer; padding:8px 12px;">投资收益</div>
+          <div class="badge badge-success" style="cursor:pointer; padding:8px 12px;">储蓄 ✓</div>
+          <div class="badge badge-pending" style="cursor:pointer; padding:8px 12px;">继承/赠与</div>
+        </div>
+      </div>
+      <div class="proto-note">SFC 适当性评估必须收集。净资产 &gt; $25K USD 才能开启 Pattern Day Trading。</div>
+      <button class="btn btn-primary" onclick="nextStep()">下一步</button>
+    </div>
+
+    <!-- Step 5: 投资经验 -->
+    <div id="step-5" class="kyc-step-content">
+      <div class="font-semi text-lg">投资经验评估</div>
+      <div class="form-group">
+        <div class="form-label">股票交易经验</div>
+        <div class="radio-group">
+          <div class="radio-item" onclick="selectRadio(this)"><div class="radio-dot"></div><div>无经验</div></div>
+          <div class="radio-item selected" onclick="selectRadio(this)"><div class="radio-dot"></div><div>1–3 年</div></div>
+          <div class="radio-item" onclick="selectRadio(this)"><div class="radio-dot"></div><div>3–5 年</div></div>
+          <div class="radio-item" onclick="selectRadio(this)"><div class="radio-dot"></div><div>5 年以上</div></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="form-label">年交易频率</div>
+        <div class="radio-group">
+          <div class="radio-item" onclick="selectRadio(this)"><div class="radio-dot"></div><div>极少（&lt; 10次/年）</div></div>
+          <div class="radio-item selected" onclick="selectRadio(this)"><div class="radio-dot"></div><div>一般（10–50次/年）</div></div>
+          <div class="radio-item" onclick="selectRadio(this)"><div class="radio-dot"></div><div>频繁（&gt; 50次/年）</div></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="form-label">风险承受能力</div>
+        <div class="radio-group">
+          <div class="radio-item" onclick="selectRadio(this)"><div class="radio-dot"></div><div>保守型（追求资本保全）</div></div>
+          <div class="radio-item selected" onclick="selectRadio(this)"><div class="radio-dot"></div><div>稳健型（可承受一定波动）</div></div>
+          <div class="radio-item" onclick="selectRadio(this)"><div class="radio-dot"></div><div>积极型（追求较高回报）</div></div>
+        </div>
+      </div>
+      <div class="proto-note">投资经验评估结果影响可交易品种权限（如期权需另行申请）。</div>
+      <button class="btn btn-primary" onclick="nextStep()">下一步</button>
+    </div>
+
+    <!-- Step 6: 税务申报 -->
+    <div id="step-6" class="kyc-step-content">
+      <div class="font-semi text-lg">税务申报</div>
+      <div class="card">
+        <div class="card-title">W-8BEN 外国人税务声明</div>
+        <div class="text-sm" style="display:flex; flex-direction:column; gap:8px;">
+          <div class="flex justify-between"><span class="text-muted">姓名</span><span>ZHANG SAN</span></div>
+          <div class="flex justify-between"><span class="text-muted">国籍</span><span>中国大陆</span></div>
+          <div class="flex justify-between"><span class="text-muted">税收协定</span><span>中美税收协定</span></div>
+          <div class="flex justify-between"><span class="text-muted">股息税率</span><span>10%（协定优惠税率）</span></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="form-label">TIN（纳税识别号，可选）</div>
+        <input class="form-input" placeholder="中国大陆：18位身份证号码">
+      </div>
+      <div class="form-group">
+        <div class="form-label">是否为美国纳税居民？</div>
+        <div class="radio-group">
+          <div class="radio-item selected" onclick="selectRadio(this)"><div class="radio-dot"></div><div>否（非美国公民/绿卡）</div></div>
+          <div class="radio-item" onclick="selectRadio(this)"><div class="radio-dot"></div><div>是（需改签 W-9 表格）</div></div>
+        </div>
+      </div>
+      <div class="sign-area" onclick="showToast('电子签名板已调起（模拟）')">
+        点击此处手写签名
+      </div>
+      <div class="proto-note">W-8BEN 有效期 3 年。FATCA 合规要求：美国纳税居民须填 W-9 + SSN。</div>
+      <button class="btn btn-primary" onclick="nextStep()">下一步</button>
+    </div>
+
+    <!-- Step 7: 协议签署 -->
+    <div id="step-7" class="kyc-step-content">
+      <div class="font-semi text-lg">协议签署确认</div>
+      <div class="card">
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div class="list-item">
+            <input type="checkbox" checked style="width:18px; height:18px; flex-shrink:0;">
+            <div class="text-sm">《客户协议书》</div>
+            <span class="nav-action">查看</span>
+          </div>
+          <div class="list-item">
+            <input type="checkbox" checked style="width:18px; height:18px; flex-shrink:0;">
+            <div class="text-sm">《风险披露声明》</div>
+            <span class="nav-action">查看</span>
+          </div>
+          <div class="list-item">
+            <input type="checkbox" checked style="width:18px; height:18px; flex-shrink:0;">
+            <div class="text-sm">《W-8BEN 外国人声明》</div>
+            <span class="nav-action">查看</span>
+          </div>
+          <div class="list-item" style="border-bottom:none;">
+            <input type="checkbox" style="width:18px; height:18px; flex-shrink:0;">
+            <div class="text-sm">《隐私政策》（可选，用于营销通知）</div>
+          </div>
+        </div>
+      </div>
+      <div class="sign-area" onclick="showToast('请在此处签名（模拟）')">
+        电子签名（用于开户协议）
+      </div>
+      <div class="proto-note">所有必选协议勾选后，提交按钮才可点击。签名图片加密存储，7年保留。</div>
+      <button class="btn btn-primary" onclick="submitKYC()">提交开户申请</button>
+    </div>
+
+    <!-- 审核状态页 (step 8) -->
+    <div id="step-8" class="kyc-step-content">
+      <div class="status-card">
+        <div class="status-icon" id="review-icon">⏳</div>
+        <div class="font-semi text-lg" id="review-title">审核中</div>
+        <div class="text-sm text-muted" id="review-desc">资料已提交，预计 1–2 个工作日完成审核。审核结果将通过 App 推送和短信通知您。</div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">已提交材料</div>
+        <div style="display:flex; flex-direction:column; gap:8px;">
+          <div class="flex justify-between text-sm">
+            <span class="text-muted">基本信息</span><span class="badge badge-success">✓ 完成</span>
+          </div>
+          <div class="flex justify-between text-sm">
+            <span class="text-muted">身份证件</span><span class="badge badge-success">✓ 完成</span>
+          </div>
+          <div class="flex justify-between text-sm">
+            <span class="text-muted">地址证明</span><span class="badge badge-pending">⏳ 审核中</span>
+          </div>
+          <div class="flex justify-between text-sm">
+            <span class="text-muted">W-8BEN</span><span class="badge badge-success">✓ 完成</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 模拟不同审核结果 -->
+      <div class="section-title">模拟审核结果（原型演示）</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn btn-secondary btn-sm" onclick="setReviewStatus('pending')">审核中</button>
+        <button class="btn btn-secondary btn-sm" onclick="setReviewStatus('approved')">审核通过</button>
+        <button class="btn btn-secondary btn-sm" onclick="setReviewStatus('rejected')">需补件</button>
+        <button class="btn btn-secondary btn-sm" onclick="setReviewStatus('failed')">审核拒绝</button>
+      </div>
+    </div>
+
+  </div><!-- /screen -->
+
+  <!-- 补件提示 Sheet -->
+  <div class="sheet-overlay" id="supplement-sheet">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">需要补充材料</div>
+      <div class="text-sm text-muted">地址证明文件不清晰，请重新上传近 3 个月的银行账单或水电费账单</div>
+      <button class="btn btn-primary" onclick="hideSheet('supplement-sheet'); gotoStep(3)">重新上传地址证明</button>
+      <button class="btn btn-ghost" onclick="hideSheet('supplement-sheet')">稍后处理</button>
+    </div>
+  </div>
+
+</div><!-- /phone -->
+
+<script src="../_shared/proto-router.js"></script>
+<script>
+  let currentStep = 4;
+
+  function gotoStep(n) {
+    document.querySelectorAll('.kyc-step-content').forEach(el => el.classList.remove('active'));
+    const target = document.getElementById('step-' + n);
+    if (target) target.classList.add('active');
+    currentStep = n;
+    updateStepUI();
+  }
+
+  function nextStep() {
+    if (currentStep < 7) gotoStep(currentStep + 1);
+  }
+
+  function prevStep() {
+    if (currentStep > 1) gotoStep(currentStep - 1);
+    else goto('../01-auth/index.html');
+  }
+
+  function updateStepUI() {
+    const label = document.getElementById('kyc-step-label');
+    const header = document.getElementById('kyc-header');
+    const steps = document.querySelector('.steps');
+    if (currentStep <= 7) {
+      if (label) label.textContent = '步骤 ' + currentStep + ' / 7';
+      if (header) header.style.display = 'flex';
+      if (steps) steps.style.display = 'flex';
+    } else {
+      if (label) label.textContent = '审核状态';
+      if (steps) steps.style.display = 'none';
+    }
+  }
+
+  function submitKYC() {
+    showToast('提交中...');
+    setTimeout(() => gotoStep(8), 1000);
+  }
+
+  function setReviewStatus(status) {
+    const icon = document.getElementById('review-icon');
+    const title = document.getElementById('review-title');
+    const desc = document.getElementById('review-desc');
+    if (status === 'approved') {
+      icon.textContent = '✅'; title.textContent = '开户成功';
+      desc.textContent = '您的账户已开通，现在可以入金交易。';
+    } else if (status === 'rejected') {
+      icon.textContent = '📋'; title.textContent = '需要补充材料';
+      desc.textContent = '地址证明文件不清晰，请重新上传。';
+      setTimeout(() => showSheet('supplement-sheet'), 500);
+    } else if (status === 'failed') {
+      icon.textContent = '❌'; title.textContent = '开户申请被拒';
+      desc.textContent = '很抱歉，您的开户申请未通过审核。如有疑问，请联系客服。';
+    } else {
+      icon.textContent = '⏳'; title.textContent = '审核中';
+      desc.textContent = '资料已提交，预计 1–2 个工作日完成审核。';
+    }
+  }
+
+  function simulateOCR(side) {
+    showToast('OCR 识别中...');
+    setTimeout(() => {
+      document.getElementById('ocr-result').style.display = 'block';
+      showToast('OCR 识别完成，请核对信息');
+    }, 1200);
+  }
+
+  function selectRadio(el) {
+    const group = el.closest('.radio-group');
+    if (!group) return;
+    group.querySelectorAll('.radio-item').forEach(i => i.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+</script>
+</body>
+</html>

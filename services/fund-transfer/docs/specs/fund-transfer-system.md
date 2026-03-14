@@ -1,5 +1,9 @@
 # 出入金系统架构设计
 
+> **配套文档**：本文档描述系统技术架构与流程。
+> 业务架构基础（托管模式、入金匹配机制、悬挂资金、资金边界、银行高可用）
+> 请先阅读 [`fund-custody-and-matching.md`](./fund-custody-and-matching.md)。
+
 ## 1. 系统概述
 
 出入金系统负责用户资金在银行账户与券商账户之间的双向流转，包括入金（Deposit）、出金（Withdrawal）、对账（Reconciliation）和合规审查。

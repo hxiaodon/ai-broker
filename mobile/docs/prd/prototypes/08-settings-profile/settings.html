@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>[低保真] 安全设置</title>
+<link rel="stylesheet" href="../_shared/proto-base.css">
+<style>
+  .toggle-row {
+    display: flex; align-items: center; padding: 14px 0; border-bottom: var(--border);
+  }
+  .toggle-row:last-child { border-bottom: none; }
+  .toggle-track {
+    width: 44px; height: 26px; border-radius: 13px; background: var(--gray-300);
+    position: relative; cursor: pointer; flex-shrink: 0; transition: background 0.2s;
+  }
+  .toggle-track.on { background: var(--gray-700); }
+  .toggle-thumb {
+    width: 20px; height: 20px; border-radius: 50%; background: #fff;
+    position: absolute; top: 3px; left: 3px; transition: left 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  }
+  .toggle-track.on .toggle-thumb { left: 21px; }
+</style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>安全设置</strong> |
+  <a href="index.html">← 个人中心</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar"><span>9:41</span><span>●●● WiFi 100%</span></div>
+  <div class="nav-bar">
+    <button class="nav-back" onclick="goto('index.html')">← 我的</button>
+    <span class="nav-title">安全设置</span>
+    <span></span>
+  </div>
+
+  <div class="screen" style="padding: 0; gap: 0; overflow-y: auto;">
+
+    <!-- 生物识别 -->
+    <div class="group-header" style="padding: 12px 16px 4px;">
+      <div class="section-title">生物识别登录</div>
+    </div>
+    <div class="card" style="margin: 0 16px 12px; padding: 0 16px;">
+      <div class="toggle-row">
+        <div style="flex:1;">
+          <div class="font-semi text-sm">Face ID 快捷登录</div>
+          <div class="text-xs text-muted">开启后可使用 Face ID 代替 OTP 登录</div>
+        </div>
+        <div class="toggle-track on" id="toggle-biometric" onclick="toggleItem(this)">
+          <div class="toggle-thumb"></div>
+        </div>
+      </div>
+      <div class="toggle-row">
+        <div style="flex:1;">
+          <div class="font-semi text-sm">下单生物识别确认</div>
+          <div class="text-xs text-muted">每次委托下单需 Face ID 二次确认</div>
+        </div>
+        <div class="toggle-track on" id="toggle-order-bio" onclick="toggleItem(this)">
+          <div class="toggle-thumb"></div>
+        </div>
+      </div>
+      <div class="toggle-row" style="border-bottom:none;">
+        <div style="flex:1;">
+          <div class="font-semi text-sm">出金生物识别确认</div>
+          <div class="text-xs text-muted">出金操作强制要求（不可关闭）</div>
+        </div>
+        <div class="toggle-track on" style="opacity:0.5; cursor:not-allowed;">
+          <div class="toggle-thumb"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 登录设备 -->
+    <div class="group-header" style="padding: 4px 16px 4px;">
+      <div class="section-title">设备安全</div>
+    </div>
+    <div class="card" style="margin: 0 16px 12px; padding: 0 16px;">
+      <div class="list-item" onclick="goto('../01-auth/index.html')">
+        <div style="flex:1;">
+          <div class="font-semi text-sm">登录设备管理</div>
+          <div class="text-xs text-muted">当前 3 台设备已登录</div>
+        </div>
+        <div class="list-item-arrow">›</div>
+      </div>
+      <div class="toggle-row" style="border-top: var(--border); padding-top: 14px;">
+        <div style="flex:1;">
+          <div class="font-semi text-sm">新设备登录提醒</div>
+          <div class="text-xs text-muted">新设备首次登录时推送通知</div>
+        </div>
+        <div class="toggle-track on" onclick="toggleItem(this)">
+          <div class="toggle-thumb"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 账户保护 -->
+    <div class="group-header" style="padding: 4px 16px 4px;">
+      <div class="section-title">账户保护</div>
+    </div>
+    <div class="card" style="margin: 0 16px 12px; padding: 0 16px;">
+      <div class="list-item" onclick="showSheet('lock-sheet')">
+        <div style="flex:1;">
+          <div class="font-semi text-sm">锁定账户</div>
+          <div class="text-xs text-muted">紧急情况下立即冻结所有操作</div>
+        </div>
+        <div class="list-item-arrow">›</div>
+      </div>
+      <div class="list-item" onclick="showToast('手机号更换（需重新OTP验证）')" style="border-bottom: none;">
+        <div style="flex:1;">
+          <div class="font-semi text-sm">更换手机号</div>
+          <div class="text-xs text-muted">+86 138****8888</div>
+        </div>
+        <div class="list-item-arrow">›</div>
+      </div>
+    </div>
+
+    <!-- 登录历史 -->
+    <div class="group-header" style="padding: 4px 16px 4px;">
+      <div class="section-title">最近登录记录</div>
+    </div>
+    <div class="card" style="margin: 0 16px 24px; padding: 0 16px;">
+      <div class="list-item">
+        <div style="flex:1;">
+          <div class="font-semi text-sm">iPhone 16 Pro <span class="badge badge-success" style="font-size:10px; margin-left:4px;">本机</span></div>
+          <div class="text-xs text-muted">2026-03-14 09:41 · 上海</div>
+        </div>
+      </div>
+      <div class="list-item" style="border-bottom:none;">
+        <div style="flex:1;">
+          <div class="font-semi text-sm">iPad Pro</div>
+          <div class="text-xs text-muted">2026-03-10 15:22 · 深圳</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 锁定账户 Sheet -->
+  <div class="sheet-overlay" id="lock-sheet">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">锁定账户</div>
+      <div class="text-sm text-muted text-center">账户锁定后，所有交易、出入金操作将被暂停。解锁需通过客服身份核验（1–3 个工作日）。</div>
+      <button class="btn btn-danger" onclick="hideSheet('lock-sheet'); showToast('账户已锁定，请联系客服解锁')">确认锁定账户</button>
+      <button class="btn btn-ghost" onclick="hideSheet('lock-sheet')">取消</button>
+    </div>
+  </div>
+</div>
+
+<script src="../_shared/proto-router.js"></script>
+<script>
+  function toggleItem(el) {
+    el.classList.toggle('on');
+    const isOn = el.classList.contains('on');
+    showToast(isOn ? '已开启' : '已关闭');
+  }
+</script>
+</body>
+</html>

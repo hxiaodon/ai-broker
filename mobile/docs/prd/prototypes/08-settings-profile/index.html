@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>[低保真] 08-Settings — 个人中心</title>
+<link rel="stylesheet" href="../_shared/proto-base.css">
+<style>
+  .profile-hero {
+    display: flex; align-items: center; gap: 16px;
+    padding: 20px 16px; background: var(--gray-50); border-bottom: var(--border);
+  }
+  .avatar {
+    width: 60px; height: 60px; border-radius: 50%;
+    background: var(--gray-300); display: flex; align-items: center;
+    justify-content: center; font-size: 24px; font-weight: 700;
+    color: var(--gray-700); flex-shrink: 0;
+  }
+  .kyc-badge { padding: 4px 10px; border-radius: var(--radius-full); font-size: 11px; font-weight: 600; }
+  .kyc-tier2 { background: var(--gray-800); color: #fff; }
+  .section-group { display: flex; flex-direction: column; gap: 0; }
+  .group-header { padding: 10px 16px 4px; }
+</style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>08-Settings — 个人中心</strong> — 页面：
+  <a href="index.html">个人中心</a> |
+  <a href="settings.html">安全设置</a> |
+  <a href="profile.html">个人资料</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar"><span>9:41</span><span>●●● WiFi 100%</span></div>
+  <div class="nav-bar">
+    <span></span>
+    <span class="nav-title">我的</span>
+    <span class="nav-action" onclick="goto('settings.html')">设置</span>
+  </div>
+
+  <div class="screen" style="padding:0; gap:0; overflow-y:auto;">
+
+    <!-- 用户头像 + 信息 -->
+    <div class="profile-hero" onclick="goto('profile.html')" style="cursor:pointer;">
+      <div class="avatar">张</div>
+      <div style="flex:1;">
+        <div class="font-semi text-lg">张三</div>
+        <div class="text-sm text-muted">+86 138****8888</div>
+        <div style="margin-top:6px; display:flex; gap:6px; align-items:center;">
+          <span class="kyc-badge kyc-tier2">Tier 2 · 已认证</span>
+        </div>
+      </div>
+      <span class="text-muted">›</span>
+    </div>
+
+    <!-- 账户卡片 -->
+    <div style="padding: 12px 16px; border-bottom: var(--border);">
+      <div class="card" style="display:flex; gap:0; padding:0; overflow:hidden; border-radius: var(--radius-md);">
+        <div style="flex:1; padding:14px; text-align:center; border-right: var(--border); cursor:pointer;" onclick="goto('../06-portfolio/index.html')">
+          <div class="text-xl font-bold">$28,452</div>
+          <div class="text-xs text-muted mt-4">总资产 (USD)</div>
+        </div>
+        <div style="flex:1; padding:14px; text-align:center; border-right: var(--border); cursor:pointer;" onclick="goto('../06-portfolio/index.html')">
+          <div class="text-xl font-bold" style="color:var(--gray-700);">+$2,847</div>
+          <div class="text-xs text-muted mt-4">累计盈亏</div>
+        </div>
+        <div style="flex:1; padding:14px; text-align:center; cursor:pointer;" onclick="goto('../05-funding/index.html')">
+          <div class="text-xl font-bold">$8,450</div>
+          <div class="text-xs text-muted mt-4">可用资金</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 快捷功能 -->
+    <div style="padding: 12px 16px; border-bottom: var(--border);">
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:8px; text-align:center;">
+        <div style="cursor:pointer;" onclick="goto('../05-funding/deposit.html')">
+          <div style="width:48px; height:48px; background:var(--gray-100); border-radius:var(--radius-md); display:flex; align-items:center; justify-content:center; font-size:20px; margin:0 auto 6px;">💵</div>
+          <div class="text-xs">入金</div>
+        </div>
+        <div style="cursor:pointer;" onclick="goto('../05-funding/withdraw.html')">
+          <div style="width:48px; height:48px; background:var(--gray-100); border-radius:var(--radius-md); display:flex; align-items:center; justify-content:center; font-size:20px; margin:0 auto 6px;">📤</div>
+          <div class="text-xs">出金</div>
+        </div>
+        <div style="cursor:pointer;" onclick="goto('../07-cross-module/index.html')">
+          <div style="width:48px; height:48px; background:var(--gray-100); border-radius:var(--radius-md); display:flex; align-items:center; justify-content:center; font-size:20px; margin:0 auto 6px;">🔔</div>
+          <div class="text-xs">消息</div>
+        </div>
+        <div style="cursor:pointer;" onclick="goto('settings.html')">
+          <div style="width:48px; height:48px; background:var(--gray-100); border-radius:var(--radius-md); display:flex; align-items:center; justify-content:center; font-size:20px; margin:0 auto 6px;">⚙️</div>
+          <div class="text-xs">设置</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 列表菜单 -->
+    <div class="group-header"><div class="section-title">账户</div></div>
+    <div class="card" style="margin: 0 16px 12px; padding: 0;">
+      <div class="list-item" onclick="goto('profile.html')"><div class="list-item-icon">👤</div><div class="list-item-content"><div class="list-item-title">个人资料</div></div><div class="list-item-arrow">›</div></div>
+      <div class="list-item" onclick="goto('../02-kyc/index.html')"><div class="list-item-icon">📋</div><div class="list-item-content"><div class="list-item-title">开户 / KYC 状态</div><div class="list-item-sub">Tier 2 · 已认证</div></div><div class="list-item-arrow">›</div></div>
+      <div class="list-item" onclick="goto('../05-funding/bank-bind.html')"><div class="list-item-icon">🏦</div><div class="list-item-content"><div class="list-item-title">银行账户管理</div><div class="list-item-sub">2 张已绑定</div></div><div class="list-item-arrow">›</div></div>
+    </div>
+
+    <div class="group-header"><div class="section-title">安全与隐私</div></div>
+    <div class="card" style="margin: 0 16px 12px; padding: 0;">
+      <div class="list-item" onclick="goto('settings.html')"><div class="list-item-icon">🔐</div><div class="list-item-content"><div class="list-item-title">安全设置</div><div class="list-item-sub">Face ID · 登录设备管理</div></div><div class="list-item-arrow">›</div></div>
+      <div class="list-item" onclick="goto('../01-auth/index.html#devices')"><div class="list-item-icon">📱</div><div class="list-item-content"><div class="list-item-title">登录设备管理</div><div class="list-item-sub">3 台设备</div></div><div class="list-item-arrow">›</div></div>
+    </div>
+
+    <div class="group-header"><div class="section-title">偏好设置</div></div>
+    <div class="card" style="margin: 0 16px 12px; padding: 0;">
+      <div class="list-item" onclick="showToast('涨跌色切换：红涨绿跌 ↔ 绿涨红跌')"><div class="list-item-icon">🎨</div><div class="list-item-content"><div class="list-item-title">涨跌颜色</div><div class="list-item-sub">红涨绿跌（A股习惯）</div></div><div class="list-item-arrow">›</div></div>
+      <div class="list-item" onclick="showToast('推送通知设置')"><div class="list-item-icon">🔔</div><div class="list-item-content"><div class="list-item-title">推送通知</div><div class="list-item-sub">成交 · 入出金 · 账户</div></div><div class="list-item-arrow">›</div></div>
+    </div>
+
+    <div class="group-header"><div class="section-title">帮助与支持</div></div>
+    <div class="card" style="margin: 0 16px 12px; padding: 0;">
+      <div class="list-item" onclick="showToast('客服中心（Phase 1 仅在线客服）')"><div class="list-item-icon">💬</div><div class="list-item-content"><div class="list-item-title">联系客服</div></div><div class="list-item-arrow">›</div></div>
+      <div class="list-item" onclick="showToast('合规文件页面')"><div class="list-item-icon">📄</div><div class="list-item-content"><div class="list-item-title">法律文件</div></div><div class="list-item-arrow">›</div></div>
+      <div class="list-item" style="border-bottom:none;" onclick="showToast('版本 1.0.0')"><div class="list-item-icon">ℹ️</div><div class="list-item-content"><div class="list-item-title">关于</div><div class="list-item-sub">v1.0.0</div></div></div>
+    </div>
+
+    <!-- 退出登录 -->
+    <div style="padding: 0 16px 32px;">
+      <button class="btn btn-ghost" onclick="showSheet('logout-confirm')">退出登录</button>
+    </div>
+
+  </div><!-- /screen -->
+
+  <!-- Tab Bar -->
+  <div class="tab-bar">
+    <div class="tab-item" onclick="goto('../03-market/index.html')"><div class="tab-icon">行</div><span>行情</span></div>
+    <div class="tab-item" onclick="goto('../04-trading/order-list.html')"><div class="tab-icon">单</div><span>订单</span></div>
+    <div class="tab-item" onclick="goto('../06-portfolio/index.html')"><div class="tab-icon">仓</div><span>持仓</span></div>
+    <div class="tab-item active"><div class="tab-icon">我</div><span>我的</span></div>
+  </div>
+
+  <!-- 退出确认 Sheet -->
+  <div class="sheet-overlay" id="logout-confirm">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">确认退出登录？</div>
+      <div class="text-sm text-muted text-center">退出后需重新验证才能查看持仓和订单</div>
+      <button class="btn btn-primary" onclick="goto('../01-auth/index.html')">确认退出</button>
+      <button class="btn btn-ghost" onclick="hideSheet('logout-confirm')">取消</button>
+    </div>
+  </div>
+</div>
+
+<script src="../_shared/proto-router.js"></script>
+</body>
+</html>

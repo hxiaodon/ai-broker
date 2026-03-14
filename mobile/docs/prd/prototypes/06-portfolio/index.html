@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>[低保真] 06-Portfolio — 资产概览</title>
+<link rel="stylesheet" href="../_shared/proto-base.css">
+<style>
+  .asset-hero {
+    background: var(--gray-800); color: #fff;
+    padding: 20px 16px; border-radius: 0;
+  }
+  .asset-total { font-size: 36px; font-weight: 700; margin: 8px 0 4px; }
+  .pnl-row { display: flex; gap: 16px; }
+  .pnl-item { display: flex; flex-direction: column; gap: 2px; }
+  .pnl-item .label { font-size: 11px; color: rgba(255,255,255,0.6); }
+  .pnl-item .val { font-size: var(--font-size-sm); font-weight: 600; }
+  .pos-row {
+    display: flex; align-items: center; gap: 12px; padding: 14px 16px;
+    border-bottom: var(--border); cursor: pointer;
+  }
+  .pos-row:last-child { border-bottom: none; }
+  .pos-ticker {
+    width: 44px; height: 44px; background: var(--gray-800);
+    border-radius: var(--radius-sm); display: flex; align-items: center;
+    justify-content: center; color: #fff; font-size: 10px; font-weight: 700; flex-shrink: 0;
+  }
+  .allocation-bar {
+    height: 6px; background: var(--gray-200); border-radius: var(--radius-full);
+    overflow: hidden; margin: 4px 0;
+  }
+  .allocation-fill { height: 100%; background: var(--gray-600); border-radius: var(--radius-full); }
+</style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>06-Portfolio — 资产概览</strong> |
+  <a href="position-detail.html">持仓详情</a> |
+  <a href="../05-funding/index.html">资金</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar" style="background: var(--gray-800); color: rgba(255,255,255,0.7);">
+    <span>9:41</span><span>●●● WiFi 100%</span>
+  </div>
+
+  <!-- 资产总览头部 -->
+  <div class="asset-hero">
+    <div style="color: rgba(255,255,255,0.7); font-size: var(--font-size-sm);">账户总资产 (USD)</div>
+    <div class="asset-total">$28,452.87</div>
+    <div class="pnl-row">
+      <div class="pnl-item">
+        <div class="label">今日盈亏</div>
+        <div class="val">+$423.15 (+1.51%)</div>
+      </div>
+      <div class="pnl-item">
+        <div class="label">累计盈亏</div>
+        <div class="val">+$2,847.32 (+11.12%)</div>
+      </div>
+    </div>
+    <div class="pnl-row" style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.15);">
+      <div class="pnl-item">
+        <div class="label">持仓市值</div>
+        <div class="val">$20,002.87</div>
+      </div>
+      <div class="pnl-item">
+        <div class="label">可用现金</div>
+        <div class="val">$8,450.00</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="screen" style="padding: 0; gap: 0;">
+
+    <!-- Tab 切换 -->
+    <div style="padding: 8px 16px; background: var(--gray-50); border-bottom: var(--border);">
+      <div class="segmented">
+        <div class="seg-item active" id="tab-pos" onclick="switchTab('pos', this)">持仓</div>
+        <div class="seg-item" id="tab-fund" onclick="switchTab('fund', this)">资金明细</div>
+        <div class="seg-item" id="tab-hist" onclick="switchTab('hist', this)">历史盈亏</div>
+      </div>
+    </div>
+
+    <!-- 持仓列表 -->
+    <div id="panel-pos">
+      <div class="pos-row" onclick="goto('position-detail.html')">
+        <div class="pos-ticker">AAPL</div>
+        <div style="flex:1;">
+          <div class="flex justify-between">
+            <span class="font-semi">Apple Inc.</span>
+            <span class="font-semi">$17,825.00</span>
+          </div>
+          <div class="flex justify-between text-xs text-muted">
+            <span>100 股 · 均价 $168.30</span>
+            <span class="badge badge-success" style="font-size:11px;">+$995 (+5.92%)</span>
+          </div>
+          <div style="margin-top: 6px;">
+            <div class="flex justify-between text-xs text-muted mb-4">
+              <span>今日 +$214.00</span><span>占比 63%</span>
+            </div>
+            <div class="allocation-bar"><div class="allocation-fill" style="width:63%;"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pos-row" onclick="goto('position-detail.html')">
+        <div class="pos-ticker" style="background: var(--gray-500);">NVDA</div>
+        <div style="flex:1;">
+          <div class="flex justify-between">
+            <span class="font-semi">NVIDIA Corp.</span>
+            <span class="font-semi">$1,768.00</span>
+          </div>
+          <div class="flex justify-between text-xs text-muted">
+            <span>2 股 · 均价 $841.25</span>
+            <span class="badge badge-success" style="font-size:11px;">+$85.50 (+5.08%)</span>
+          </div>
+          <div style="margin-top: 6px;">
+            <div class="flex justify-between text-xs text-muted mb-4">
+              <span>今日 +$176.00</span><span>占比 6%</span>
+            </div>
+            <div class="allocation-bar"><div class="allocation-fill" style="width:6%;"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pos-row" onclick="goto('position-detail.html')">
+        <div class="pos-ticker" style="background: var(--gray-600);">TSLA</div>
+        <div style="flex:1;">
+          <div class="flex justify-between">
+            <span class="font-semi">Tesla, Inc.</span>
+            <span class="font-semi">$409.87</span>
+          </div>
+          <div class="flex justify-between text-xs text-muted">
+            <span>5 股 · 均价 $261.00</span>
+            <span class="badge badge-error" style="font-size:11px; background: var(--gray-300); color:var(--gray-800);">-$95.13 (-18.83%)</span>
+          </div>
+          <div style="margin-top: 6px;">
+            <div class="flex justify-between text-xs text-muted mb-4">
+              <span>今日 +$33.15</span><span>占比 1%</span>
+            </div>
+            <div class="allocation-bar"><div class="allocation-fill" style="width:1%;"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 待结算提示 -->
+      <div class="card" style="margin: 12px 16px;">
+        <div class="card-title">待结算资金</div>
+        <div class="text-sm text-muted">NVDA 买入 $1,682.50 · T+1 · 预计 2026-03-17 结算</div>
+      </div>
+    </div>
+
+    <!-- 资金明细 -->
+    <div id="panel-fund" style="display:none;">
+      <div style="padding: 12px 16px;">
+        <div class="card" style="padding: 0;">
+          <div class="list-item" style="padding:12px 14px;"><div style="flex:1;"><div class="font-semi text-sm">NVDA 买入成交</div><div class="text-xs text-muted">2026-03-14 · 2 股 × $841.25</div></div><span style="color:var(--gray-600);">-$1,682.50</span></div>
+          <div class="list-item" style="padding:12px 14px;"><div style="flex:1;"><div class="font-semi text-sm">ACH 入金</div><div class="text-xs text-muted">2026-03-12 · Chase ****1234</div></div><span>+$5,000.00</span></div>
+          <div class="list-item" style="padding:12px 14px;"><div style="flex:1;"><div class="font-semi text-sm">AAPL 买入成交</div><div class="text-xs text-muted">2026-03-10 · 100 股 × $168.30</div></div><span style="color:var(--gray-600);">-$16,830.00</span></div>
+          <div class="list-item" style="padding:12px 14px; border-bottom:none;"><div style="flex:1;"><div class="font-semi text-sm">ACH 入金</div><div class="text-xs text-muted">2026-03-05 · Chase ****1234</div></div><span>+$20,000.00</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 历史盈亏 -->
+    <div id="panel-hist" style="display:none;">
+      <div class="empty-state" style="padding:40px 24px;">
+        <div class="empty-icon">📊</div>
+        <div class="empty-title">暂无已实现盈亏</div>
+        <div class="empty-sub">完成第一笔卖出交易后，盈亏记录将显示在这里</div>
+      </div>
+    </div>
+
+  </div><!-- /screen -->
+
+  <!-- Tab Bar -->
+  <div class="tab-bar">
+    <div class="tab-item" onclick="goto('../03-market/index.html')"><div class="tab-icon">行</div><span>行情</span></div>
+    <div class="tab-item" onclick="goto('../04-trading/order-list.html')"><div class="tab-icon">单</div><span>订单</span></div>
+    <div class="tab-item active"><div class="tab-icon">仓</div><span>持仓</span></div>
+    <div class="tab-item" onclick="goto('../08-settings-profile/index.html')"><div class="tab-icon">我</div><span>我的</span></div>
+  </div>
+</div>
+
+<script src="../_shared/proto-router.js"></script>
+<script>
+  function switchTab(tab, el) {
+    document.querySelectorAll('.seg-item').forEach(s => s.classList.remove('active'));
+    el.classList.add('active');
+    ['pos','fund','hist'].forEach(t => document.getElementById('panel-' + t).style.display = 'none');
+    document.getElementById('panel-' + tab).style.display = '';
+  }
+</script>
+</body>
+</html>

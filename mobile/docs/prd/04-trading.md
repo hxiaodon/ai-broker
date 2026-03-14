@@ -1,647 +1,382 @@
 # PRD-04：交易模块
 
 > **文档状态**: Phase 1 正式版
-> **版本**: v1.1
-> **日期**: 2026-03-13
-> **变更说明**: 根据交易引擎工程师评审意见修订：新增市价单价格保护 Collar（3.7节）；补充 DAY 单精确过期时间规则（3.4节）；修正订单状态机（6.1节：增加 RISK_CHECKING→REJECTED 路径、EXCHANGE_REJECTED 状态、PENDING_SUBMIT 标注为客户端态）；新增 GTC 调度器规格（6.3节）；撤单接口改为 POST /cancel（10.4节）；费用字段精度升级为 NUMERIC(18,8)；新增 fee_rates 动态配置表；order_fills 增加 settlement_date；附录 A FIX ExecType 映射表
+> **版本**: v2.0
+> **日期**: 2026-03-14
+> **变更说明**: v2.0 整改 — 移除接口规格、数据模型、GTC 调度器伪代码，改用 Mermaid 流程图与状态图，补充用户旅程与业务规则
+
+> **低保真原型**：[下单面板](prototypes/04-trading/order-entry.html) · [订单确认](prototypes/04-trading/order-confirm.html) · [订单列表](prototypes/04-trading/order-list.html)
 
 ---
 
-## 一、模块概述
+## 一、背景与问题
 
-### 1.1 功能范围
+### 1.1 用户痛点
 
-| 功能 | Phase 1 | Phase 2 |
-|------|---------|---------|
-| 市价单（Market Order） | ✅ | - |
-| 限价单（Limit Order） | ✅ | - |
-| 止损单（Stop Order） | ❌ | ✅ |
-| 止损限价单（Stop-Limit） | ❌ | ✅ |
-| 追踪止损（Trailing Stop） | ❌ | ✅ |
-| DAY / GTC 有效期 | ✅ | - |
-| IOC / FOK | ❌ | ✅ |
-| 盘前/盘后交易 | ✅（仅限价单） | - |
-| 委托修改 | ❌（仅撤单） | ✅ |
-| 订单历史与导出 | ✅ | - |
+- 首次美股下单流程陌生，不清楚市价单与限价单的区别
+- 盘前盘后时段容易搞混，担心在不希望的时段成交
+- 下单后不知道订单是否成功，缺乏及时反馈
+- 限价单长时间挂单后忘记撤销，超时后不知情
 
-### 1.2 权限前置条件
+### 1.2 业务价值
+
+下单是 App 最核心的转化行为，直接产生交易收入（手续费/通道费）。下单流程越简洁、反馈越及时，用户频繁交易的意愿越强。
+
+### 1.3 交易权限前置条件
 
 | 条件 | 说明 |
 |------|------|
-| KYC 状态 | `APPROVED`（Tier 1 或 Tier 2） |
-| 账户类型 | 现金账户（Phase 1 仅此类型） |
-| 最低买入金额 | 无（美股支持 1 股起买，Phase 1 不支持碎股） |
+| 账户 KYC 状态 | 必须为 `APPROVED`（Tier 1 或 Tier 2） |
+| 账户类型 | Phase 1 仅现金账户（Cash Account） |
+| 最小委托数量 | 1 股（Phase 1 不支持碎股 / 零股） |
+| 交易市场 | Phase 1 仅美股（NYSE / NASDAQ） |
 
 ---
 
-## 二、交易流程
+## 二、目标用户与场景
 
-### 2.1 主流程（买入 / 卖出）
-
-```
-进入股票详情页
-    ↓
-点击 [买入] 或 [卖出] 按钮
-    ↓
-交易委托页（填写委托参数）
-    ↓
-动态风险提示展示
-    ↓
-滑动确认（Slide-to-Confirm）
-    ↓
-弹出委托确认弹窗（最优执行披露 + Face ID 确认）
-    ↓
-生物识别验证（Face ID / 指纹）
-    ↓
-    [通过] → 提交至风控 → 送往交易所 → 委托成功 Toast → 跳转订单列表
-    [失败] → 返回委托页，保留输入
-```
-
-### 2.2 盘前/盘后交易首次确认
-
-```
-用户首次进入盘前/盘后交易时段点击买卖按钮
-    ↓
-弹出风险确认弹窗（说明流动性风险、宽幅报价、仅限价单）
-    ↓
-用户勾选"我已了解风险"并确认
-    ↓
-后续同一 App 安装期间不再提示
-```
-
----
-
-## 三、委托页设计规格
-
-### 3.1 页面头部
-
-| 元素 | 说明 |
+| 用户 | 场景 |
 |------|------|
-| 股票代码 + 名称 | 当前交易标的 |
-| 实时价格 | 最新价，WebSocket 实时更新 |
-| 涨跌幅 | 颜色随用户颜色设置 |
-| 交易时段标识 | 常规 / 盘前 / 盘后 |
-| 可用资金 | 现金账户买入方向：可用余额；卖出方向：可卖出股数 |
-
-### 3.2 订单类型（Phase 1）
-
-| 类型 | 显示名称 | 参数 |
-|------|---------|------|
-| 市价单 | 市价（Market） | 仅数量 |
-| 限价单 | 限价（Limit） | 限价 + 数量 |
-
-**市价单说明区**:
-- 显示当前最优买/卖报价（Bid / Ask）
-- 提示："以当前市场最优价格成交，实际成交价可能与当前显示价格不同"
-
-**限价单价格输入**:
-- 步进按钮（±$0.01）
-- 数字键盘直接输入
-- 参考 NBBO（National Best Bid and Offer）显示当前最优价
-- 价格偏离警告：输入价格与当前价格偏离 > 5% 时显示黄色警告
-- 最小报价单位：$0.0001（美股）
-
-### 3.3 数量输入
-
-| 元素 | 规格 |
-|------|------|
-| 数量输入框 | 正整数，最小 1 股 |
-| 快速选择按钮 | 25股 / 50股 / 100股 / 最大 |
-| "最大"计算逻辑（买入） | floor(可用资金 / 委托价格)，市价单用 ask 价估算 |
-| "最大"计算逻辑（卖出） | 当前持有已结算股数（不含未结算） |
-| 卖出时显示持仓摘要 | 持有股数 / 平均成本 / 市值 / 浮动盈亏 / 可卖（已结算）/ 未结算股数及预计结算日 |
-
-### 3.4 有效期（Time-in-Force）
-
-| TIF | 说明 | Phase 1 |
-|-----|------|---------|
-| DAY | 当日有效，收盘自动过期 | ✅ |
-| GTC | 最多有效 90 天（到期通知用户） | ✅ |
-| IOC | 立即成交否则撤销 | ❌ Phase 2 |
-| FOK | 完全成交否则全部撤销 | ❌ Phase 2 |
-
-**默认 TIF**：DAY（可在交易设置中修改默认值）
-
-**DAY 单过期精确规则**：
-
-| 交易时段 | 过期时间（ET） | 说明 |
-|---------|--------------|------|
-| 常规交易（Regular） | 16:00:00 | NYSE/NASDAQ 正常收盘 |
-| 包含盘后（extended_hours=true） | 20:00:00 | 盘后交易截止 |
-| 早收盘日（Early Close） | 13:00:00 | NYSE 发布的特殊交易日（如感恩节次日） |
-| 交易暂停（Trading Halt）期间 | 暂停期间不过期，复牌后继续计算至当日截止时间 | |
-
-- 过期逻辑由 GTC 调度器统一处理（见 6.3 节）
-- 过期时，系统向交易所发出撤单指令，收到 ExecType=4（Cancelled）回报后更新状态为 EXPIRED
-- 若交易所已成交但过期指令到达，以成交为准（ExecType=2 优先）
-
-### 3.5 费用预估明细
-
-| 费用项 | 买入显示 | 卖出显示 | 说明 |
-|--------|---------|---------|------|
-| 佣金 | $0.00 | $0.00 | 免佣 |
-| 交易所费用 | ≈$0.30 | ≈$0.30 | Exchange Fee |
-| SEC 费用 | — | ≈$X.XX | 仅卖出，0.0000278 × 成交金额 |
-| FINRA TAF | — | ≈$0.XX | 仅卖出，$0.000166/股，最高$8.30 |
-| 合计费用 | 显示 | 显示 | — |
-| 委托金额 | 数量 × 价格（估算） | 数量 × 价格（估算） | — |
-| 预计总金额 | 委托金额 + 费用 | 委托金额 − 费用 + 税 | — |
-
-**P&L 预览（卖出专属）**:
-```
-预计盈亏：+$XXX.XX (+X.XX%)
-= (预计卖出价 − 平均成本) × 数量 − 费用
-```
-
-### 3.6 动态风险提示
-
-| 触发条件 | 提示内容 |
-|---------|---------|
-| 单只持仓占比 > 20% | "该股票持仓集中度较高，请注意分散投资风险" |
-| 下单金额 > $10,000 | 弹出二次确认："大额委托确认，您正在下达超过 $10,000 的委托" |
-| 限价与市价偏离 > 5% | "您的委托价格与当前市价偏离超过 5%，请确认" |
-| 盘前/盘后下单 | "盘前/盘后交易流动性较低，可能无法成交或以不理想价格成交" |
-| PDT 触发警告（Day Trade 第 4 次） | 见 PDT 章节 |
-
-### 3.7 市价单价格保护（Price Protection Collar）
-
-市价单在提交至交易所前，系统自动添加价格保护区间，防止在流动性差或行情剧烈波动时以极端价格成交。
-
-| 交易时段 | Collar 范围 | 说明 |
-|---------|------------|------|
-| 常规交易（Regular Hours） | ±5% | 以提交时 NBBO 中间价为基准 |
-| 盘前/盘后（Extended Hours） | ±3% | 流动性更差，保护范围更窄 |
-
-**执行逻辑**：
-```
-买入市价单：实际上限价 = NBBO Ask × (1 + collar_pct)
-卖出市价单：实际下限价 = NBBO Bid × (1 - collar_pct)
-
-若价格触碰 Collar 边界，订单转为 LIMIT 单（以 Collar 价格提交）
-若此价格仍无法成交，订单进入等待，直到收盘或用户主动撤单
-```
-
-**前端展示**：
-- 委托确认弹窗中注明："市价单设有价格保护区间（±5%），超出范围将以保护价格委托"
-- 实际成交后，成交详情页展示"保护价格"字段（若触碰 Collar）
-
-**注**：Collar 功能为服务端逻辑，客户端仅做展示，不参与计算。
+| 散户投资者 | 看好某支股票，快速买入一定数量 |
+| 有策略的用户 | 设置限价单等待理想价格，不想盯盘 |
+| 持仓用户 | 盈利后部分卖出，锁定收益 |
+| 谨慎型用户 | 下单前反复确认金额和方向，担心误操作 |
 
 ---
 
-## 四、委托确认弹窗
+## 三、功能范围
 
-### 4.1 内容布局
+| 功能 | Phase 1 | Phase 2 | 优先级 |
+|------|---------|---------|--------|
+| 市价单（Market Order） | ✅ | - | Must |
+| 限价单（Limit Order） | ✅ | - | Must |
+| DAY / GTC 有效期 | ✅ | - | Must |
+| 盘前 / 盘后交易（仅限价单） | ✅ | - | Must |
+| 生物识别下单确认 | ✅ | - | Must |
+| 撤单 | ✅ | - | Must |
+| 订单列表与历史 | ✅ | - | Must |
+| 成交明细导出（CSV） | ✅ | - | Should |
+| 止损单 / 止损限价单 | ❌ | ✅ | - |
+| 追踪止损 | ❌ | ✅ | - |
+| 委托修改（修改价格/数量） | ❌（仅撤单重下） | ✅ | - |
+| 碎股 / 零股 | ❌ | ✅ | - |
+| IOC / FOK | ❌ | ✅ | - |
 
+---
+
+## 四、核心用户流程
+
+### 4.1 下单主流程
+
+> **原型参考**：[下单面板](prototypes/04-trading/order-entry.html) → [订单确认](prototypes/04-trading/order-confirm.html)
+
+```mermaid
+flowchart TD
+    A([股票详情页]) --> B[点击买入 / 卖出]
+    B --> C{用户是否已登录\n且 KYC 通过?}
+    C -->|否| D[登录 / 开户引导]
+    C -->|是| E[委托下单页]
+
+    E --> F[选择买入或卖出]
+    F --> G[选择订单类型]
+    G --> H{订单类型}
+    H -->|市价单| I[仅填写数量]
+    H -->|限价单| J[填写委托价 + 数量]
+
+    I --> K[选择有效期\nDAY / GTC]
+    J --> K
+
+    K --> L{当前时段?}
+    L -->|盘中| M[可选盘前盘后选项\n默认关闭]
+    L -->|盘前盘后| N[自动启用盘前盘后\n显示风险提示]
+    L -->|休市| O[只能下 GTC 限价单\n或次日 DAY 单]
+
+    M --> P[查看费用预估]
+    N --> P
+    O --> P
+
+    P --> Q{动态风险提示}
+    Q -->|无风险提示| R[滑动确认]
+    Q -->|有风险提示| S[展示风险提示\n用户确认]
+    S --> R
+
+    R --> T[生物识别验证\nFace ID / 指纹]
+    T --> U{验证结果}
+    U -->|通过| V[提交委托]
+    U -->|失败| W[提示重试\n保留输入内容]
+
+    V --> X{委托结果}
+    X -->|成功| Y[成功 Toast\n跳转订单列表]
+    X -->|失败| Z[错误提示\n说明原因]
 ```
-[委托摘要]
-方向：买入 AAPL
-类型：限价单
-委托价：$182.52
-数量：100 股
-有效期：当日有效
-委托金额：$18,252.00
 
-[费用明细]
-交易所费用：$0.30
-合计：$18,252.30
+### 4.2 盘前 / 盘后首次确认流程
 
-[最优执行披露]
-"您的订单将以最优价格路由至 NYSE、NASDAQ 等交易所，
- 我们不接受 PFOF，执行质量报告每季度公示。"
-
-[确认按钮] 🔐 Face ID 确认
+```mermaid
+flowchart TD
+    A[用户首次点击盘前盘后时段的买卖] --> B[弹出风险说明弹窗]
+    B --> C[展示内容:\n· 流动性较低，价差可能较大\n· 仅支持限价单\n· 可能无法成交]
+    C --> D{用户操作}
+    D -->|勾选已了解 + 确认| E[进入下单流程\n本次安装不再提示]
+    D -->|取消| F[返回，不下单]
 ```
 
-### 4.2 确认方式
+### 4.3 撤单流程
 
-| 场景 | 确认方式 |
+> **原型参考**：[订单列表 — 撤单操作](prototypes/04-trading/order-list.html)
+
+```mermaid
+flowchart TD
+    A[订单列表] --> B[找到待成交或部分成交订单]
+    B --> C[点击撤单]
+    C --> D[确认弹窗:\n显示委托摘要 + 已成交数量 + 待撤数量]
+    D --> E{用户操作}
+    E -->|确认撤单| F[提交撤单请求]
+    E -->|取消| G[不操作]
+
+    F --> H{撤单结果}
+    H -->|成功| I[Toast 提示订单撤销成功\n状态更新为已撤销]
+    H -->|失败: 已成交| J[Toast 提示该委托已全部成交\n无法撤销]
+    H -->|失败: 网络| K[Toast 提示撤单失败请重试]
+```
+
+---
+
+## 五、订单状态生命周期
+
+```mermaid
+stateDiagram-v2
+    [*] --> 待提交: 用户点击确认\n（客户端本地状态）
+    待提交 --> 风控检查中: HTTP 响应成功
+    风控检查中 --> 已提交: 风控通过
+    风控检查中 --> 已拒绝: 风控拒绝\n（资金不足/限制/合规）
+
+    已提交 --> 待成交: 交易所确认接受
+    待成交 --> 部分成交: 部分数量成交
+    待成交 --> 已成交: 全部数量成交
+    待成交 --> 已撤销: 用户撤单且交易所确认
+    待成交 --> 已过期: DAY 单收盘 / GTC 满90天
+    待成交 --> 交易所拒绝: 交易所拒绝
+
+    部分成交 --> 已成交: 剩余数量成交
+    部分成交 --> 部分成交后撤销: 用户撤单
+
+    已成交 --> [*]
+    已拒绝 --> [*]
+    已撤销 --> [*]
+    部分成交后撤销 --> [*]
+    已过期 --> [*]
+    交易所拒绝 --> [*]
+```
+
+**订单状态的用户感知标识：**
+
+| 状态 | 标识颜色 | 显示文字 |
+|------|---------|---------|
+| 风控检查中 | 蓝色（加载动画） | 审核中 |
+| 待成交 | 蓝色 | 待成交 |
+| 部分成交 | 橙色 | 部分成交 |
+| 已成交 | 绿色 | 已成交 |
+| 已撤销 | 灰色 | 已撤销 |
+| 部分成交后撤销 | 橙色 | 部分成交后撤销 |
+| 已过期 | 灰色 | 已过期 |
+| 已拒绝 | 红色 | 已拒绝 |
+| 交易所拒绝 | 红色 | 交易所拒绝 |
+
+---
+
+## 六、委托下单页详细设计
+
+> **原型参考**：[下单面板](prototypes/04-trading/order-entry.html)
+
+### 6.1 页面信息区
+
+- 股票代码 + 公司名称
+- 当前价格（实时更新）+ 涨跌幅
+- 当前交易时段标识（常规 / 盘前 / 盘后 / 休市）
+- 买入方向：显示可用现金；卖出方向：显示当前可卖股数（仅已结算部分）
+
+### 6.2 订单类型说明
+
+| 类型 | 用户说明 |
 |------|---------|
+| 市价单 | 以当前市场最优价格立即成交，适合追求速度；实际成交价可能与显示价格有差异（特别是在波动剧烈时） |
+| 限价单 | 仅在价格达到您指定的价格时成交，适合有价格要求的投资者；若市价未触及委托价，订单将持续挂单 |
+
+**市价单提示：** 系统会对市价单设置价格保护区间（常规时段 ±5%，盘前盘后 ±3%），防止在流动性差时以极端价格成交。用户无需操作，自动生效。
+
+### 6.3 数量输入规则
+
+| 场景 | 规则 |
+|------|------|
+| 买入 — "最大"计算 | 可用资金 ÷ 委托价（取整），市价单用最新卖价估算 |
+| 卖出 — "最大"计算 | 当前已结算持仓数量（未结算部分不可卖） |
+| 卖出时持仓摘要 | 展示：持有总股数 / 可卖数量 / 待结算数量及结算日期 / 持仓均价 / 当前浮动盈亏 |
+| 快捷选择 | 25 / 50 / 100 / 最大（卖出时追加"1/4 / 1/2 / 3/4"选项） |
+
+### 6.4 有效期规则
+
+| 选项 | 说明 | 注意 |
+|------|------|------|
+| 当日有效（DAY） | 当日收盘时自动过期取消 | 盘前盘后时段下单选 DAY，过期时间延至 20:00 ET |
+| 长期有效（GTC） | 最多有效 90 天 | 到期前 3 天 / 1 天推送通知提醒；到期后自动取消 |
+
+### 6.5 费用预估展示
+
+| 费用项 | 买入 | 卖出 |
+|--------|------|------|
+| 佣金 | $0.00（免佣） | $0.00（免佣） |
+| 交易所费用 | 约 $0.30 | 约 $0.30 |
+| SEC 费用 | — | 按成交金额 × 0.0000278 计算 |
+| FINRA 费用 | — | 按股数 × $0.000166，上限 $8.30 |
+| 预计总金额 | 委托金额 + 费用 | 委托金额 − 费用 |
+
+> 以上费用为预估，以实际成交时的费用为准
+
+### 6.6 动态风险提示触发条件
+
+| 触发条件 | 提示方式 |
+|---------|---------|
+| 单只持仓占总资产比例 > 20% | 黄色警告横幅（非阻断） |
+| 单笔委托金额 > $10,000 | 弹出二次确认弹窗 |
+| 限价与当前市价偏离 > 5% | 黄色警告（"委托价与市价偏离 X%，请确认"） |
+| 盘前 / 盘后下单 | 黄色横幅说明流动性风险 |
+| 第一次盘前盘后下单 | 单独弹窗，需勾选确认 |
+
+---
+
+## 七、订单确认页设计
+
+> **原型参考**：[订单确认页](prototypes/04-trading/order-confirm.html)
+
+确认页展示完整委托摘要，让用户最后核对后再提交：
+
+**确认页必须展示：**
+- 委托方向（买入 / 卖出）+ 股票代码
+- 订单类型 + 委托价格（市价单显示"市价"）
+- 委托数量 + 有效期
+- 费用明细 + 预计总金额
+- 最优执行披露（说明订单路由原则，不接受 PFOF）
+- 确认方式：滑动 + 生物识别（Face ID / 指纹）
+
+**确认方式说明：**
+
+| 场景 | 要求 |
+|------|------|
 | 默认 | 滑动解锁 + 生物识别 |
 | 生物识别不可用 | 仅滑动解锁 |
-| 用户在交易设置关闭生物识别确认 | 仅滑动解锁 |
-| 限价单（用户设置 "限价免生物识别"） | 仅滑动 |
+| 用户在"交易设置"关闭生物识别 | 仅滑动解锁 |
 
 ---
 
-## 五、PDT（Pattern Day Trader）规则
+## 八、订单管理页设计
 
-### 5.1 规则定义
+> **原型参考**：[订单列表](prototypes/04-trading/order-list.html)
 
-| 规则 | 说明 |
-|------|------|
-| PDT 定义 | 5 个交易日内在保证金账户完成 4 次或以上 Day Trade |
-| Phase 1 | 现金账户不受 PDT 限制（Phase 1 仅现金账户） |
-| Phase 2 | 融资账户需追踪 Day Trade 计数，余额 < $25K 时触发限制 |
-| 前端 | PDT 教育页面（设置 → 交易 → PDT 规则说明），无切换开关 |
+### 8.1 列表 Tab 分类
 
-**重要决策**（参考 pm-decision-response.md CRITICAL-1）:
-- PDT 是 FINRA 强制要求，**不提供绕过选项**
-- 交易引擎层硬性拦截（Phase 2 融资账户时）
-- Phase 1 现金账户不受约束，但应向用户展示 PDT 教育内容
+待成交 | 已成交 | 已撤销 / 已过期 | 全部
 
----
+### 8.2 列表卡片信息
 
-## 六、订单状态机
-
-### 6.1 状态定义
-
-```
-PENDING_SUBMIT     [仅客户端态，不持久化到服务端]
-                   (前端已发送，等待服务端 HTTP 响应)
-    ↓ HTTP 200
-RISK_CHECKING      (服务端收单，风控预检中)
-    ↓ [通过]            ↓ [拒绝]
-SUBMITTED          REJECTED（风控拒绝，终态）
-    ↓
-PENDING_FILL       (已送至交易所，挂单中，等待成交)
-    ↓ [部分成交]         ↓ [全部成交]        ↓ [撤单]
-PARTIAL_FILL       FILLED（终态）            CANCELLED（终态）
-    ↓ [全部成交]         ↓ [撤单]
-    FILLED（终态）       CANCELLED_PARTIAL（终态，部分成交后撤单）
-                         EXPIRED（终态，超时过期：GTC 90天 / DAY 收盘）
-                         EXCHANGE_REJECTED（终态，交易所拒绝，详见附录A FIX ExecType）
-```
-
-**状态说明**：
-
-| 状态 | 是否持久化 | 描述 |
-|------|---------|------|
-| PENDING_SUBMIT | ❌ 仅客户端 | Flutter 本地 UI 状态，HTTP 响应后即替换 |
-| RISK_CHECKING | ✅ | 服务端风控处理中，通常 < 100ms |
-| SUBMITTED | ✅ | 已通过风控，发送至经纪商/交易所 |
-| PENDING_FILL | ✅ | 交易所已确认接受，等待成交 |
-| PARTIAL_FILL | ✅ | 部分数量已成交 |
-| FILLED | ✅ 终态 | 全部成交 |
-| CANCELLED | ✅ 终态 | 用户主动撤单，交易所确认 |
-| CANCELLED_PARTIAL | ✅ 终态 | 部分成交后用户撤单 |
-| EXPIRED | ✅ 终态 | DAY 单收盘过期 / GTC 达 90 天 |
-| REJECTED | ✅ 终态 | 风控拒绝（含资金不足、PDT 等） |
-| EXCHANGE_REJECTED | ✅ 终态 | 交易所拒绝（FIX ExecType=8，见附录 A） |
-
-### 6.2 状态对应 UI
-
-| 状态 | 徽标颜色 | 文字 |
-|------|---------|------|
-| RISK_CHECKING | 蓝色（动画） | 风控中 |
-| PENDING_FILL | 蓝色 | 待成交 |
-| PARTIAL_FILL | 黄色 | 部分成交 |
-| FILLED | 绿色 | 已成交 |
-| CANCELLED | 灰色 | 已撤销 |
-| CANCELLED_PARTIAL | 橙色 | 部分成交后撤销 |
-| EXPIRED | 灰色 | 已过期 |
-| REJECTED | 红色 | 已拒绝 |
-| EXCHANGE_REJECTED | 红色 | 交易所拒绝 |
-
-### 6.3 GTC 调度器 / DAY 单过期调度器
-
-**服务**: `order-expiry-scheduler`（独立 Go goroutine，每分钟扫描）
-
-```
-调度逻辑（伪代码）：
-
-每分钟执行：
-  1. 查询当日 DAY 单过期时间（NYSE/NASDAQ 收盘时间，含早收盘日）
-  2. SELECT * FROM orders
-       WHERE status IN ('PENDING_FILL', 'PARTIAL_FILL')
-         AND time_in_force = 'DAY'
-         AND expires_at <= NOW()
-         AND expires_at > NOW() - INTERVAL '5 minutes'  // 避免重复处理
-     FOR UPDATE SKIP LOCKED;
-  3. 对每个订单：发送 FIX OrderCancelRequest → 等待 ExecType=4 回报 → 更新 EXPIRED
-  4. GTC 90 天到期：同逻辑，提前 3 天/1 天发送推送通知（见 PRD-07 通知模块）
-
-并发保护：
-  - FOR UPDATE SKIP LOCKED 防止多实例重复处理
-  - 发送 FIX 请求前设置 processing_at 时间戳（乐观锁）
-  - 若 ExecType 回报未在 30s 内收到，进入 PENDING_CANCEL 中间态（Phase 2）
-
-推送通知（GTC 即将到期）：
-  - 到期前 3 天：推送"您的 GTC 委托将在 3 天后过期"
-  - 到期前 1 天：推送"您的 GTC 委托将在明天过期"
-  - 已过期：推送"您的 GTC 委托已过期"
-```
-
----
-
-## 七、订单管理页
-
-### 7.1 订单列表
-
-**Tab 分类**:
-- 全部 / 待成交 / 已成交 / 已撤销 / 已过期
-
-**列表卡片字段**:
-- 股票代码 + 方向（买/卖）+ 订单类型
-- 委托价格 / 委托数量
+- 股票代码 + 方向（买入/卖出）+ 订单类型标签
+- 委托价格 + 委托数量
 - 已成交数量 / 未成交数量
-- 订单号（短号，12 位）
 - 委托时间
-- 撤单按钮（仅 PENDING_FILL / PARTIAL_FILL 状态）
+- 状态标识
+- 撤单按钮（仅"待成交"和"部分成交"状态显示）
 
-### 7.2 订单详情（底部抽屉）
+### 8.3 订单详情（点击卡片展开）
 
-```
-[状态标题区]
-方向 + 代码 + 状态 Badge
+| 信息区块 | 内容 |
+|---------|------|
+| 订单信息 | 委托类型、委托价、数量、有效期、订单号 |
+| 成交明细 | 成交时间、成交数量、成交均价、交易所 |
+| 费用明细 | 逐项费用 + 合计 |
+| 状态时间轴 | 委托创建 → 风控通过 → 送往交易所 → 确认接受 → 成交/撤销/过期 |
 
-[订单信息]
-委托类型 / 委托价 / 委托数量 / 已成交 / 均价 / 剩余 / 有效期
+### 8.4 交易历史
 
-[成交明细]（有成交时）
-成交时间 / 成交数量 / 成交价 / 成交金额 / 成交所 / 执行 ID
-
-[费用明细]
-逐笔费用 + 合计
-
-[状态时间轴]
-节点1：委托创建 2026-03-13 09:30:00.123
-节点2：风控通过 2026-03-13 09:30:00.456
-节点3：已送往交易所 2026-03-13 09:30:00.789
-节点4：确认接受 2026-03-13 09:30:01.012
-节点5：已成交 / 已撤销 / 已过期
-
-[操作区域]
-[撤单] 按钮（状态允许时显示）
-```
-
-### 7.3 撤单流程
-
-```
-点击 [撤单] → 弹出确认弹窗
-    ↓
-弹窗内容：
-  - 原委托摘要（代码、方向、委托价、委托数量）
-  - 已成交数量（部分成交情况）
-  - 待撤销数量
-  - "注意：撤单不保证成功，若订单已成交撤单请求将被拒绝"
-    ↓
-[确认撤单] / [取消]
-    ↓
-服务端处理：
-  [撤单成功] → Toast 提示"撤单请求已提交" → 订单状态更新
-  [撤单失败-已成交] → Toast "该委托已成交，无法撤单" → 刷新订单
-  [撤单失败-网络] → Toast "撤单请求失败，请重试"
-```
-
-### 7.4 交易历史（成交记录）
-
-- 时间过滤：今天 / 本周 / 本月 / 自定义
-- 市场过滤：全部 / 美股
-- 按日期分组，每组显示当日交易摘要
-- 每条成交记录：代码、方向、数量 × 价格 = 金额、费用、时间、交易所
-- 导出：CSV（Phase 1），PDF（Phase 2）
+- 时间过滤：今天 / 本周 / 本月 / 自定义日期范围
+- 按日期分组显示，每日显示当日交易汇总（总买入额 / 总卖出额 / 当日盈亏）
+- 支持导出 CSV（含成交明细，用于报税）
 
 ---
 
-## 八、交易设置
+## 九、PDT 规则（Pattern Day Trader）
 
-| 设置项 | 选项 | 默认 |
-|--------|------|------|
-| 默认订单类型 | 市价单 / 限价单 | 限价单 |
-| 默认有效期 | DAY / GTC | DAY |
-| 确认方式 | 滑动+生物识别 / 仅滑动 / 限价单免确认 | 滑动+生物识别 |
-| 大额委托阈值 | $5,000 / $10,000 / $20,000 | $10,000 |
-| 盘前/盘后交易 | 开启 / 关闭 | 关闭（首次需确认风险） |
-| 价格偏离警告阈值 | 3% / 5% / 10% | 5% |
+> **监管要求**：FINRA Rule 4210，不可绕过
 
----
-
-## 九、错误处理
-
-| 错误类型 | 错误码 | 用户提示 | 操作 |
-|---------|--------|---------|------|
-| 资金不足 | ERR_INSUFFICIENT_FUNDS | "可用资金不足，当前可用 $X.XX" | 显示充值入口 |
-| 持仓不足（卖出） | ERR_INSUFFICIENT_POSITION | "持仓不足，当前可卖出 X 股（已结算）" | 无 |
-| 市场休市 | ERR_MARKET_CLOSED | "当前市场已休市，可预设次日限价委托" | 提示开市时间 |
-| 交易暂停（股票） | ERR_TRADING_HALTED | "该股票交易暂时中止，请稍后再试" | 设置恢复提醒 |
-| PDT 拦截（Phase 2） | ERR_PDT_RESTRICTED | "您已触发 PDT 规则，账户权益需维持在 $25,000 以上" | 跳转 PDT 教育页 |
-| 风控拦截 | ERR_RISK_REJECTED | "委托被风控拒绝，请联系客服" | 客服入口 |
-| 网络超时 | ERR_NETWORK_TIMEOUT | "网络连接超时，请检查您的网络后在订单列表确认委托状态" | 跳转订单列表 |
-| 交易所拒绝 | ERR_EXCHANGE_REJECTED | "委托被交易所拒绝：{原因}" | 无 |
-
----
-
-## 十、后端接口规格
-
-### 10.1 提交委托
-
-```
-POST /v1/orders
-Headers:
-  Authorization: Bearer {token}
-  Idempotency-Key: {uuid}
-Request:
-  {
-    "symbol": "AAPL",
-    "market": "US",
-    "side": "BUY" | "SELL",
-    "order_type": "MARKET" | "LIMIT",
-    "quantity": 100,
-    "limit_price": "182.52",          // 限价单必填
-    "time_in_force": "DAY" | "GTC",
-    "extended_hours": false,           // 是否允许盘前盘后
-    "device_id": "device-uuid",
-    "biometric_signature": "..."       // 生物识别签名（可选）
-  }
-Response:
-  {
-    "order_id": "ord-xxxxxxxx",
-    "client_order_id": "uuid",         // 等同 Idempotency-Key
-    "status": "SUBMITTED",
-    "created_at": "2026-03-13T09:30:00.000Z"
-  }
-```
-
-**幂等性规则**：相同 `Idempotency-Key` 的请求，72 小时内返回第一次响应。
-
-### 10.2 查询订单列表
-
-```
-GET /v1/orders?status=PENDING_FILL&page=1&page_size=20
-Response:
-  {
-    "orders": [...],
-    "total": 150,
-    "page": 1
-  }
-```
-
-### 10.3 查询订单详情
-
-```
-GET /v1/orders/{order_id}
-Response: 订单完整详情（含成交明细、状态时间轴）
-```
-
-### 10.4 撤单
-
-```
-POST /v1/orders/{order_id}/cancel
-Headers:
-  Authorization: Bearer {token}
-  Idempotency-Key: {uuid}
-Body: {}   // 无需请求体，预留用于 Phase 2 部分撤单
-
-Response 200:
-  {
-    "order_id": "ord-xxxxxxxx",
-    "cancel_status": "CANCEL_REQUESTED" | "CANCELLED" | "FAILED_ALREADY_FILLED"
-  }
-
-注：使用 POST /cancel 而非 DELETE，原因：
-  1. 撤单是业务操作（带 Idempotency-Key），非幂等的 HTTP DELETE 语义
-  2. 可在 Body 中携带参数（如 Phase 2 的部分撤单数量）
-  3. API Gateway 和防火墙对 DELETE with body 支持不一致
-```
-
-### 10.5 预估费用
-
-```
-POST /v1/orders/estimate
-Request: 同提交委托（不实际提交）
-Response:
-  {
-    "estimated_commission": "0.00",
-    "estimated_exchange_fee": "0.30",
-    "estimated_sec_fee": "0.00",       // 买入为 0
-    "estimated_finra_taf": "0.00",     // 买入为 0
-    "total_estimated_fee": "0.30",
-    "estimated_total_amount": "18252.30"
-  }
-```
-
----
-
-## 十一、数据模型
-
-```sql
--- 订单主表
-CREATE TABLE orders (
-    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id             UUID NOT NULL REFERENCES users(id),
-    client_order_id     UUID UNIQUE NOT NULL,      -- 幂等键（等同 Idempotency-Key）
-    symbol              VARCHAR(10) NOT NULL,
-    market              VARCHAR(5) NOT NULL DEFAULT 'US',
-    side                VARCHAR(4) NOT NULL,        -- 'BUY', 'SELL'
-    order_type          VARCHAR(20) NOT NULL,       -- 'MARKET', 'LIMIT'
-    quantity            NUMERIC(18,6) NOT NULL,
-    limit_price         NUMERIC(18,4),
-    time_in_force       VARCHAR(5) NOT NULL,        -- 'DAY', 'GTC'
-    extended_hours      BOOLEAN DEFAULT false,
-    status              VARCHAR(30) NOT NULL DEFAULT 'RISK_CHECKING',
-                        -- 注：PENDING_SUBMIT 为客户端态，不写入 DB
-    filled_quantity     NUMERIC(18,6) DEFAULT 0,
-    avg_fill_price      NUMERIC(18,4),
-    commission          NUMERIC(18,8) DEFAULT 0,   -- 精度升级至 8 位（SEC/FINRA 费率需要）
-    exchange_fee        NUMERIC(18,8) DEFAULT 0,
-    sec_fee             NUMERIC(18,8) DEFAULT 0,   -- 费率：0.0000278 × 成交金额
-    finra_taf           NUMERIC(18,8) DEFAULT 0,   -- 费率：$0.000166/股，max $8.30
-    collar_price        NUMERIC(18,4),              -- 市价单触碰 Collar 时的保护价格
-    broker_order_id     VARCHAR(100),               -- 经纪商/交易所分配的 ID
-    fix_exec_type       VARCHAR(5),                 -- 最后一次 FIX ExecType 值，用于调试
-    reject_reason       TEXT,
-    expires_at          TIMESTAMPTZ,               -- DAY: 收盘时间, GTC: created_at+90d
-    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_orders_user_status ON orders (user_id, status);
-CREATE INDEX idx_orders_expiry ON orders (expires_at)
-    WHERE status IN ('PENDING_FILL', 'PARTIAL_FILL');  -- 过期调度器专用
-
--- 成交明细表
-CREATE TABLE order_fills (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    order_id        UUID NOT NULL REFERENCES orders(id),
-    fill_quantity   NUMERIC(18,6) NOT NULL,
-    fill_price      NUMERIC(18,4) NOT NULL,
-    fill_amount     NUMERIC(18,4) NOT NULL,         -- fill_quantity × fill_price
-    commission      NUMERIC(18,8) NOT NULL DEFAULT 0,
-    sec_fee         NUMERIC(18,8) NOT NULL DEFAULT 0,
-    finra_taf       NUMERIC(18,8) NOT NULL DEFAULT 0,
-    exchange        VARCHAR(20),                    -- 成交所（NYSE/NASDAQ/ARCA等）
-    execution_id    VARCHAR(100) UNIQUE,            -- FIX ExecID，幂等键
-    settlement_date DATE NOT NULL,                  -- T+1（US），用于可提现余额计算
-    filled_at       TIMESTAMPTZ NOT NULL,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_fills_order ON order_fills (order_id);
-CREATE INDEX idx_fills_settlement ON order_fills (settlement_date)
-    WHERE settlement_date > CURRENT_DATE;           -- 查询待结算数据
-
--- 订单状态变更历史（只追加，不更新不删除）
-CREATE TABLE order_status_log (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    order_id    UUID NOT NULL REFERENCES orders(id),
-    old_status  VARCHAR(30),
-    new_status  VARCHAR(30) NOT NULL,
-    reason      TEXT,
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- 费率动态配置表（避免硬编码费率）
-CREATE TABLE fee_rates (
-    id          SERIAL PRIMARY KEY,
-    fee_type    VARCHAR(30) NOT NULL,   -- 'SEC_FEE', 'FINRA_TAF', 'EXCHANGE_FEE'
-    market      VARCHAR(5) NOT NULL DEFAULT 'US',
-    rate        NUMERIC(18,10) NOT NULL, -- 费率本身（如 SEC: 0.0000278）
-    max_amount  NUMERIC(18,4),          -- 单笔上限（如 FINRA TAF: 8.30）
-    min_amount  NUMERIC(18,4),          -- 单笔下限（如 0.01）
-    effective_from  DATE NOT NULL,
-    effective_to    DATE,               -- NULL 表示当前有效
-    CONSTRAINT uq_fee_rate_active UNIQUE (fee_type, market, effective_from)
-);
-
--- 初始数据（费率以实际监管公告为准，需定期更新）
-INSERT INTO fee_rates (fee_type, market, rate, max_amount, effective_from) VALUES
-  ('SEC_FEE',    'US', 0.0000278, NULL, '2024-01-01'),
-  ('FINRA_TAF',  'US', 0.000166,  8.30, '2024-01-01'),
-  ('EXCHANGE_FEE','US', 0.003,    NULL, '2024-01-01');
--- 注：Exchange Fee 以实际执行交易所 Schedule 为准，此处为估算默认值
-```
-
----
-
-## 十二、验收标准
-
-| 场景 | 标准 |
+| 项目 | 说明 |
 |------|------|
-| 委托提交延迟 | P99 < 1 秒（下单到订单状态 SUBMITTED） |
-| 幂等性 | 重复提交同一 Idempotency-Key 不产生双单 |
-| 滑动确认 | 滑动距离 > 80% 才触发提交，防误触 |
-| 生物识别确认 | Face ID 验证失败 3 次后降级至滑动确认 |
-| 大额委托 | > $10K 必须弹出二次确认，不可关闭 |
-| 撤单结果 | 撤单后 3 秒内刷新订单状态 |
-| 网络断开 | 断网后不自动重试委托，提示用户确认 |
-| 市价单 Collar | 常规时段 ±5%、盘前盘后 ±3%，触碰时自动转限价 |
-| DAY 单过期 | 16:00 ET（早收盘日 13:00）精准触发，误差 < 60s |
-| GTC 到期通知 | 到期前 3 天和 1 天均有推送通知 |
-| 状态机完整性 | EXCHANGE_REJECTED 正确显示为红色"交易所拒绝" |
+| Phase 1（现金账户） | 不受 PDT 规则约束，但 App 内提供 PDT 教育内容 |
+| Phase 2（融资账户） | 5 个交易日内日内交易次数 ≥ 4 次 → 触发 PDT；账户权益须维持 ≥ $25,000 |
+| 前端处理 | "设置 → 交易规则 → PDT 说明"页面；不提供绕过按钮 |
+| 拦截方式 | Phase 2 工程师在交易引擎层实现，PM 不参与技术实现 |
 
 ---
 
-## 附录 A：FIX ExecType 映射表
+## 十、交易设置
 
-本附录定义 FIX 4.2/4.4 协议的 ExecType（tag 150）值与系统内部订单状态的映射关系。
+用户可在"我的 → 交易设置"中调整以下默认值：
 
-| FIX ExecType | 值 | 系统内部状态变更 | 说明 |
-|-------------|---|--------------|------|
-| New | 0 | SUBMITTED → PENDING_FILL | 交易所确认接受订单 |
-| Partial Fill | 1 | → PARTIAL_FILL | 部分成交，触发 order_fills 记录 |
-| Fill | 2 | → FILLED | 全部成交，终态 |
-| Done For Day | 3 | → EXPIRED | DAY 单当日结束，未成交部分作废 |
-| Cancelled | 4 | → CANCELLED 或 EXPIRED | 撤单成功；调度器触发的过期也收此回报 |
-| Replace | 5 | 暂不支持（Phase 2 委托修改） | 收到则记录告警，不改状态 |
-| Pending Cancel | 6 | 记录 fix_exec_type，不改状态 | 交易所处理撤单中 |
-| Stopped | 7 | → PENDING_FILL（保持） | 特殊执行情况，等待后续回报 |
-| Rejected | 8 | → EXCHANGE_REJECTED | 交易所拒绝，reject_reason 记录 Text(58) |
-| Suspended | 9 | → PENDING_FILL（保持） | 订单暂停，等待恢复 |
-| Pending New | A | → RISK_CHECKING（保持） | 交易所确认收到，待处理 |
-| Expired | C | → EXPIRED | GTC 到达交易所设定的到期日 |
+| 设置项 | 默认值 | 选项 |
+|--------|--------|------|
+| 默认订单类型 | 限价单 | 市价单 / 限价单 |
+| 默认有效期 | 当日有效（DAY） | DAY / GTC |
+| 下单确认方式 | 滑动 + 生物识别 | 滑动 + 生物识别 / 仅滑动 |
+| 大额提醒阈值 | $10,000 | $5,000 / $10,000 / $20,000 |
+| 价格偏离警告 | 5% | 3% / 5% / 10% / 关闭 |
+| 允许盘前盘后交易 | 关闭 | 开启 / 关闭（首次开启需确认风险） |
 
-**注意**：
-- ExecType=C（Expired）与 ExecType=4（Cancelled）均映射至 EXPIRED 状态，区别在于触发方（交易所 vs 系统调度）
-- 所有 ExecType 值均记录到 `orders.fix_exec_type` 和 `order_status_log` 中供调试
-- 未知 ExecType 值：记录告警日志，不改变订单状态，人工介入
+---
+
+## 十一、合规要求
+
+| 要求 | 适用规定 |
+|------|---------|
+| 最优执行披露 | SEC Reg NMS Rule 606；在确认页明确说明订单路由原则 |
+| 不接受 PFOF | SEC Reg NMS；确认页须明确告知 |
+| PDT 规则告知 | FINRA Rule 4210；用户在 KYC Step 6 阅读 PDT 风险披露文件 |
+| 交易确认书 | FINRA Rule 2232；成交后 24 小时内发送确认书（Phase 1 使用 App 通知替代，Phase 2 完整文档） |
+| 下单生物识别 | 安全规定；所有委托须经生物识别或密码二次确认 |
+| 交易审计记录 | SEC Rule 17a-4；所有委托、成交、撤单记录保留 7 年 |
+
+---
+
+## 十二、异常与边界场景
+
+| 场景 | 用户感知 | 处理 |
+|------|---------|------|
+| 可用资金不足 | "可用资金不足，当前可用 $X.XX"，显示入金入口 | 阻断提交 |
+| 持仓不足（卖出） | "持仓不足，当前可卖 X 股（已结算）" | 阻断提交 |
+| 市场休市 | "当前市场已休市" + 显示下次开市时间 | 提示，不阻断挂单 |
+| 股票停牌 | "该股票交易暂时中止，请稍后再试" | 阻断提交 |
+| 网络超时 | "网络连接超时，请在订单列表确认委托状态" | 重要：不要让用户重复提交 |
+| 风控拒绝 | "委托被审核拒绝，如有疑问请联系客服" + 拒绝原因 | 不自动重试 |
+| 撤单已成交 | "该委托已全部成交，无法撤单" | 刷新显示最新状态 |
+| GTC 单即将过期 | 到期前 3 天和 1 天推送通知 | 用户点击可进入该订单详情 |
+
+---
+
+## 十三、成功指标
+
+| 指标 | 目标 | 测量方式 |
+|------|------|---------|
+| 下单转化率 | 进入下单页 → 完成提交 ≥ 70% | 漏斗分析 |
+| 确认页放弃率 | 确认页放弃率 ≤ 15% | 按钮点击分析 |
+| 撤单成功率 | 撤单请求成功率 ≥ 95% | 成功/失败日志 |
+| 错误提示满意度 | 每条错误用户可理解原因（NPS 调研） | 用户调研 |
+| 成交通知及时率 | 成交后 ≤ 5 秒推送到 App | 推送延迟监控 |
+
+---
+
+## 十四、依赖与风险
+
+| 项目 | 说明 |
+|------|------|
+| FIX 协议对接 | 依赖经纪商/做市商 FIX 协议接入，UAT 测试周期可能影响上线 |
+| 市价单价格保护（Collar） | 工程师实现，PM 确认用户提示文案即可 |
+| GTC 到期通知 | 依赖推送服务（见 PRD-07），需确认 GTC 90 天上限是否符合当地监管要求（法务确认） |
+| 待确认 | 碎股支持时间节点（Phase 2），影响小额用户参与度 |
+| 待确认 | 成交确认书的具体交付形式（Phase 1 App 通知是否满足 FINRA Rule 2232）需法务确认 |

@@ -161,31 +161,46 @@ User requests withdrawal
 Double-entry bookkeeping for all fund movements:
 
 ```
-每笔入金:
+每笔入金（银行渠道到账后）:
   DEBIT   platform_bank_account     +$1,000.00
   CREDIT  user_available_balance    +$1,000.00
 
-每笔出金:
+每笔出金（银行渠道扣款后）:
   DEBIT   user_available_balance    -$500.00
   CREDIT  platform_bank_account     -$500.00
 
-每笔交易扣款 (买入):
+买入下单（交易冻结，等待 DTCC 证券结算）:
   DEBIT   user_available_balance    -$150.25
-  CREDIT  user_frozen_balance       +$150.25    (T+2 结算前冻结)
+  CREDIT  user_trade_frozen         +$150.25
 
-结算完成:
-  DEBIT   user_frozen_balance       -$150.25
+DTCC 证券结算完成（T+1 美股 / T+2 港股，由 Trading Engine 通知）:
+  DEBIT   user_trade_frozen         -$150.25
   CREDIT  user_position_value       +$150.25
+
+卖出成交（等待 DTCC 证券结算）:
+  DEBIT   user_position_value       -$150.25
+  CREDIT  user_unsettled_proceeds   +$150.25
+
+DTCC 证券结算完成（资金可提现）:
+  DEBIT   user_unsettled_proceeds   -$150.25
+  CREDIT  user_available_balance    +$150.25
 ```
+
+**注意**：上述"DTCC 证券结算"与银行出入金的清结算是两套独立体系。
+T+1/T+2 是证券体系的时间，不是银行渠道的到账时间。
+详见 `docs/references/clearing-settlement-primer.md`。
 
 ## Key Business Rules
 
 ### Settlement Rules (结算规则)
 
-| Market | Settlement Cycle | Impact on Withdrawal |
-|--------|-----------------|---------------------|
-| US Stocks | T+1 (since May 2024) | Proceeds available T+1 after sale |
-| HK Stocks | T+2 | Proceeds available T+2 after sale |
+**重要**：这里的 T+1/T+2 指证券交易的 DTCC 结算周期（卖出后资金多久变为可提现），
+不是银行出入金渠道的到账时间（ACH T+1～T+3，Wire 当日，FPS 实时）。
+
+| Market | Securities Settlement | Impact on Withdrawal |
+|--------|----------------------|---------------------|
+| US Stocks | T+1 (since May 2024) | Sell proceeds withdrawable T+1 after sale |
+| HK Stocks | T+2 | Sell proceeds withdrawable T+2 after sale |
 
 - **Unsettled funds cannot be withdrawn** — must wait for settlement completion
 - **Buying power** = Available cash + Unsettled sell proceeds (for buying only, not withdrawal)

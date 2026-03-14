@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>[低保真] 搜索 — 行情</title>
+<link rel="stylesheet" href="../_shared/proto-base.css">
+<style>
+  .search-input-bar {
+    display: flex; align-items: center; gap: 8px;
+    border: 2px solid var(--gray-800); border-radius: var(--radius-md);
+    padding: 10px 14px; background: #fff;
+  }
+  .search-real-input {
+    flex: 1; border: none; outline: none; font-size: var(--font-size-md);
+    background: transparent;
+  }
+  .search-result-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 16px; border-bottom: var(--border); cursor: pointer;
+  }
+  .search-result-row:hover { background: var(--gray-50); }
+  .ticker-sm {
+    width: 44px; height: 44px; background: var(--gray-700);
+    border-radius: var(--radius-sm); display: flex; align-items: center;
+    justify-content: center; color: #fff; font-size: var(--font-size-xs);
+    font-weight: 700; flex-shrink: 0;
+  }
+  .highlight { font-weight: 700; color: var(--gray-800); }
+</style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>搜索</strong> |
+  <a href="index.html">← 行情首页</a> |
+  <a href="stock-detail.html">股票详情</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar">
+    <span>9:41</span><span>●●● WiFi 100%</span>
+  </div>
+
+  <div style="padding: 12px 16px; background: var(--gray-50); border-bottom: var(--border); display:flex; gap:8px; align-items:center;">
+    <div class="search-input-bar" style="flex:1;">
+      <span class="text-muted">🔍</span>
+      <input class="search-real-input" id="search-input" placeholder="搜索股票代码或公司名" autofocus value="app" oninput="handleSearch(this.value)">
+      <span class="text-muted" style="cursor:pointer;" onclick="clearSearch()">✕</span>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="goto('index.html')">取消</button>
+  </div>
+
+  <div class="screen" style="padding: 0; gap: 0; overflow-y: auto;">
+
+    <!-- 搜索结果列表（有输入时） -->
+    <div id="search-results">
+      <div class="section-title" style="padding: 10px 16px 4px;">搜索结果 · "APP"</div>
+
+      <div class="search-result-row" onclick="goto('stock-detail.html')">
+        <div class="ticker-sm">AAPL</div>
+        <div style="flex:1;">
+          <div><span class="highlight">AAPL</span> · NASDAQ</div>
+          <div class="text-sm text-muted"><span class="highlight">App</span>le Inc.</div>
+        </div>
+        <div style="text-align:right;">
+          <div class="font-semi">$178.25</div>
+          <div style="font-size:12px; color:#555; background:var(--gray-200); padding:2px 6px; border-radius:4px;">+2.14%</div>
+        </div>
+      </div>
+
+      <div class="search-result-row" onclick="goto('stock-detail.html')">
+        <div class="ticker-sm" style="background:var(--gray-500);">APP</div>
+        <div style="flex:1;">
+          <div><span class="highlight">APP</span> · NASDAQ</div>
+          <div class="text-sm text-muted"><span class="highlight">App</span>Lovin Corp.</div>
+        </div>
+        <div style="text-align:right;">
+          <div class="font-semi">$346.12</div>
+          <div style="font-size:12px; color:#fff; background:var(--gray-600); padding:2px 6px; border-radius:4px;">-1.22%</div>
+        </div>
+      </div>
+
+      <div class="search-result-row" onclick="goto('stock-detail.html')">
+        <div class="ticker-sm" style="background:var(--gray-400);">APPS</div>
+        <div style="flex:1;">
+          <div><span class="highlight">APPS</span> · NASDAQ</div>
+          <div class="text-sm text-muted">Digital Turbine Inc.</div>
+        </div>
+        <div style="text-align:right;">
+          <div class="font-semi">$1.84</div>
+          <div style="font-size:12px; color:#555; background:var(--gray-200); padding:2px 6px; border-radius:4px;">+0.55%</div>
+        </div>
+      </div>
+
+      <!-- 无结果状态 -->
+      <div id="no-result" style="display:none;">
+        <div class="empty-state">
+          <div class="empty-icon">🔍</div>
+          <div class="empty-title">未找到相关结果</div>
+          <div class="empty-sub">请确认股票代码或公司名称是否正确</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 空状态：无输入时，显示热门/历史 -->
+    <div id="search-empty" style="display:none;">
+      <div style="padding: 12px 16px;">
+        <div class="section-title">搜索历史</div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top: 8px;">
+          <div class="badge badge-pending" style="cursor:pointer; padding:8px 12px;" onclick="fillSearch('TSLA')">TSLA</div>
+          <div class="badge badge-pending" style="cursor:pointer; padding:8px 12px;" onclick="fillSearch('NVDA')">NVDA</div>
+          <div class="badge badge-pending" style="cursor:pointer; padding:8px 12px;" onclick="fillSearch('AMZN')">AMZN</div>
+          <span class="text-xs text-muted" style="align-self:center; cursor:pointer;" onclick="showToast('历史已清除')">清除</span>
+        </div>
+      </div>
+      <div style="padding: 12px 16px; border-top: var(--border);">
+        <div class="section-title">热门搜索</div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top: 8px;">
+          <div class="badge badge-pending" style="cursor:pointer; padding:8px 12px;" onclick="fillSearch('AAPL')">AAPL</div>
+          <div class="badge badge-pending" style="cursor:pointer; padding:8px 12px;" onclick="fillSearch('MSFT')">MSFT</div>
+          <div class="badge badge-pending" style="cursor:pointer; padding:8px 12px;" onclick="fillSearch('GOOG')">GOOG</div>
+          <div class="badge badge-pending" style="cursor:pointer; padding:8px 12px;" onclick="fillSearch('META')">META</div>
+          <div class="badge badge-pending" style="cursor:pointer; padding:8px 12px;" onclick="fillSearch('SPY')">SPY</div>
+          <div class="badge badge-pending" style="cursor:pointer; padding:8px 12px;" onclick="fillSearch('QQQ')">QQQ</div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /screen -->
+</div>
+
+<script src="../_shared/proto-router.js"></script>
+<script>
+  function handleSearch(val) {
+    document.getElementById('search-results').style.display = val ? '' : 'none';
+    document.getElementById('search-empty').style.display = val ? 'none' : '';
+  }
+  function clearSearch() {
+    document.getElementById('search-input').value = '';
+    handleSearch('');
+  }
+  function fillSearch(val) {
+    document.getElementById('search-input').value = val;
+    handleSearch(val);
+  }
+  // 初始化
+  handleSearch(document.getElementById('search-input').value);
+</script>
+</body>
+</html>

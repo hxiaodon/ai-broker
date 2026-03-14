@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>[低保真] 04-Trading — 下单面板</title>
+<link rel="stylesheet" href="../_shared/proto-base.css">
+<style>
+  .order-type-bar { display: flex; gap: 2px; }
+  .order-type-btn {
+    flex: 1; padding: 10px 4px; text-align: center;
+    font-size: var(--font-size-sm); border: var(--border);
+    border-radius: var(--radius-md); cursor: pointer;
+    background: var(--gray-50); color: var(--gray-600);
+  }
+  .order-type-btn.active {
+    background: var(--gray-800); color: #fff; border-color: var(--gray-800);
+  }
+  .qty-stepper {
+    display: flex; align-items: center; gap: 0;
+    border: var(--border); border-radius: var(--radius-md); overflow: hidden;
+  }
+  .qty-btn {
+    width: 48px; height: 48px; display: flex; align-items: center; justify-content: center;
+    font-size: var(--font-size-xl); cursor: pointer;
+    background: var(--gray-100); border: none; color: var(--gray-700);
+  }
+  .qty-input {
+    flex: 1; height: 48px; border: none; text-align: center;
+    font-size: var(--font-size-lg); font-weight: 600;
+    background: var(--gray-50); outline: none;
+  }
+  .side-tabs { display: flex; border-radius: var(--radius-md); overflow: hidden; border: var(--border); }
+  .side-tab {
+    flex: 1; padding: 12px; text-align: center; font-size: var(--font-size-md);
+    font-weight: 600; cursor: pointer; background: var(--gray-50); color: var(--gray-500);
+  }
+  .side-tab.buy  { background: var(--gray-800); color: #fff; }
+  .side-tab.sell { background: var(--gray-600); color: #fff; }
+  .power-bar { background: var(--gray-100); border-radius: var(--radius-md); padding: 12px; }
+  .risk-warn { background: var(--gray-200); border-radius: var(--radius-md); padding: 10px 12px; border-left: 3px solid var(--gray-500); }
+</style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>04-Trading — 下单面板</strong> |
+  <a href="../03-market/stock-detail.html">← 股票详情</a> |
+  <a href="order-confirm.html">下一步：确认 →</a> |
+  <a href="order-list.html">订单列表</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar"><span>9:41</span><span>●●● WiFi 100%</span></div>
+  <div class="nav-bar">
+    <button class="nav-back" onclick="goto('../03-market/stock-detail.html')">← 返回</button>
+    <span class="nav-title">委托下单</span>
+    <span></span>
+  </div>
+
+  <div class="screen" style="gap: 16px;">
+
+    <!-- 股票标题 -->
+    <div class="flex items-center gap-12">
+      <div style="width:40px; height:40px; background: var(--gray-800); border-radius: var(--radius-sm); display:flex; align-items:center; justify-content:center; color:#fff; font-size:10px; font-weight:700;">AAPL</div>
+      <div>
+        <div class="font-semi text-lg">AAPL</div>
+        <div class="text-xs text-muted">Apple Inc. · $178.25 (+2.14%) · 盘中</div>
+      </div>
+    </div>
+
+    <!-- 买入/卖出切换 -->
+    <div class="side-tabs">
+      <div class="side-tab buy" id="side-buy" onclick="setSide('buy')">买入</div>
+      <div class="side-tab" id="side-sell" onclick="setSide('sell')">卖出</div>
+    </div>
+
+    <!-- 订单类型 -->
+    <div class="form-group">
+      <div class="form-label">订单类型</div>
+      <div class="order-type-bar">
+        <div class="order-type-btn active" id="type-market" onclick="setOrderType('market')">市价单</div>
+        <div class="order-type-btn" id="type-limit" onclick="setOrderType('limit')">限价单</div>
+      </div>
+    </div>
+
+    <!-- 限价价格（限价单时显示）-->
+    <div class="form-group" id="price-field" style="display:none;">
+      <div class="form-label">委托价格 (USD)</div>
+      <div style="position:relative;">
+        <input class="form-input" type="number" value="175.00" id="price-input" step="0.01">
+        <span style="position:absolute; right:14px; top:50%; transform:translateY(-50%); color:var(--gray-500); font-size:13px;">USD</span>
+      </div>
+      <div class="form-hint">当前买一：$178.20 / 卖一：$178.30</div>
+    </div>
+
+    <!-- 委托数量 -->
+    <div class="form-group">
+      <div class="form-label">委托数量（股）</div>
+      <div class="qty-stepper">
+        <button class="qty-btn" onclick="changeQty(-1)">−</button>
+        <input class="qty-input" type="number" value="10" id="qty-input" min="1">
+        <button class="qty-btn" onclick="changeQty(1)">+</button>
+      </div>
+      <div class="form-hint">最小 1 股</div>
+    </div>
+
+    <!-- 有效期 -->
+    <div class="form-group">
+      <div class="form-label">订单有效期</div>
+      <div class="segmented">
+        <div class="seg-item active" id="tif-day" onclick="setTIF('day')">当日 (DAY)</div>
+        <div class="seg-item" id="tif-gtc" onclick="setTIF('gtc')">长期有效 (GTC)</div>
+      </div>
+    </div>
+
+    <!-- 交易时段提示（GTC + 限价单时） -->
+    <div class="form-group" id="ext-hours-field">
+      <div class="form-label">允许盘前盘后成交</div>
+      <div class="flex items-center gap-12">
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+          <input type="checkbox" id="ext-hours-check" style="width:18px; height:18px;">
+          <span class="text-sm">允许盘前（4:00–9:30 ET）和盘后（16:00–20:00 ET）成交</span>
+        </label>
+      </div>
+      <div class="form-hint">仅限价单可参与盘前盘后</div>
+    </div>
+
+    <!-- 购买力 -->
+    <div class="power-bar">
+      <div class="flex justify-between text-sm">
+        <span class="text-muted">可用购买力</span>
+        <span class="font-semi">$12,450.00</span>
+      </div>
+      <div class="flex justify-between text-sm mt-8">
+        <span class="text-muted">预计金额</span>
+        <span class="font-semi" id="est-amount">$1,782.50</span>
+      </div>
+      <div class="flex justify-between text-sm mt-8">
+        <span class="text-muted">手续费</span>
+        <span>$0.00（免佣）</span>
+      </div>
+      <div class="divider"></div>
+      <div class="flex justify-between text-sm">
+        <span class="text-muted">下单后剩余购买力</span>
+        <span class="font-semi">$10,667.50</span>
+      </div>
+    </div>
+
+    <!-- PDT 风险提示（可选） -->
+    <div class="risk-warn" id="pdt-warn" style="display:none;">
+      <div class="text-sm font-semi">⚠ Pattern Day Trader 提醒</div>
+      <div class="text-xs text-muted mt-8">今日已触发 3 次日内交易。账户净资产需≥$25,000 才能继续频繁交易。</div>
+    </div>
+
+    <button class="btn btn-primary" onclick="goto('order-confirm.html')" id="submit-btn">
+      预览订单
+    </button>
+
+    <div class="proto-note">市价单：以当前最优市场价格成交。限价单：仅在达到指定价格时成交。盘前盘后仅支持限价单。</div>
+  </div>
+
+  <!-- 盘后交易提醒 Sheet -->
+  <div class="sheet-overlay" id="ext-warn-sheet">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">盘后交易风险提示</div>
+      <div class="text-sm text-muted">盘后交易流动性较低，价差可能较大，价格波动风险更高。确认在盘后时段成交吗？</div>
+      <button class="btn btn-primary" onclick="hideSheet('ext-warn-sheet')">我已了解，继续</button>
+      <button class="btn btn-ghost" onclick="hideSheet('ext-warn-sheet')">取消</button>
+    </div>
+  </div>
+</div>
+
+<script src="../_shared/proto-router.js"></script>
+<script>
+  let currentSide = 'buy';
+  let currentType = 'market';
+
+  function setSide(side) {
+    currentSide = side;
+    ['buy','sell'].forEach(s => {
+      const el = document.getElementById('side-' + s);
+      el.className = 'side-tab' + (s === side ? (' ' + s) : '');
+    });
+    document.getElementById('submit-btn').textContent = side === 'buy' ? '预览买入订单' : '预览卖出订单';
+  }
+
+  function setOrderType(type) {
+    currentType = type;
+    ['market','limit'].forEach(t => {
+      document.getElementById('type-' + t).classList.toggle('active', t === type);
+    });
+    document.getElementById('price-field').style.display = type === 'limit' ? '' : 'none';
+    document.getElementById('ext-hours-field').style.display = type === 'limit' ? '' : 'none';
+  }
+
+  function changeQty(delta) {
+    const input = document.getElementById('qty-input');
+    const val = Math.max(1, parseInt(input.value || 1) + delta);
+    input.value = val;
+    updateEstAmount();
+  }
+
+  function setTIF(tif) {
+    ['day','gtc'].forEach(t => document.getElementById('tif-' + t).classList.toggle('active', t === tif));
+  }
+
+  function updateEstAmount() {
+    const qty = parseInt(document.getElementById('qty-input').value || 1);
+    const price = parseFloat(document.getElementById('price-input')?.value || 178.25);
+    document.getElementById('est-amount').textContent = '$' + (qty * price).toFixed(2);
+  }
+
+  document.getElementById('qty-input').addEventListener('input', updateEstAmount);
+
+  // 初始化
+  setOrderType('market');
+</script>
+</body>
+</html>

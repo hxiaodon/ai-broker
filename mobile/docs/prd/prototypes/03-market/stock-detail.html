@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>[低保真] 股票详情 — AAPL</title>
+<link rel="stylesheet" href="../_shared/proto-base.css">
+<style>
+  .price-hero {
+    padding: 16px 0 8px;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .price-main { font-size: 36px; font-weight: 700; }
+  .price-meta { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .chart-placeholder {
+    width: 100%; background: var(--gray-100); border: var(--border);
+    border-radius: var(--radius-md); display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 6px;
+    color: var(--gray-400); font-size: var(--font-size-sm); position: relative;
+    overflow: hidden;
+  }
+  /* 模拟折线图 */
+  .chart-svg-wrap { width: 100%; height: 140px; position: relative; }
+  .chart-svg-wrap svg { width: 100%; height: 100%; }
+  .kline-tabs { display: flex; gap: 2px; padding: 4px; background: var(--gray-100); border-radius: var(--radius-md); }
+  .kline-tab {
+    flex: 1; text-align: center; padding: 6px;
+    font-size: var(--font-size-xs); border-radius: 6px; cursor: pointer; color: var(--gray-500);
+  }
+  .kline-tab.active { background: #fff; color: var(--gray-800); font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  .info-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+    background: var(--gray-200); border-radius: var(--radius-md); overflow: hidden;
+    border: var(--border);
+  }
+  .info-cell {
+    background: var(--gray-50); padding: 10px 12px;
+  }
+  .info-cell .label { font-size: var(--font-size-xs); color: var(--gray-500); }
+  .info-cell .value { font-size: var(--font-size-sm); font-weight: 600; color: var(--gray-800); margin-top: 2px; }
+  .action-bar {
+    display: flex; gap: 8px; padding: 12px 16px;
+    background: var(--gray-50); border-top: var(--border);
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>股票详情 — AAPL</strong> |
+  <a href="index.html">← 行情首页</a> |
+  <a href="search.html">搜索</a> |
+  <a href="../04-trading/order-entry.html">→ 下单</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar">
+    <span>9:41</span><span>●●● WiFi 100%</span>
+  </div>
+
+  <div class="nav-bar">
+    <button class="nav-back" onclick="goto('index.html')">← 行情</button>
+    <span class="nav-title">AAPL</span>
+    <span class="nav-action" onclick="showToast('已加入自选股 ⭐')">+ 自选</span>
+  </div>
+
+  <div class="screen" style="padding: 0; gap: 0;">
+
+    <!-- 价格区 -->
+    <div style="padding: 8px 16px 16px; border-bottom: var(--border);">
+      <div class="text-sm text-muted">Apple Inc. · NASDAQ</div>
+      <div class="price-hero">
+        <div class="price-main">$178.25</div>
+        <div class="price-meta">
+          <span class="badge badge-success" style="font-size:13px; padding:4px 10px;">▲ +3.72 (+2.14%)</span>
+          <span class="text-xs text-muted">今日</span>
+          <span class="badge badge-pending text-xs">盘中</span>
+        </div>
+        <div class="text-xs text-muted">美东时间 14:32 · 实时数据</div>
+      </div>
+
+      <!-- K线时段选择 -->
+      <div class="kline-tabs">
+        <div class="kline-tab" onclick="switchKline('1d', this)">分时</div>
+        <div class="kline-tab active" onclick="switchKline('5d', this)">5日</div>
+        <div class="kline-tab" onclick="switchKline('1m', this)">1月</div>
+        <div class="kline-tab" onclick="switchKline('3m', this)">3月</div>
+        <div class="kline-tab" onclick="switchKline('1y', this)">1年</div>
+        <div class="kline-tab" onclick="switchKline('all', this)">全部</div>
+      </div>
+
+      <!-- 图表占位（模拟折线） -->
+      <div class="chart-svg-wrap" style="margin-top:8px;">
+        <svg viewBox="0 0 358 120" preserveAspectRatio="none">
+          <polyline
+            fill="none" stroke="#444" stroke-width="2"
+            points="0,90 30,85 60,75 90,80 120,60 150,55 180,65 210,45 240,50 270,40 300,35 330,25 358,20"
+          />
+          <polyline
+            fill="rgba(100,100,100,0.08)" stroke="none"
+            points="0,90 30,85 60,75 90,80 120,60 150,55 180,65 210,45 240,50 270,40 300,35 330,25 358,20 358,120 0,120"
+          />
+          <!-- 价格标注 -->
+          <text x="340" y="16" font-size="10" fill="#444">178.25</text>
+          <text x="340" y="94" font-size="10" fill="#888">168.32</text>
+        </svg>
+      </div>
+    </div>
+
+    <!-- 关键数据 -->
+    <div style="padding: 12px 16px;">
+      <div class="card-title">行情数据</div>
+      <div class="info-grid">
+        <div class="info-cell"><div class="label">今开</div><div class="value">$174.53</div></div>
+        <div class="info-cell"><div class="label">昨收</div><div class="value">$174.53</div></div>
+        <div class="info-cell"><div class="label">最高</div><div class="value">$179.12</div></div>
+        <div class="info-cell"><div class="label">最低</div><div class="value">$173.80</div></div>
+        <div class="info-cell"><div class="label">成交量</div><div class="value">58.4M</div></div>
+        <div class="info-cell"><div class="label">市值</div><div class="value">$2.76T</div></div>
+        <div class="info-cell"><div class="label">52周最高</div><div class="value">$199.62</div></div>
+        <div class="info-cell"><div class="label">52周最低</div><div class="value">$164.08</div></div>
+        <div class="info-cell"><div class="label">市盈率 (TTM)</div><div class="value">28.4x</div></div>
+        <div class="info-cell"><div class="label">股息率</div><div class="value">0.52%</div></div>
+      </div>
+    </div>
+
+    <!-- 个人持仓（已登录时显示）-->
+    <div style="padding: 0 16px 12px;">
+      <div class="card">
+        <div class="card-title">我的持仓</div>
+        <div class="text-sm" style="display:flex; flex-direction:column; gap:8px;">
+          <div class="flex justify-between">
+            <span class="text-muted">持仓数量</span>
+            <span class="font-semi">100 股</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-muted">持仓成本</span>
+            <span>$168.30</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-muted">市值</span>
+            <span>$17,825.00</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-muted">浮动盈亏</span>
+            <span class="badge badge-success">▲ +$995.00 (+5.92%)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 公司简介 -->
+    <div style="padding: 0 16px 80px;">
+      <div class="card">
+        <div class="card-title">公司简介</div>
+        <div class="text-sm text-muted" style="line-height:1.6;">
+          Apple Inc. 设计、制造并销售智能手机、个人电脑、平板电脑、可穿戴设备及配件，同时提供各类相关服务。公司产品包括 iPhone、Mac、iPad、Apple Watch…
+        </div>
+        <div class="link-text" style="text-align:left; margin-top:8px; font-size:var(--font-size-sm);" onclick="showToast('展开全文')">展开全文 ▾</div>
+      </div>
+    </div>
+
+  </div><!-- /screen -->
+
+  <!-- 底部交易按钮 -->
+  <div class="action-bar">
+    <button class="btn btn-ghost" style="flex:1;" onclick="openOrder('SELL')">卖出</button>
+    <button class="btn btn-primary" style="flex:1;" onclick="openOrder('BUY')">买入</button>
+  </div>
+
+  <!-- 底部 Sheet：快速下单引导 -->
+  <div class="sheet-overlay" id="login-prompt-sheet">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">登录后开始交易</div>
+      <div class="text-sm text-muted text-center">实时行情、委托下单和持仓管理需要先登录</div>
+      <button class="btn btn-primary" onclick="goto('../01-auth/index.html')">立即登录</button>
+      <button class="btn btn-ghost" onclick="hideSheet('login-prompt-sheet')">继续浏览</button>
+    </div>
+  </div>
+</div>
+
+<script src="../_shared/proto-router.js"></script>
+<script>
+  function switchKline(period, el) {
+    document.querySelectorAll('.kline-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    showToast('已切换至 ' + period + ' K线（模拟）');
+  }
+
+  function openOrder(side) {
+    // 模拟已登录 → 跳转下单页
+    const params = side === 'BUY' ? '?side=buy&symbol=AAPL' : '?side=sell&symbol=AAPL';
+    goto('../04-trading/order-entry.html');
+  }
+</script>
+</body>
+</html>

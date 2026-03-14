@@ -1,573 +1,397 @@
 # PRD-02：KYC / 开户模块
 
-> **文档状态**: Phase 1 正式版（技术评审修订版）
-> **版本**: v1.1
-> **日期**: 2026-03-13
-> **变更说明**: 根据 Backend、Frontend（WebView）、Flutter 评审意见修订：修正 KYC 进度保存幂等性（PATCH + Idempotency-Key）、补充 KYC 提交完整性校验（步骤位图）、补充 W-8BEN 到期触发机制和 is_current 约束、补充财务状况/投资评估独立数据表、补充 Admin KYC API（见 PRD-09）、补充服务端风险披露已读验证、补充 flutter_secure_storage 图片安全上传、移除 OCR 高亮对比功能（无 bounding box 坐标，不可实现）
+> **文档状态**: Phase 1 正式版
+> **版本**: v2.0
+> **日期**: 2026-03-14
+> **变更说明**: v2.0 整改 — 移除接口规格与数据模型，改用 Mermaid 流程图，补充用户旅程与业务规则，嵌入低保真原型引用
+
+> **低保真原型**：[查看原型](prototypes/02-kyc/index.html)（7步开户全流程 · OCR 识别 · W-8BEN · 审核状态）
 
 ---
 
-## 一、模块概述
+## 一、背景与问题
 
-### 1.1 功能范围
+### 1.1 用户痛点
 
-KYC（Know Your Customer）是用户从注册到真实交易的必要流程，包含：
+- 海外证券开户流程繁琐，用户不清楚需要准备哪些材料
+- 多次往返补件，审核进度不透明，用户容易放弃
+- 税务表格（W-8BEN）专业术语多，普通用户看不懂
 
-- 7 步在线开户（个人信息 → 文件上传 → 财务状况 → 投资评估 → 税务申报 → 风险披露 → 协议签署）
-- OCR 自动识别证件
-- W-8BEN / W-9 税务表格
-- KYC 审核状态追踪
-- Admin Panel KYC 审核工作台
+### 1.2 业务价值
 
-### 1.2 监管依据
+KYC 是合规准入门槛，同时也是用户从"行情浏览者"转化为"真实交易者"的关键节点。流程体验直接决定开户完成率，进而影响首次入金率。
+
+### 1.3 监管依据
 
 | 监管要求 | 适用规定 |
 |---------|---------|
-| 身份验证 | SEC/FINRA KYC 规定，SFC KYC 指引（Phase 2） |
-| 税务申报 | IRS W-8BEN（非美国居民）/ W-9（美国居民） |
-| 反洗钱 | AMLO Part 4A，BSA，FINRA Rule 3310 |
-| 风险披露 | FINRA Rule 2010，SEC Reg BI |
-| 数据保留 | KYC 记录保留账户关闭后 6 年 |
-
-### 1.3 Phase 1 vs Phase 2
-
-| 功能 | Phase 1 | Phase 2 |
-|------|---------|---------|
-| 7 步 KYC 流程 | ✅ | - |
-| OCR 证件识别 | ✅ 基础 OCR | - |
-| 活体检测 | ❌（人工审核替代） | ✅ Onfido/Sumsub/Jumio |
-| 手写签名 | ❌（勾选 + 打字姓名替代） | ✅ 电子签名 SDK |
-| 自动审核 | ❌ | ✅ |
-| 融资融券开户 | ❌ | ✅ |
-| 机构开户 | ❌ | ✅ |
+| 身份验证 | SEC/FINRA KYC 规定；SFC KYC 指引（Phase 2 追加） |
+| 税务申报 | IRS W-8BEN（非美国税务居民）/ W-9（美国税务居民） |
+| 反洗钱筛查 | BSA、FINRA Rule 3310、AMLO Part 4A（Phase 2） |
+| 风险披露 | FINRA Rule 2010、SEC Regulation BI |
+| 数据保留 | KYC 记录保留至账户关闭后 6 年 |
 
 ---
 
-## 二、7 步开户流程
+## 二、目标用户与场景
 
-### 流程总览
-
-```
-Step 1: 个人信息 + 就业状况
-Step 2: 证件上传（OCR）
-Step 3: 财务状况
-Step 4: 投资评估
-Step 5: 税务申报（W-8BEN / W-9）
-Step 6: 风险披露（5 份文档）
-Step 7: 协议签署
-
-→ 提交 → 审核中状态页 → 结果通知
-```
-
-### Step 1：个人信息 + 就业状况
-
-**必填字段**:
-
-| 字段 | 类型 | 验证规则 |
-|------|------|---------|
-| 名（英文） | 文本 | 仅允许英文字母、连字符、空格，最大 50 字 |
-| 姓（英文） | 文本 | 同上 |
-| 中文名 | 文本 | 选填，最大 20 字 |
-| 出生日期 | 日期选择器 | 年龄 18-100 岁 |
-| 国籍 | 下拉（国家列表） | 必选 |
-| 证件类型 | 下拉 | 身份证 / 护照 / 港澳居民来往内地通行证 / 香港身份证（HKID） |
-| 证件号码 | 文本 | 按证件类型正则校验 |
-| 就业状况 | 单选 | 在职 / 自雇 / 退休 / 学生 / 其他 |
-| 职业（就业时） | 文本 | 最大 100 字 |
-| 雇主名称（就业时） | 文本 | 最大 200 字 |
-| 是否政治敏感人士（PEP） | 复选框 | 默认未勾选 |
-| 是否证券公司内部人员 | 复选框 | 默认未勾选 |
-
-**业务规则**:
-- 英文姓名必须与证件一致（OCR 在 Step 2 后回填对比）
-- PEP / Insider 勾选 → 触发人工审核强制流程，不可自动审核通过
-- 就业状态影响财务状况 Step 3 的字段显示
-
----
-
-### Step 2：证件上传（OCR）
-
-**上传要求**:
-
-| 证件类型 | 需上传页面 |
+| 用户类型 | 场景描述 |
 |---------|---------|
-| 身份证 | 正面 + 背面 |
-| 护照 | 个人信息页 |
-| 港澳通行证 | 正面 + 背面 |
-| HKID | 正面（含地址区） |
-
-**OCR 流程**:
-```
-用户上传图片 → 本地裁剪/压缩（< 5MB）→ 发送至后端 OCR 服务
-             ↓
-    [识别成功] → 返回结构化字段 → 自动填充 Step 1 字段 → 用户确认或修改
-    [识别失败] → 提示用户手动填写 → 记录 OCR 失败原因（异常上报）
-```
-
-**图片质量要求**:
-- 分辨率 ≥ 720p，文件格式 JPEG / PNG / HEIC
-- 不可遮挡证件四角
-- 图片不可模糊（服务端校验 Blur Score）
-- 不接受过期证件（从 OCR 识别有效期判断）
-
-**数据存储**:
-- 证件图片加密存储（AES-256-GCM）于对象存储，不落入主数据库
-- 应用层加密，密钥由 KMS 管理
-- 审核完成后 6 年保留，账户关闭后另保留 6 年
+| 中国大陆居民（主力） | 持身份证，首次投资美股，对 W-8BEN 完全陌生 |
+| 香港居民 | 持 HKID，可能已有境外账户经验 |
+| 在美华人 | 持护照或绿卡，需要填写 W-9（美国税务居民） |
+| 补件用户 | 首次提交被退回，需要重新上传特定材料 |
 
 ---
 
-### Step 3：财务状况
+## 三、功能范围
 
-| 字段 | 类型 | 选项 |
+| 功能 | Phase 1 | Phase 2 | 优先级 |
+|------|---------|---------|--------|
+| 7 步在线开户流程 | ✅ | - | Must |
+| 证件图片上传 + OCR 自动识别 | ✅ 基础 OCR | - | Must |
+| W-8BEN 税务申报（非美国居民） | ✅ | - | Must |
+| W-9 税务申报（美国税务居民） | ✅ | - | Must |
+| 风险披露文件阅读确认 | ✅ | - | Must |
+| 协议在线签署 | ✅ 打字输入姓名 | ✅ 电子签名 SDK | Must |
+| KYC 审核进度追踪 | ✅ | - | Must |
+| 补件流程 | ✅ | - | Must |
+| 活体检测 | ❌（人工审核替代） | ✅ Onfido / Sumsub / Jumio | Should |
+| W-8BEN 到期续签 | ✅ 通知提醒 | - | Must |
+| 融资融券开户 | ❌ | ✅ | - |
+| 机构开户 | ❌ | ✅ | - |
+
+---
+
+## 四、核心用户流程
+
+### 4.1 开户总流程
+
+> **原型参考**：[开户总流程](prototypes/02-kyc/index.html)（页面顶部可切换各步骤）
+
+```mermaid
+flowchart TD
+    A([OTP 登录成功\n新用户]) --> B[开户引导页\n说明开户好处 + 预计时间]
+    B --> C{用户选择}
+    C -->|开始开户| D[Step 1: 个人信息]
+    C -->|稍后再说| E[进入首页\n顶部显示开户提示横幅]
+
+    D --> F[Step 2: 证件上传 + OCR]
+    F --> G[Step 3: 财务状况]
+    G --> H[Step 4: 投资评估]
+    H --> I[Step 5: 税务申报]
+    I --> J[Step 6: 风险披露]
+    J --> K[Step 7: 协议签署]
+    K --> L[提交申请]
+    L --> M[审核状态页]
+
+    M --> N{审核结果}
+    N -->|通过| O[账户激活\n推送通知 + 引导入金]
+    N -->|需补件| P[补件通知\n跳回对应步骤]
+    N -->|拒绝| Q[拒绝说明 + 客服联系]
+
+    P --> F
+```
+
+### 4.2 Step 1：个人信息
+
+> **原型参考**：[Step 1 - 基本信息](prototypes/02-kyc/index.html)（顶部导航切换到步骤 1）
+
+**收集字段：**
+
+| 字段 | 必填 | 说明 |
 |------|------|------|
-| 年收入（USD） | 下拉 | < $30K / $30K-$75K / $75K-$200K / $200K-$500K / > $500K |
-| 总净资产（USD） | 下拉 | < $50K / $50K-$200K / $200K-$1M / $1M-$5M / > $5M |
-| 流动净资产（USD） | 下拉 | 同上 |
-| 资金来源 | 多选 | 工资/薪金 / 经营收入 / 投资收益 / 遗产赠与 / 房产出租 / 其他 |
+| 英文姓名（名 / 姓） | ✅ | 必须与证件一致，仅允许英文字母 |
+| 中文姓名 | 选填 | 用于显示 |
+| 出生日期 | ✅ | 年龄需满 18 岁 |
+| 国籍 | ✅ | 下拉国家列表 |
+| 证件类型 | ✅ | 身份证 / 护照 / 港澳通行证 / HKID |
+| 就业状况 | ✅ | 在职 / 自雇 / 退休 / 学生 / 其他 |
+| 职业 / 雇主（在职时） | ✅ | 就业状态影响后续财务信息显示 |
+| 是否政治敏感人士（PEP） | ✅ | 默认否；勾选后触发人工审核 |
+| 是否证券公司内部人员 | ✅ | 默认否；勾选后触发人工审核 |
 
-**业务规则**:
-- 流动净资产不得超过总净资产（前端实时校验）
-- 资金来源至少选 1 项
-- 该数据用于 AML 评分和后续风险评估
+**业务规则：**
+- PEP / 内部人员勾选 → 不可走自动审核，强制进入人工合规审核（额外 2-3 个工作日）
+- 英文姓名在 Step 7 协议签署时将被二次比对
 
----
+### 4.3 Step 2：证件上传与 OCR
 
-### Step 4：投资评估
+> **原型参考**：[Step 2 - 证件上传](prototypes/02-kyc/index.html)（切换到步骤 2）
 
-| 字段 | 类型 | 选项 |
-|------|------|------|
-| 投资经验年限 | 单选 | 无经验 / 1-3 年 / 3-5 年 / 5-10 年 / 10 年以上 |
-| 投资频率 | 单选 | 很少（< 5 次/年）/ 偶尔（5-20 次/年）/ 频繁（> 20 次/年）|
-| 产品知识 | 多选 | 股票 / ETF / 债券 / 期权 / 期货 / 外汇 |
-| 投资目标 | 单选 | 资本保值 / 稳定收益 / 资本增值 / 高风险高回报 |
-| 风险承受能力 | 单选 | 保守 / 稳健 / 平衡 / 进取 / 激进 |
+```mermaid
+flowchart TD
+    A[选择证件类型] --> B{证件类型}
+    B -->|身份证| C[上传正面 + 背面]
+    B -->|护照| D[上传个人信息页]
+    B -->|港澳通行证| E[上传正面 + 背面]
+    B -->|HKID| F[上传正面含地址区]
 
-**业务规则**:
-- 根据评估结果系统自动生成风险等级（R1-R5）
-- 风险等级影响可交易产品范围（Phase 1 仅美股，故不作拦截，但数据记录归档）
-- Phase 2 期权 / 融资产品将依据此分级限制访问
+    C --> G[OCR 识别]
+    D --> G
+    E --> G
+    F --> G
 
----
+    G --> H{识别结果}
+    H -->|识别成功| I[自动回填 Step 1 字段\n用户核对确认]
+    H -->|识别失败\n图片模糊/过暗| J[提示重拍\n说明拍摄要求]
+    H -->|识别失败\n其他原因| K[提示手动填写]
 
-### Step 5：税务申报（W-8BEN / W-9）
-
-**流程分支**:
+    I --> L{用户确认}
+    L -->|信息正确| M[进入 Step 3]
+    L -->|需要修改| N[手动修改字段]
+    N --> M
 ```
-"您是否是美国税务居民？"
-    ↓ 是 → W-9 填写流程 → TIN（SSN / EIN）
-    ↓ 否 → W-8BEN 填写流程
-```
 
-**W-8BEN 字段**:
+**图片质量要求（用户可感知）：**
+- 证件四角完整，不遮挡
+- 光线均匀，无反光
+- 无模糊、不抖动
+- 文件大小 ≤ 10MB（支持 JPG / PNG）
+- 不接受过期证件
 
-| 字段 | 说明 |
+**OCR 说明：** OCR 自动识别结果仅作辅助填写，用户可手动修改。最终以用户确认的内容为准。
+
+### 4.4 Step 3：财务状况
+
+> **原型参考**：[Step 3 - 财务状况](prototypes/02-kyc/index.html)（切换到步骤 3 或点击顶部进度"财务"）
+
+| 字段 | 选项 |
 |------|------|
-| 税务居住国 | 下拉（国家列表） |
-| 纳税人识别号（TIN） | 各国 TIN（中国居民用身份证号，香港居民用 HKID 号） |
-| 申请税收协定优惠 | 复选框（美中双边税收协定 Article 10，股息税 10%） |
-| 协定国家 | 自动填充（基于税务居住国） |
-| 适用条款 | Article 10 |
-| 申报税率 | 10%（标准 30% → 协定 10%） |
-| 电子签署确认 | "本人以电子方式确认上述信息真实准确" 复选框 |
+| 年收入（USD 等值） | < $30K / $30K–$75K / $75K–$200K / $200K–$500K / > $500K |
+| 总净资产（USD） | < $50K / $50K–$200K / $200K–$1M / $1M–$5M / > $5M |
+| 流动净资产（USD） | 与总净资产相同选项（不得超过总净资产，实时校验） |
+| 资金来源（多选） | 工资薪金 / 经营收入 / 投资收益 / 遗产赠与 / 房产出租 / 其他 |
 
-**W-8BEN 有效期**:
-- 签署后有效 3 年
-- 到期前 90 天系统推送提醒更新
-- 到期未更新：股息自动按 30% 扣税（后台标记，Admin 工作台提醒）
+**业务规则：**
+- 流动净资产不得超过总净资产（前端实时提示）
+- 资金来源至少选 1 项
+- 净资产 ≥ $25,000 USD 才满足 Pattern Day Trader（PDT）基本条件
 
-**数据存储**:
-- W-8BEN 表单数据加密存储
-- 生成 PDF 存档（供用户在"我的"页下载）
-- 保留期：账户有效期间 + 关闭后 6 年
+### 4.5 Step 4：投资评估
 
----
+| 字段 | 选项 |
+|------|------|
+| 股票投资年限 | 无经验 / 1–3 年 / 3–5 年 / 5–10 年 / 10 年以上 |
+| 年均交易频次 | 极少（< 5 次）/ 偶尔（5–20 次）/ 频繁（> 20 次）|
+| 了解的投资产品（多选） | 股票 / ETF / 债券 / 期权 / 期货 / 外汇 |
+| 投资目标 | 资本保全 / 稳定收益 / 资本增值 / 高风险高回报 |
+| 风险承受能力 | 保守型 / 稳健型 / 平衡型 / 进取型 |
 
-### Step 6：风险披露
+**业务规则：**
+- 系统根据以上回答自动计算风险等级（R1–R5，内部使用）
+- Phase 1 美股交易不因风险等级限制（数据存档备用）
+- Phase 2 期权/融资产品将依据此分级限制交易权限
 
-**5 份必读文件**（可展开/收起）:
+### 4.6 Step 5：税务申报
 
-| 编号 | 文档名称 | 核心内容 |
-|------|---------|---------|
+> **原型参考**：[Step 5 - 税务申报](prototypes/02-kyc/index.html)（切换到步骤 4 – W-8BEN 页面）
+
+```mermaid
+flowchart TD
+    A[Step 5: 税务申报] --> B{您是否是美国税务居民?}
+    B -->|是\n美国公民/绿卡/居住者| C[填写 W-9 表格\n提供 SSN 或 EIN]
+    B -->|否| D[填写 W-8BEN 表格]
+
+    D --> E[选择税务居住国]
+    E --> F[填写本国 TIN\n中国大陆:身份证号 香港:HKID号]
+    F --> G{是否申请税收协定优惠?}
+    G -->|是\n如中美税收协定| H[显示协定税率\n例:中国居民股息税10%]
+    G -->|否| I[适用标准30%预扣税]
+    H --> J[电子确认签署]
+    I --> J
+    C --> J
+    J --> K[进入 Step 6]
+```
+
+**W-8BEN 核心说明（用户版）：**
+- W-8BEN 是美国税务局（IRS）要求的表格，证明您不是美国税务居民
+- 签署后适用税收协定优惠税率（如中美协定：股息税从 30% 降至 10%）
+- **有效期 3 年**：到期前 90 天系统会提醒续签，到期未续签则股息将恢复 30% 标准扣税
+
+### 4.7 Step 6：风险披露
+
+**5 份必读文件：**
+
+| 编号 | 文件名 | 核心内容 |
+|------|--------|---------|
 | 1 | 证券风险声明书 | 投资风险通用说明 |
-| 2 | 美国市场风险说明 | NYSE/NASDAQ 市场特有风险 |
-| 3 | 香港市场风险说明（Phase 2 后激活） | HKEX 市场特有风险 |
-| 4 | Pattern Day Trader（PDT）规则说明 | $25K 最低权益要求，4 次 Day Trade 规则 |
-| 5 | 最优执行（Best Execution）说明 | 订单路由原则，PFOF 说明 |
+| 2 | 美国市场风险说明 | NYSE/NASDAQ 特有风险 |
+| 3 | 香港市场风险说明 | Phase 2 激活 |
+| 4 | PDT 规则说明 | $25K 最低权益要求、4 次日内交易规则 |
+| 5 | 最优执行说明 | 订单路由原则 |
 
-**交互规则**:
-- 5 份文件全部展开阅读（或滚动至底部）后，才激活"我已阅读全部文件"复选框
-- 复选框未勾选：下一步按钮禁用
-- 内容支持中英文双语
+**交互规则：**
+- 5 份文件全部需滚动至底部或展开阅读，"已阅读全部"勾选框才可点击
+- 勾选框未勾选时，"下一步"按钮保持禁用状态
+- 文件支持中英文切换
 
----
+### 4.8 Step 7：协议签署
 
-### Step 7：协议签署
+**5 份协议（全部必选）：**
 
-**5 份协议**:
+| 协议 | 说明 |
+|------|------|
+| 客户协议 | 核心服务条款 |
+| 隐私政策 | 数据处理说明 |
+| 电子通讯协议 | 授权以电子方式接收文件 |
+| 交易所数据协议 | 非专业投资者声明（降低行情数据费用） |
+| 反洗钱声明 | AML 合规声明 |
 
-| 编号 | 协议名称 |
-|------|---------|
-| 1 | 客户协议（Client Agreement） |
-| 2 | 隐私政策（Privacy Policy） |
-| 3 | 电子通讯协议（E-Communications Agreement） |
-| 4 | 交易所数据协议（Exchange Data Agreement）— 非专业投资者声明 |
-| 5 | 反洗钱声明（AML Declaration） |
-
-**签署方式（Phase 1）**:
-- 在文本框中打字输入完整法定英文姓名（必须与 Step 1 一致）
-- 系统比对：姓名不一致 → 报错提示（不区分大小写，去除首尾空格）
-- 勾选"本人已阅读并同意上述所有协议"
-- 点击"提交申请"
-
-**业务规则**:
-- 签署时间戳（UTC）、IP 地址、设备 ID 记录至审计日志
-- 协议版本号与签署记录关联存储
-- 签署后不可更改协议版本（版本升级需重新签署）
+**签署方式（Phase 1）：**
+- 在文本框中打字输入完整法定英文姓名（不区分大小写，去除首尾空格）
+- 系统比对签名与 Step 1 填写的英文姓名是否一致，不一致则提示错误
+- 勾选"本人已阅读并同意上述所有协议"后，点击"提交申请"
 
 ---
 
-## 三、KYC 审核流程
+## 五、KYC 审核状态机
 
-### 3.1 状态机
-
+```mermaid
+stateDiagram-v2
+    [*] --> NOT_STARTED: 账户创建
+    NOT_STARTED --> IN_PROGRESS: 开始填写
+    IN_PROGRESS --> IN_PROGRESS: 保存草稿\n（断点续传）
+    IN_PROGRESS --> SUBMITTED: 提交申请
+    SUBMITTED --> PENDING_REVIEW: 进入审核队列
+    PENDING_REVIEW --> APPROVED: 审核通过
+    PENDING_REVIEW --> NEEDS_MORE_INFO: 需要补件
+    PENDING_REVIEW --> REJECTED: 审核拒绝
+    NEEDS_MORE_INFO --> SUBMITTED: 用户补件后重提交
+    IN_PROGRESS --> EXPIRED: 60 天未完成\n自动过期
+    EXPIRED --> IN_PROGRESS: 用户重新填写
 ```
-NOT_STARTED
-    → IN_PROGRESS（用户开始填写）
-    → SUBMITTED（用户提交所有步骤）
-    → PENDING_REVIEW（进入人工审核队列）
-    → APPROVED（审核通过，账户激活）
-    → NEEDS_MORE_INFO（需补充材料）
-    → REJECTED（拒绝开户）
-```
 
-### 3.2 审核状态页（用户端）
+**用户感知的审核状态页：**
 
-| 状态 | 显示内容 |
+> **原型参考**：[审核状态页](prototypes/02-kyc/index.html)（点击顶部"审核状态"链接，或点击"模拟审核结果"按钮）
+
+| 状态 | 页面展示 |
 |------|---------|
-| 审核中 | 进度时间轴（5 个节点）+ 预计 1-2 个工作日 |
-| 需补充材料 | 具体原因说明 + 补件入口 |
-| 已通过 | 账号 UID + 开户成功确认 + "立即入金"按钮 |
-| 已拒绝 | 拒绝原因概述 + 客服联系方式 |
+| 审核中（PENDING_REVIEW） | 进度时间轴（5个节点）+ "预计 1–2 个工作日" |
+| 需补件（NEEDS_MORE_INFO） | 具体原因说明 + 直接跳转到对应补件步骤的入口 |
+| 已通过（APPROVED） | 账号 UID + 开户成功确认 + "立即入金"按钮 |
+| 已拒绝（REJECTED） | 拒绝原因概述 + 客服联系方式 |
 
-**进度时间轴节点**:
+**审核进度时间轴节点：**
 1. 申请已提交
 2. 身份核验
 3. 人工审核
 4. 合规审批
 5. 账户已激活
 
-### 3.3 SLA
+---
 
-| 状态 | 目标处理时间 |
-|------|------------|
-| 普通 KYC | 1 个工作日内完成审核 |
-| PEP / 内部人员标记 | 2-3 个工作日（合规专项审核） |
+## 六、业务规则
+
+### 6.1 断点续传
+
+用户可随时关闭 App，下次打开自动跳转至上次进行到的步骤。草稿数据在服务端保存，不依赖本地缓存。
+
+### 6.2 开户超时
+
+- IN_PROGRESS 状态超过 60 天无操作 → 自动标记为 EXPIRED
+- 用户重新进入后，已填写的内容可继续使用（部分敏感信息可能需重新确认）
+
+### 6.3 PEP / 内部人员处理
+
+| 情况 | 处理方式 |
+|------|---------|
+| 勾选 PEP（政治敏感人士） | 强制进入人工合规审核，审核周期延长至 2–3 个工作日，合规专员负责 |
+| 勾选证券公司内部人员 | 同 PEP，额外记录雇主名称、职位，合规备案 |
+
+### 6.4 W-8BEN 有效期管理
+
+| 时间节点 | 动作 |
+|---------|------|
+| 到期前 90 天 | App 内弹出提醒 + 推送通知，引导用户进入"税务信息"重新签署 |
+| 到期前 30 天 | 再次推送通知 |
+| 到期当天 | 股息扣税率自动切换回 30%；App 内显示税务到期警告横幅 |
+| 用户续签后 | 立即恢复协定税率，新有效期从续签日起算 3 年 |
+
+### 6.5 审核 SLA
+
+| 类型 | 目标时间 |
+|------|---------|
+| 普通 KYC 申请 | 1 个工作日内完成审核 |
+| PEP / 内部人员标记申请 | 2–3 个工作日 |
 | 补件后重审 | 1 个工作日 |
+| SLA 超时预警 | 超过 20 小时未处理，Admin Panel 标红预警 |
 
 ---
 
-## 四、Admin Panel：KYC 审核工作台
+## 七、合规要求
 
-### 4.1 审核队列
+| 要求 | 适用规定 |
+|------|---------|
+| 实名身份验证 | SEC/FINRA KYC 强制要求；Phase 2 追加 SFC KYC 指引 |
+| AML 筛查 | 提交时自动触发 OFAC 制裁名单比对；命中则人工审核处理 |
+| 投资者适当性 | FINRA Rule 2010；Step 4 投资评估结果存档用于合规审计 |
+| W-8BEN / W-9 | IRS 要求；所有美股账户必须完成税务声明方可交易 |
+| 风险披露阅读确认 | SEC Reg BI；5 份文件必须确认已读，服务端校验 |
+| 协议电子签署 | ESIGN Act；签署时间戳、IP 地址记录至审计日志 |
+| 数据保留 | KYC 文件保留至账户关闭后 6 年 |
 
-| 功能 | 说明 |
-|------|------|
-| 按提交时间排序 | 先进先出（FIFO）默认排序 |
-| 过滤器 | 状态 / 国籍 / 证件类型 / 提交日期范围 / 是否 PEP |
-| 批量操作 | 批量标记"需补件"（可选） |
-| SLA 预警 | 超过 20 小时未处理标红预警 |
+---
 
-### 4.2 审核工作台页面
+## 八、异常与边界场景
 
-| 模块 | 内容 |
-|------|------|
-| 用户信息面板 | 所有 7 步填写的结构化数据 |
-| 证件图片查看 | 原图查看（缩放、旋转）；OCR 识别结果高亮对比 |
-| 风险信号 | PEP 标记 / OFAC 筛查结果 / 风险评分 |
-| 操作区域 | 通过 / 需补件（填写原因）/ 拒绝（选择拒绝类型） |
-| 审核备注 | 内部备注（不对用户展示） |
-| 审核历史 | 该申请的所有审核操作记录 |
+| 场景 | 用户感知 | 处理 |
+|------|---------|------|
+| OCR 识别失败 | "无法识别证件信息，请重新拍摄或手动填写" | 允许手动填写，记录失败原因 |
+| 证件过期 | "证件已过期，请上传有效期内的证件" | 阻止提交 |
+| 图片过大/格式不支持 | "请上传 JPG 或 PNG 格式，文件 ≤ 10MB" | 前端提示，不上传 |
+| 流动净资产超过总净资产 | "流动净资产不可超过总净资产" | 实时校验，红色提示 |
+| 签名与姓名不匹配 | "签名与您填写的英文姓名不符，请检查" | 提示，不允许提交 |
+| 用户补件后再次被拒 | 再次发送补件通知，说明新原因 | 最多支持 3 次补件机会 |
+| 提交后 App 崩溃 | 重新进入 App 显示"审核中"状态 | 幂等提交，不重复进队 |
 
-### 4.3 操作权限
+---
+
+## 九、Admin Panel — KYC 审核工作台
+
+> **注**：Admin Panel 界面设计由运营工程师负责，此处仅定义 PM 所需的功能范围。
+
+### 审核队列需要展示：
+- 按提交时间排序（FIFO），超 20 小时未处理标红
+- 可按状态 / 国籍 / 证件类型 / 提交日期 / PEP 标记过滤
+
+### 审核工作台需要具备：
+- 用户填写的所有结构化信息（7 步全部内容）
+- 证件图片查看（可缩放、旋转）
+- OFAC 筛查结果与风险信号展示
+- 操作按钮：通过 / 需补件（填写原因）/ 拒绝（选择拒绝类型）
+- 内部审核备注（不对用户展示）
+- 审核历史记录（只追加）
+
+### 操作权限：
 
 | 操作 | 所需角色 |
 |------|---------|
-| 审核通过 | KYC Reviewer |
-| 要求补件 | KYC Reviewer |
+| 审核通过 / 要求补件 | KYC Reviewer |
 | 拒绝开户 | KYC Senior Reviewer |
 | PEP 专项审核 | Compliance Officer |
-| 查看所有审核历史 | Admin / Compliance Officer |
 
 ---
 
-## 五、后端接口规格
+## 十、成功指标
 
-### 5.1 保存 KYC 进度（断点续传）
-
-> **[v1.1 修订]** P0-KYC-01 修复：PUT → PATCH，增加 Idempotency-Key；去除 `resume_token`（无明确用途）。
-
-```
-PATCH /v1/kyc/progress
-Headers:
-  Authorization: Bearer {token}
-  Idempotency-Key: {uuid-v4}         // [v1.1 新增] 防止断网重试重复调用 OCR
-Request:
-  {
-    "step": 1,
-    "data": { /* 该步骤的字段数据 */ }
-  }
-Response:
-  {
-    "step_status": "SAVED",
-    "next_step": 2,
-    "completed_steps_mask": 1         // [v1.1 新增] 位图，第 n 位表示第 n 步已完成
-  }
-```
-
-**幂等处理**: Redis 存储 `kyc_progress_idem:{user_id}:{idempotency_key}` → 响应内容，TTL=72h。
-
-### 5.2 OCR 识别
-
-> **[v1.1 修订]** Flutter 图片上传使用 `image_picker ^1.2.1` + `image_cropper ^7.1.5`；HEIC 格式在 Android API 26-27 不支持，客户端强制转换为 JPEG（质量 85%，控制在 5MB 内）后再上传。
-
-```
-POST /v1/kyc/ocr
-Content-Type: multipart/form-data
-Headers:
-  Idempotency-Key: {uuid-v4}
-Request:
-  file: 图片文件（JPEG/PNG，服务端限制 < 5MB）
-  doc_type: "ID_CARD_FRONT" | "ID_CARD_BACK" | "PASSPORT" | "HKID"
-Response:
-  {
-    "success": true,
-    "fields": {
-      "first_name": "San",
-      "last_name": "Zhang",
-      "id_number": "110101199001010001",
-      "date_of_birth": "1990-01-01",
-      "expiry_date": "2030-01-01"
-    },
-    "confidence": 0.95,
-    "blur_score": 0.02
-    // [v1.1 移除] ocr_highlight_boxes: 无 bounding box 数据，Admin 高亮对比功能不可实现，需改方案
-  }
-```
-
-**证件图片安全访问（Presigned URL）**:
-- 证件图片存储于对象存储（S3/OSS），加密存储，不可直接访问
-- Admin 查看图片通过独立接口获取 Presigned URL（TTL=5分钟）
-- 接口：`GET /v1/admin/kyc/applications/{id}/document-url?doc_type=xxx`（见 PRD-09）
-
-### 5.3 提交 KYC 申请
-
-> **[v1.1 修订]** 补充服务端步骤完整性校验（P1-KYC-07 修复）和幂等处理。
-
-```
-POST /v1/kyc/submit
-Headers:
-  Idempotency-Key: {uuid-v4}         // [v1.1 新增] 防止双击提交重复进队
-Request:
-  {
-    "read_documents": [              // [v1.1 新增] 服务端验证 5 份风险披露全部已读
-      "RISK_DISCLOSURE_1",
-      "RISK_DISCLOSURE_2",
-      "RISK_DISCLOSURE_3",
-      "PDT_RULES",
-      "BEST_EXECUTION"
-    ]
-  }
-Response:
-  {
-    "application_id": "kyc-uuid",
-    "status": "PENDING_REVIEW",
-    "estimated_review_time": "1 business day"
-  }
-```
-
-**服务端校验**:
-1. `completed_steps_mask == 0b1111111`（7 步全部完成位图验证）
-2. `read_documents` 包含全部 5 份必读文件
-3. 协议签署姓名与 Step 1 英文姓名一致（大小写不敏感，去首尾空格）
-4. 72h 幂等缓存，重复提交返回第一次响应
-
-### 5.4 查询 KYC 状态
-
-```
-GET /v1/kyc/status
-Response:
-  {
-    "status": "PENDING_REVIEW" | "APPROVED" | "NEEDS_MORE_INFO" | "REJECTED",
-    "kyc_tier": 0 | 1 | 2,
-    "account_number": "XXX123456",  // 通过后返回
-    "needs_info_reason": "证件图片模糊，请重新上传",
-    "rejection_reason": null,
-    "timeline": [
-      {"node": "submitted", "completed_at": "2026-03-13T10:00:00Z"},
-      {"node": "identity_verified", "completed_at": null}
-    ]
-  }
-```
-
-### 5.5 补充材料
-
-```
-POST /v1/kyc/resubmit
-Request:
-  {
-    "step": 2,
-    "data": { /* 补充的字段/文件 */ }
-  }
-```
+| 指标 | 目标 | 测量 |
+|------|------|------|
+| 开户完成率 | 开始填写 → 提交审核 ≥ 70% | 漏斗分析 |
+| 首次审核通过率 | 提交后首次通过率 ≥ 80% | 审核结果统计 |
+| 平均开户时长 | 用户完成 7 步 ≤ 15 分钟 | 行为日志 |
+| 审核 SLA 达标率 | 1 个工作日内完成率 ≥ 95% | 审核时效统计 |
+| W-8BEN 续签率 | 到期前 30 天内续签率 ≥ 85% | 续签漏斗 |
 
 ---
 
-## 六、数据模型
+## 十一、依赖与风险
 
-```sql
--- KYC 申请主表（v1.1 新增 completed_steps_mask、started_at、expires_at）
-CREATE TABLE kyc_applications (
-    id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id              UUID NOT NULL REFERENCES users(id),
-    status               VARCHAR(30) NOT NULL DEFAULT 'NOT_STARTED',
-    kyc_tier             SMALLINT DEFAULT 0,
-    account_number       VARCHAR(20) UNIQUE,
-    completed_steps_mask SMALLINT NOT NULL DEFAULT 0, -- [v1.1 新增] 位图，7 步全完成=0b1111111=127
-    started_at           TIMESTAMP WITH TIME ZONE,    -- [v1.1 新增] 首次进入 KYC 时间
-    expires_at           TIMESTAMP WITH TIME ZONE,    -- [v1.1 新增] IN_PROGRESS 超时：started_at + 60 days
-    submitted_at         TIMESTAMP WITH TIME ZONE,
-    reviewed_at          TIMESTAMP WITH TIME ZONE,
-    reviewer_id          UUID,
-    rejection_reason     TEXT,
-    created_at           TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at           TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
--- 定时任务（每日 00:00 UTC）：超时处理
--- UPDATE kyc_applications SET status = 'EXPIRED' WHERE status = 'IN_PROGRESS' AND expires_at < NOW()
-
--- KYC 个人信息（加密存储敏感字段，v1.1 移除 risk_level 至独立表）
-CREATE TABLE kyc_personal_info (
-    kyc_id            UUID PRIMARY KEY REFERENCES kyc_applications(id),
-    first_name        VARCHAR(100) NOT NULL,
-    last_name         VARCHAR(100) NOT NULL,
-    chinese_name      VARCHAR(50),
-    date_of_birth     DATE NOT NULL,
-    nationality       VARCHAR(5) NOT NULL,  -- ISO 3166-1 alpha-2
-    id_type           VARCHAR(30) NOT NULL,
-    id_number_enc     BYTEA NOT NULL,       -- AES-256-GCM 加密
-    employment_status VARCHAR(20),
-    occupation        VARCHAR(100),
-    employer_name     VARCHAR(200),
-    is_pep            BOOLEAN DEFAULT false,
-    is_insider        BOOLEAN DEFAULT false
-    -- [v1.1 移除] risk_level 归入 kyc_risk_assessment 表
-);
-
--- [v1.1 新增] 财务状况（KYC Step 3 原始数据，原缺失）
-CREATE TABLE kyc_financial_profile (
-    kyc_id              UUID PRIMARY KEY REFERENCES kyc_applications(id),
-    annual_income_range VARCHAR(30) NOT NULL,
-    net_worth_range     VARCHAR(30) NOT NULL,
-    liquid_assets_range VARCHAR(30) NOT NULL,
-    fund_sources        TEXT[] NOT NULL,      -- ARRAY of source codes
-    created_at          TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- [v1.1 新增] 投资评估（KYC Step 4 原始数据 + 计算结果，原只存 risk_level）
-CREATE TABLE kyc_risk_assessment (
-    kyc_id                UUID PRIMARY KEY REFERENCES kyc_applications(id),
-    investment_exp_years  VARCHAR(20) NOT NULL,
-    investment_frequency  VARCHAR(20) NOT NULL,
-    product_knowledge     TEXT[] NOT NULL,
-    investment_objective  VARCHAR(30) NOT NULL,
-    risk_tolerance        VARCHAR(20) NOT NULL,
-    computed_risk_level   SMALLINT NOT NULL,   -- 1-5
-    computed_at           TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- W-8BEN 表单（v1.1 新增 status、is_current 字段及约束）
-CREATE TABLE w8ben_forms (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    kyc_id          UUID NOT NULL REFERENCES kyc_applications(id),
-    user_id         UUID NOT NULL REFERENCES users(id),
-    tax_country     VARCHAR(5) NOT NULL,
-    tin_enc         BYTEA,               -- TIN 加密存储
-    treaty_claim    BOOLEAN DEFAULT false,
-    treaty_article  VARCHAR(20),
-    withholding_rate NUMERIC(5,2),       -- 10.00 for treaty rate
-    signed_name     VARCHAR(200) NOT NULL,
-    signed_at       TIMESTAMP WITH TIME ZONE NOT NULL,
-    signed_ip       INET NOT NULL,
-    signed_device_id VARCHAR(64) NOT NULL,
-    valid_until     DATE NOT NULL,       -- 签署日期 + 3 年
-    status          VARCHAR(20) NOT NULL DEFAULT 'ACTIVE', -- [v1.1 新增] ACTIVE / EXPIRED / SUPERSEDED
-    is_current      BOOLEAN NOT NULL DEFAULT true,          -- [v1.1 新增]
-    pdf_storage_key VARCHAR(500),
-    created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    -- [v1.1 新增] 同一用户同时只有一条当前有效记录
-    CONSTRAINT uq_user_w8ben_current UNIQUE (user_id, is_current) WHERE is_current = true
-);
--- W-8BEN 到期定时任务（每日 00:00 UTC）：
--- SELECT user_id FROM w8ben_forms WHERE is_current = true AND valid_until < NOW()
--- → 标记 status='EXPIRED', is_current=false → Kafka 事件 → 推送通知 → 交易引擎切换 30% 税率
--- W-8BEN 90 天提前提醒：
--- WHERE is_current = true AND valid_until BETWEEN NOW() AND NOW() + INTERVAL '90 days'
-
--- 协议签署记录
-CREATE TABLE agreement_signatures (
-    id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    kyc_id            UUID NOT NULL REFERENCES kyc_applications(id),
-    agreement_type    VARCHAR(50) NOT NULL,
-    agreement_version VARCHAR(20) NOT NULL,
-    signed_name       VARCHAR(200) NOT NULL,
-    signed_at         TIMESTAMP WITH TIME ZONE NOT NULL,
-    signed_ip         INET NOT NULL,
-    signed_device_id  VARCHAR(64) NOT NULL
-);
-
--- KYC 审核历史（只追加，不修改）
-CREATE TABLE kyc_review_log (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    kyc_id          UUID NOT NULL REFERENCES kyc_applications(id),
-    action          VARCHAR(30) NOT NULL,  -- 'APPROVE', 'REJECT', 'REQUEST_INFO'
-    reviewer_id     UUID NOT NULL,
-    reason          TEXT,
-    internal_notes  TEXT,
-    created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- [v1.1 新增] 必要审计索引
-CREATE INDEX idx_kyc_applications_user    ON kyc_applications (user_id, created_at DESC);
-CREATE INDEX idx_kyc_applications_status  ON kyc_applications (status, created_at DESC);
-CREATE INDEX idx_w8ben_user_current       ON w8ben_forms (user_id, is_current) WHERE is_current = true;
-CREATE INDEX idx_w8ben_valid_until        ON w8ben_forms (valid_until) WHERE is_current = true;
-```
-
----
-
-## 七、安全与合规
-
-| 项目 | 规格 |
+| 项目 | 说明 |
 |------|------|
-| 证件图片加密 | AES-256-GCM，密钥由 KMS 管理 |
-| PII 字段加密 | 证件号、TIN、DOB（与其他字段组合时）加密存储 |
-| 传输加密 | TLS 1.3 全程 |
-| 访问控制 | 证件图片仅 KYC Reviewer 及以上角色可查看 |
-| 审计追踪 | 所有审核操作记录至 `kyc_review_log`，不可修改 |
-| 数据保留 | KYC 记录：账户关闭后 6 年 |
-| OFAC 筛查 | KYC 提交时自动触发，结果记录（见 PRD-05 AML 部分） |
-
----
-
-## 八、验收标准
-
-| 场景 | 标准 |
-|------|------|
-| 7 步流程完整性 | 每步数据验证通过后方可进入下一步 |
-| 断点续传 | App 关闭重开后可从上次完成的步骤继续 |
-| OCR 识别率 | 清晰证件图片识别成功率 ≥ 85% |
-| 提交审核时间 | 材料完整情况下 1 工作日内完成审核 |
-| W-8BEN 生效 | 签署后立即生效，股息税率调整为 10%（后台配置） |
-| 补件流程 | 用户收到补件通知后可直接从指定步骤重新上传 |
-| 审核工作台 | Reviewer 可在单页面完成查看 + 操作，无需切换多页 |
+| OCR 服务 | 第三方 OCR 供应商（Mindee / 其他），识别率直接影响首次通过率 |
+| 活体检测（Phase 2） | Onfido / Sumsub / Jumio 评估中，Phase 1 人工审核替代存在人力成本 |
+| OFAC 数据源 | 每日更新，延迟更新可能导致漏筛 |
+| 待确认 | 补件机会次数（当前定为 3 次）是否满足合规要求，需法务确认 |
+| 待确认 | W-8BEN PDF 是否需要支持用户在 App 内下载，影响文件服务设计 |

@@ -1,480 +1,296 @@
 # PRD-01：登录与认证模块
 
-> **文档状态**: Phase 1 正式版（技术评审修订版）
-> **版本**: v1.1
-> **日期**: 2026-03-13
-> **变更说明**: 根据 Backend、Flutter 工程师技术评审意见修订：修正 Token 存储方案（Native App 不适用 HttpOnly Cookie）、补充 Biometric Challenge 下发接口、修正并发注册竞态、修正 OTP purpose 校验、修正 user_devices 唯一约束、补充 token_version 机制、补充 Android SMS Retriever API 要求
+> **文档状态**: Phase 1 正式版
+> **版本**: v2.0
+> **日期**: 2026-03-14
+> **变更说明**: v2.0 整改 — 移除接口规格与数据模型（归入工程师技术文档），改用 Mermaid 流程图，补充用户旅程与业务规则说明，新增低保真原型引用
+
+> **低保真原型**：[查看原型](prototypes/01-auth/index.html)（冷启动 · OTP 登录 · 生物识别 · 访客模式 · 设备管理）
 
 ---
 
-## 一、模块概述
+## 一、背景与问题
 
-### 1.1 功能范围
+### 1.1 用户痛点
 
-本模块覆盖用户身份验证的全生命周期：
+目标用户（中国大陆 / 香港零售投资者）在使用海外经纪商时面临：
 
-- 手机号 + OTP 登录（Phase 1 唯一登录方式）
-- 生物识别快捷登录（Face ID / 指纹）
-- 访客模式（延迟行情浏览）
-- 设备管理（最多 3 台并发）
-- Token 管理与会话安全
+- **注册门槛高**：需要邮箱+密码，部分用户不习惯或忘记密码
+- **登录体验差**：每次打开 App 都需要完整的账密输入
+- **安全感缺失**：不确定账户是否被他人登录
 
-### 1.2 Phase 1 范围边界
+### 1.2 业务价值
 
-| 功能 | Phase 1 | Phase 2 |
+- 手机号 OTP 是国内用户最熟悉的验证方式，降低注册弃单率
+- 生物识别快捷登录提升日活频次（目标：日均打开 ≥ 2 次）
+- 访客模式降低获客成本，用户可先体验行情再决定注册
+
+---
+
+## 二、目标用户与场景
+
+| 用户 | 场景 |
+|------|------|
+| 首次下载用户 | 想快速注册开始看行情，不想填写繁琐的账号密码 |
+| 已有账户用户 | 每天打开 App 查行情、下单，希望一键进入 |
+| 谨慎型用户 | 担心账号安全，关注是否在其他设备被登录 |
+| 访客 | 还未决定注册，先体验行情再说 |
+
+---
+
+## 三、功能范围
+
+| 功能 | Phase 1 | Phase 2 | 优先级 |
+|------|---------|---------|--------|
+| 手机号 + OTP 登录 | ✅ | - | Must |
+| 生物识别快捷登录（Face ID / 指纹） | ✅ 首次 OTP 后引导设置 | - | Must |
+| 访客模式（延迟行情） | ✅ | - | Must |
+| 设备管理（最多 3 台并发） | ✅ | - | Must |
+| 推送通知（新设备登录告警） | ✅ | - | Must |
+| 邮箱 + 密码登录 | ❌ | ✅ | - |
+| 找回密码 | ❌（Phase 1 无密码概念） | ✅ | - |
+| 第三方授权登录（微信/Google） | ❌ | ✅ | - |
+
+---
+
+## 四、核心用户流程
+
+### 4.1 首次登录 / 注册主流程
+
+> **原型参考**：[冷启动 → OTP 登录](prototypes/01-auth/index.html)
+
+```mermaid
+flowchart TD
+    A([App 冷启动]) --> B{设备是否已登录?}
+    B -->|是| C{已设置生物识别?}
+    B -->|否| D[冷启动页]
+
+    C -->|是| E[显示 Face ID 图标]
+    C -->|否| D
+
+    D --> F[点击手机号登录]
+    D --> G[点击先逛逛]
+
+    G --> H[访客模式行情页]
+
+    F --> I[输入手机号 + 区号]
+    I --> J{格式校验}
+    J -->|不通过| I
+    J -->|通过| K[发送 OTP]
+    K --> L[输入 6 位验证码]
+    L --> M{验证码是否正确?}
+
+    M -->|错误 < 5 次| L
+    M -->|错误 ≥ 5 次| N[账户锁定 30 分钟]
+    M -->|正确| O{是否新用户?}
+
+    O -->|是| P[自动创建账户]
+    O -->|否| Q{KYC 状态?}
+
+    P --> R[引导设置生物识别]
+    Q -->|未开始| S[进入 KYC 流程]
+    Q -->|审核中| T[KYC 状态页]
+    Q -->|已通过| U[进入首页]
+
+    R --> V{用户是否开启?}
+    V -->|是| U
+    V -->|否，跳过| U
+```
+
+### 4.2 生物识别登录流程
+
+> **原型参考**：[生物识别登录](prototypes/01-auth/index.html)（点击页面顶部"生物识别登录"标签）
+
+```mermaid
+flowchart TD
+    A([App 冷启动]) --> B[显示 Face ID 快捷登录入口]
+    B --> C[用户触发生物识别]
+    C --> D{验证结果}
+    D -->|通过| E[刷新会话 Token]
+    E --> F[进入 App]
+    D -->|失败 1-2 次| C
+    D -->|失败 ≥ 3 次| G[降级至 OTP 登录]
+    D -->|用户取消| H[返回冷启动页]
+    G --> I[手机号 OTP 流程]
+```
+
+### 4.3 访客模式流程
+
+```mermaid
+flowchart TD
+    A[冷启动页] --> B[点击先逛逛]
+    B --> C[行情首页\n显示延迟15分钟标识]
+
+    C --> D{用户操作}
+    D -->|浏览行情/股票详情| E[正常展示\n延迟数据 + 标注]
+    D -->|点击买入/卖出| F[底部弹出登录引导 Sheet]
+    D -->|点击订单/持仓/我的 Tab| G[登录占位页\n含登录按钮]
+
+    F --> H{用户选择}
+    H -->|立即登录| I[OTP 登录流程]
+    H -->|继续浏览| E
+```
+
+### 4.4 设备管理流程
+
+```mermaid
+flowchart TD
+    A[新设备发起登录] --> B{账户已登录设备数?}
+    B -->|< 3 台| C[正常登录，加入设备列表]
+    B -->|= 3 台| D[踢出最早登录的设备]
+    D --> E[向被踢设备推送告警通知]
+    E --> C
+
+    F[用户主动注销设备] --> G[安全设置 → 设备管理]
+    G --> H[选择目标设备]
+    H --> I[生物识别确认]
+    I --> J{验证结果}
+    J -->|通过| K[设备注销，Session 失效]
+    J -->|失败| L[提示验证失败]
+```
+
+---
+
+## 五、登录状态生命周期
+
+```mermaid
+stateDiagram-v2
+    [*] --> 未登录: App 首次安装
+    未登录 --> 已登录: OTP 验证通过
+    未登录 --> 访客模式: 点击先逛逛
+
+    已登录 --> 生物识别登录可用: 首次 OTP 后设置成功
+    生物识别登录可用 --> 已登录: 生物识别验证通过
+    生物识别登录可用 --> 未登录: 连续失败 3 次
+
+    访客模式 --> 未登录: 点击登录入口
+    已登录 --> 未登录: 主动退出 / 被踢出 / Session 过期
+    未登录 --> [*]
+```
+
+---
+
+## 六、业务规则
+
+### 6.1 OTP 发送规则
+
+| 规则 | 说明 |
+|------|------|
+| 发送间隔 | 同一手机号 60 秒内只能发送 1 次 |
+| 发送上限 | 1 小时内最多 5 次；超限后需等待至下一小时 |
+| 有效期 | OTP 5 分钟内有效，过期需重新发送 |
+| 错误上限 | 同一 OTP 请求最多错误 5 次，超限锁定账号 30 分钟 |
+| 区号支持 | Phase 1：+86（中国大陆，11 位）、+852（香港，8 位） |
+| 自动填充 | iOS 系统原生识别短信 OTP；Android 通过 SMS Retriever API（无需 READ_SMS 权限）自动填充 |
+
+### 6.2 生物识别规则
+
+| 规则 | 说明 |
+|------|------|
+| 开启条件 | 设备已注册 Face ID 或指纹；仅在首次 OTP 登录后引导设置 |
+| 跳过重提 | 最多提醒 3 次，第 3 次跳过后不再主动提示，用户可在设置中手动开启 |
+| 失败降级 | 连续失败 3 次，自动切换到 OTP 登录 |
+| 安全绑定 | 生物识别与当前设备绑定；若设备更换指纹/面容，已绑定记录失效，需重新注册 |
+| 登录保护 | 生物识别仅在设备解锁状态下可用（App 后台超过 15 分钟需重新验证） |
+
+### 6.3 设备管理规则
+
+| 规则 | 说明 |
+|------|------|
+| 并发上限 | 同一账户最多 3 台设备同时在线 |
+| 超限策略 | 第 4 台设备登录时，自动踢出"最早登录时间"的设备，并向该设备发送推送通知 |
+| 注销确认 | 远程注销他人设备需在**当前设备**完成生物识别验证（防误操作） |
+| 设备显示 | 设备名、平台、最后活跃时间；当前设备标注"本机" |
+
+### 6.4 访客模式规则
+
+| 页面 | 访客是否可用 | 限制说明 |
+|------|------------|---------|
+| 行情首页 | ✅ | 价格显示"延迟 15 分钟"标识，不可隐藏 |
+| 股票详情 | ✅ | 数据延迟；买/卖按钮替换为登录引导 |
+| 搜索 | ✅ | 功能完整可用 |
+| 订单管理 | ❌ | 显示登录占位页 |
+| 持仓 | ❌ | 显示登录占位页 |
+| 我的 | ❌ | 显示登录占位页 |
+
+> **合规要求**：延迟行情必须在显著位置标注"Delayed 15 minutes"，不可以任何形式隐藏或缩小（SEC 合规）。
+
+### 6.5 新用户 vs 已有用户判断
+
+系统通过手机号自动判断：OTP 验证通过后，若手机号未注册则**自动创建账户**（无独立注册页），若已注册则直接登录。用户无需提前判断选择"注册"或"登录"。
+
+---
+
+## 七、合规要求
+
+| 要求 | 适用规定 | 说明 |
+|------|---------|------|
+| 身份绑定 | SEC/FINRA 账户认证要求 | 登录手机号须与 KYC 认证手机号一致 |
+| 延迟行情标注 | SEC Regulation NMS | 非实时数据必须明确标注延迟时间 |
+| 审计记录 | FINRA Rule 4511、SEC 17a-4 | 所有登录/登出/失败事件记录可审计日志，保留 7 年 |
+| 多设备管理 | FINRA Rule 4370（业务连续性） | 提供账户安全控制手段，防止未授权访问 |
+| 账号锁定 | NIST SP 800-63B 认证指南 | 多次失败后锁定，防止暴力破解 |
+
+---
+
+## 八、异常与边界场景
+
+| 场景 | 用户感知 | 处理方式 |
 |------|---------|---------|
-| 手机号 + OTP | ✅ | - |
-| 生物识别登录 | ✅ 首次 OTP 后设置 | - |
-| 访客模式 | ✅ | - |
-| 设备管理 | ✅ | - |
-| 邮箱 + 密码登录 | ❌ | ✅ |
-| 找回密码 | ❌（Phase 1 无密码概念） | ✅ |
+| OTP 发送失败（网络问题） | "验证码发送失败，请稍后重试" + 30 秒后重发按钮 | 不消耗发送次数 |
+| OTP 超时（5 分钟） | "验证码已过期，请重新获取" + 自动清空输入框 | 用户重新发送 |
+| OTP 输入错误 | "验证码不正确，还可重试 N 次"（剩余 1 次时字体加粗警示） | 超限锁定 |
+| 账号被锁定 | "登录失败次数过多，请 30 分钟后重试"（显示剩余时间） | 不提供客服解锁入口（防社工） |
+| 生物识别失败 | "验证未通过，请使用验证码登录" | 自动切换 OTP 流程 |
+| 网络断开 | 顶部横幅："连接已断开，正在重试..." | 自动重连，输入内容保留 |
+| 被远程踢出 | 推送通知："您已在新设备登录，旧设备已退出" | 该设备下次打开 App 需重新登录 |
+| 新设备告警 | 推送通知："您的账号已在新设备登录，如非本人请立即联系客服" | 设备管理页可查看 |
+| 生物识别已变更（指纹更换） | 首次打开时检测到变更，提示"设备安全信息已变更，请重新设置" | 清除旧生物识别绑定，引导重新注册 |
 
 ---
 
-## 二、用户流程
+## 九、推送通知
 
-### 2.1 主流程：首次登录 / 注册
-
-```
-冷启动页 → 输入手机号 → 发送 OTP → 验证 OTP
-         ↓
-    [新用户] → 自动创建账号 → 进入 KYC 流程（见 PRD-02）
-    [已注册用户]
-         ↓
-    [KYC 已通过] → 进入首页（行情页）
-    [KYC 审核中] → 进入 KYC 状态页
-    [KYC 未开始] → 进入 KYC 流程
-```
-
-### 2.2 生物识别登录流程
-
-```
-冷启动页 → Face ID 图标（已注册设备）→ 生物识别验证
-         ↓
-    [验证通过] → 获取新 Access Token → 进入 App
-    [验证失败（3 次）] → 降级至 OTP 登录
-    [生物识别未注册] → 不显示该入口
-```
-
-### 2.3 访客模式流程
-
-```
-冷启动页 → "先逛逛" 链接 → 进入行情页（15 分钟延迟标识）
-         ↓
-    行情/详情页：正常浏览（延迟数据）
-    订单/持仓/我的：显示登录占位页 + 登录按钮
-    点击买/卖：底部弹出登录引导 Sheet
-```
-
-### 2.4 设备管理流程
-
-```
-我的 → 安全设置 → 登录设备管理
-→ 列表显示最多 3 台设备（设备名、登录时间、最后活跃）
-→ 当前设备标注 "本机"
-→ 远程注销其他设备：需生物识别确认
-→ 新设备登录时：若超过 3 台，踢出最老设备并推送通知
-```
+| 触发事件 | 推送内容 | 优先级 |
+|---------|---------|--------|
+| 新设备首次登录 | "您的账号已在 [设备名] 登录，如非本人操作请立即联系客服" | 高 |
+| 设备被远程注销 | "您的账号已在另一台设备注销本机登录" | 高 |
+| 账号被锁定 | "多次登录失败，账号已暂时锁定，请 30 分钟后重试" | 普通 |
 
 ---
 
-## 三、页面设计规格
+## 十、成功指标
 
-### 3.1 冷启动页
+| 指标 | 目标 | 测量方式 |
+|------|------|---------|
+| 注册转化率 | 进入手机号输入页 → OTP 验证通过 ≥ 80% | 埋点漏斗分析 |
+| 登录成功率 | 生物识别登录成功率 ≥ 95% | 用户行为日志 |
+| 生物识别开启率 | 首次登录后开启生物识别 ≥ 60% | 功能使用率统计 |
+| OTP 送达时间 | 95% 的 OTP 在 10 秒内送达 | SMS 通道监控 |
+| 访客转注册率 | 访客用户 7 日内注册率 ≥ 25% | 用户路径分析 |
 
-| 元素 | 规格 |
+---
+
+## 十一、验收标准
+
+| 场景 | 验收标准 |
+|------|---------|
+| 首次登录 | 从冷启动到进入首页 ≤ 3 步操作（输入手机号 → 输入 OTP → 进入） |
+| 生物识别登录 | Face ID 触发到进入 App ≤ 2 秒 |
+| OTP 送达 | 95% 的 OTP ≤ 10 秒内送达 |
+| 访客延迟标识 | 所有行情数据旁必须显示"延迟 15 分钟"标识，设计评审必须确认可见性 |
+| 设备超限通知 | 新设备登录后，被踢出设备 ≤ 30 秒内收到推送 |
+| 错误提示完整性 | 所有错误场景均有明确的中文用户提示，无白屏或静默失败 |
+| 账号锁定恢复 | 锁定 30 分钟后自动解锁，无需人工干预 |
+
+---
+
+## 十二、依赖与风险
+
+| 项目 | 说明 |
 |------|------|
-| Logo / 品牌名 | 顶部居中，"环球通"品牌 |
-| 主按钮 | "手机号登录" — 主色调，全宽 |
-| 次级入口 | "注册" — 文字按钮 |
-| 访客入口 | "先逛逛" — 小字链接，底部 |
-| 法律链接 | 用户协议 / 隐私政策，最底部 |
-
-### 3.2 手机号输入页
-
-| 元素 | 规格 |
-|------|------|
-| 国家代码选择器 | Phase 1：+86（中国大陆）/ +852（香港）下拉 |
-| 手机号输入 | tel 类型，最大 15 位，实时格式校验 |
-| 发送验证码按钮 | 点击后禁用并显示 60 秒倒计时 |
-| 服务条款提示 | "登录即代表同意《用户协议》和《隐私政策》" |
-
-### 3.3 OTP 输入页
-
-| 元素 | 规格 |
-|------|------|
-| OTP 输入框 | 6 位独立格子，数字键盘，等宽字体 |
-| 倒计时重发 | 60 秒后可重发，重发上限 5 次/小时 |
-| 自动填充 | iOS: `AutofillHints.oneTimeCode`（Flutter TextField，底层 UITextField，无需额外实现）；**Android: `smart_auth ^3.2.0`（SMS Retriever API / SMS User Consent），禁止使用 `READ_SMS` 权限（Google Play 拒绝）** |
-| 错误提示 | 验证码错误：内联提示；5 次错误：锁定 30 分钟 |
-
-### 3.4 生物识别设置页（首次 OTP 登录后弹出）
-
-| 元素 | 规格 |
-|------|------|
-| 触发时机 | 首次 OTP 登录成功后，若设备支持生物识别则弹出 |
-| 设置按钮 | "开启 Face ID / 指纹" — 主按钮 |
-| 跳过按钮 | "以后再说" — 文字按钮 |
-| 重新提示时机 | 跳过后，下次 OTP 登录时再次提示（最多 3 次） |
-
----
-
-## 四、后端接口规格
-
-### 4.1 发送 OTP
-
-```
-POST /v1/auth/otp/send
-Request:
-  {
-    "phone": "+8613800138000",
-    "purpose": "login" | "register"
-  }
-Response:
-  {
-    "request_id": "uuid",
-    "expires_in": 300,
-    "resend_available_at": "2026-03-13T09:00:00Z"
-  }
-```
-
-**业务规则**:
-- 同一手机号 60 秒内只能发送 1 次
-- 1 小时内最多发送 5 次
-- 超限后返回 429，并告知解锁时间
-
-### 4.2 验证 OTP / 登录
-
-```
-POST /v1/auth/otp/verify
-Request:
-  {
-    "phone": "+8613800138000",
-    "otp": "123456",
-    "request_id": "uuid",
-    "device_id": "device-uuid",
-    "device_name": "iPhone 15 Pro",
-    "device_platform": "iOS"
-  }
-Response:
-  {
-    "access_token": "JWT",
-    "refresh_token": "opaque-token",
-    "expires_in": 900,
-    "user_id": "usr-xxx",
-    "is_new_user": true | false,
-    "kyc_status": "NOT_STARTED" | "IN_PROGRESS" | "PENDING_REVIEW" | "APPROVED" | "REJECTED"
-  }
-```
-
-**业务规则**:
-- 连续 5 次错误：账号锁定 30 分钟
-- Access Token 有效期：15 分钟（JWT RS256）
-- Refresh Token 有效期：7 天（HttpOnly Secure Cookie）
-- 同一设备登录不同账号：旧会话失效
-
-### 4.3 刷新 Token
-
-```
-POST /v1/auth/token/refresh
-Request: Bearer {refresh_token}（从 flutter_secure_storage 读取，放 Authorization Header）
-Response:
-  {
-    "access_token": "新 JWT",
-    "refresh_token": "新 Refresh Token",  // 旧 Token 原子消费后颁发
-    "expires_in": 900
-  }
-```
-
-**业务规则**:
-- Refresh Token 单次使用制（使用 Redis Lua 脚本原子消费，防止并发竞态）
-- 检测到二次使用 → 视为重放攻击 → 吊销所有 Token → 推送安全警告
-- **[v1.1 修订]** 不再使用 HttpOnly Cookie，Refresh Token 以 Bearer Token 形式在请求体传递
-
-### 4.4 生物识别 Challenge 下发（新增）
-
-> **[v1.1 新增]** P0-Auth-04 修复：补充 Challenge 下发接口。
-
-```
-POST /v1/auth/biometric/challenge
-Request:
-  {
-    "device_id": "uuid",
-    "key_id": "key-uuid"
-  }
-Response:
-  {
-    "challenge": "base64(random_32_bytes)",
-    "expires_in": 30
-  }
-```
-
-**服务端处理**:
-- 生成 32 字节随机数，Base64 编码
-- Redis 存储 `biometric_challenge:{challenge_hash}` → `device_id`，TTL=30s
-- 同一 device_id 并发 Challenge 请求：旧 Challenge 作废，颁发新 Challenge
-
-### 4.5 生物识别密钥注册
-
-```
-POST /v1/auth/biometric/register
-Request:
-  {
-    "device_id": "uuid",
-    "public_key": "base64-encoded-public-key",  // 设备 Keystore/Keychain 生成
-    "attestation": "..."
-  }
-Response:
-  {
-    "key_id": "key-uuid"
-  }
-```
-
-### 4.6 生物识别登录
-
-```
-POST /v1/auth/biometric/login
-Request:
-  {
-    "device_id": "uuid",
-    "key_id": "key-uuid",
-    "signature": "base64-signed-challenge",
-    "challenge": "server-issued-challenge"   // 必须先调用 4.4 获取
-  }
-Response: 同 4.2 登录响应
-```
-
-### 4.6 登出
-
-```
-POST /v1/auth/logout
-Request:
-  {
-    "device_id": "uuid"
-  }
-```
-
-**业务规则**:
-- 将当前 Access Token 加入 Redis 黑名单
-- 清除设备对应的 Refresh Token
-
-### 4.7 设备列表
-
-```
-GET /v1/auth/devices
-Response:
-  {
-    "devices": [
-      {
-        "device_id": "uuid",
-        "device_name": "iPhone 15 Pro",
-        "platform": "iOS",
-        "login_at": "ISO8601",
-        "last_active_at": "ISO8601",
-        "is_current": true
-      }
-    ]
-  }
-```
-
-### 4.8 远程注销设备
-
-```
-DELETE /v1/auth/devices/{device_id}
-Request Header: X-Biometric-Signature（生物识别签名验证）
-```
-
----
-
-## 五、安全规格
-
-### 5.1 Token 安全
-
-> **[v1.1 修订]** Refresh Token 存储方案从 HttpOnly Cookie 更改为 Native 安全存储。理由：HttpOnly Cookie 是 Web 安全最佳实践，但 Native App 中 `WKWebView`/`WebView` 独立 Cookie 存储，`Ktor HttpCookies` 插件无 Keychain/Keystore 集成，HttpOnly Cookie 在 Native App 中无安全语义。
-
-| 项目 | 规格 |
-|------|------|
-| Access Token 算法 | JWT RS256（非对称签名） |
-| Access Token 有效期 | 15 分钟 |
-| Refresh Token 类型 | 不透明随机字符串（256 bit entropy） |
-| **Refresh Token 存储（Native App）** | **iOS: Keychain（`kSecAttrAccessibleWhenUnlockedThisDeviceOnly`）；Android: EncryptedSharedPreferences；Flutter: `flutter_secure_storage ^10.0.0`** |
-| Token 绑定 | Device ID + IP Range（/24 掩码） |
-| Token 黑名单 | Redis，TTL = Token 剩余有效期 |
-| **token_version（新增）** | **`users` 表增加 `token_version INTEGER NOT NULL DEFAULT 0`，JWT payload 携带此值；手机号变更、密码重置时 +1，服务端验证 JWT 时额外校验（Redis 缓存，避免每次查 DB）** |
-
-**[v1.1 新增] Refresh Token 轮换原子性（P0-Auth-03 修复）**
-
-使用 Redis Lua 脚本原子消费 Refresh Token，防止多端并发刷新竞态：
-
-```lua
--- Redis Lua 脚本：原子检查-标记-颁发
-local val = redis.call('GET', KEYS[1])
-if val == false then return {0, ''} end        -- Token 不存在
-if val == 'consumed' then return {-1, ''} end  -- Token 已消费（视为重放攻击）
-redis.call('SET', KEYS[1], 'consumed', 'EX', 300)
-return {1, val}
-```
-
-检测到 Refresh Token 二次使用 → 视为 Token 重放攻击 → 吊销该账户所有 Refresh Token → 推送安全警告。
-
-### 5.2 生物识别安全
-
-> **[v1.1 新增]** 补充 Biometric Challenge 下发接口（P0-Auth-04 修复）；补充 Android `KeyPermanentlyInvalidatedException` 处理。
-
-| 项目 | 规格 |
-|------|------|
-| iOS | LAContext，`.biometryCurrentSet` 策略（生物识别变更后自动失效） |
-| Android | BiometricPrompt，`BIOMETRIC_STRONG` 级别；捕获 `KeyPermanentlyInvalidatedException`（指纹变更后删除旧密钥，引导用户重新注册生物识别） |
-| 密钥存储 | iOS Keychain（kSecAttrAccessibleWhenUnlockedThisDeviceOnly）；Android Keystore（StrongBox 优先） |
-| **Challenge 流程（新增）** | **客户端先调用 `POST /v1/auth/biometric/challenge` 获取服务端 Challenge；服务端 Redis 存储 `challenge → device_id`，TTL=30s，单次有效；签名验证时通过 challenge 查绑定 device_id，不一致则拒绝** |
-| Flutter 实现 | `local_auth ^3.0.1`；Secure Enclave 密钥签名通过 Method Channel → `core/auth/biometric_key_manager.dart` |
-
-### 5.3 OTP 安全
-
-| 项目 | 规格 |
-|------|------|
-| OTP 长度 | 6 位数字 |
-| OTP 有效期 | 5 分钟 |
-| 错误上限 | 5 次/请求，超限锁定 30 分钟 |
-| 发送频率 | 60 秒冷却，5 次/小时 |
-| **purpose 绑定（新增）** | **OTP Redis value 包含 `purpose` 字段，验证时校验 purpose 一致性（防止 login OTP 被复用于 phone_change 场景）** |
-| 存储 | Redis，OTP 哈希存储（HMAC-SHA256）；验证成功后立即删除 |
-
-**OTP purpose 枚举值**:
-
-| purpose 值 | 使用场景 |
-|-----------|---------|
-| `login` | 手机号 OTP 登录 |
-| `register` | 注册（与 login 合并，由 is_new_user 区分） |
-| `phone_change_old` | 更换手机号 — 验证旧号 |
-| `phone_change_new` | 更换手机号 — 验证新号 |
-| `account_close` | 注销账户确认 |
-
-### 5.4 设备管理安全
-
-| 项目 | 规格 |
-|------|------|
-| 最大并发设备 | 3 台 |
-| 超限策略 | 踢出最早登录设备 + 推送通知 |
-| 远程注销 | 需在当前设备完成生物识别验证 |
-| 设备指纹 | 包含：OS 版本、设备型号、App 版本（不使用 IDFA/GAID） |
-
----
-
-## 六、访客模式规格
-
-| 页面 | 访客可用 | 访客限制 |
-|------|---------|---------|
-| 行情页 | ✅ 全功能（延迟 15 分钟） | 价格显示"延迟"徽标 |
-| 股票详情页 | ✅ 查看（延迟数据） | 买/卖按钮替换为登录引导 |
-| 搜索 | ✅ 可搜索 | 结果点击跳转详情（访客模式） |
-| 订单页 | ❌ | 显示登录占位页 + "立即登录" 按钮 |
-| 持仓页 | ❌ | 显示登录占位页 + "立即登录" 按钮 |
-| 我的 | ❌ | 显示登录占位页 + "立即登录" 按钮 |
-| 底部 Tab | 全部可见 | 订单/持仓/我的 Tab 点击触发登录引导 |
-
-**SEC 合规要求**: 延迟数据必须在显著位置标注"Delayed 15 minutes"，不可省略。
-
----
-
-## 七、错误处理
-
-| 错误场景 | 用户提示 | 操作 |
-|---------|---------|------|
-| OTP 发送失败（网络） | "验证码发送失败，请重试" | 30 秒后可重发 |
-| OTP 超时（5 分钟） | "验证码已过期，请重新获取" | 清空输入框 |
-| OTP 错误 | "验证码不正确，请重试（剩余 N 次）" | 剩余 1 次时加重提示 |
-| 账号锁定 | "登录失败次数过多，请 30 分钟后重试" | 不提供解锁入口 |
-| 生物识别失败 | "验证失败，请使用验证码登录" | 降级至 OTP |
-| 网络断开 | 顶部 Banner："连接已断开，正在重试..." | 自动重连 |
-| 设备超限 | 推送通知："您已在新设备登录，旧设备已退出" | - |
-
----
-
-## 八、推送通知（认证相关）
-
-| 事件 | 推送内容 | 优先级 |
-|------|---------|--------|
-| 新设备登录 | "您的账号已在新设备登录，若非本人操作请立即联系客服" | HIGH |
-| 设备被远程注销 | "您的账号已在另一台设备注销当前设备" | HIGH |
-| 账号被锁定 | "多次登录失败，账号已暂时锁定 30 分钟" | NORMAL |
-
----
-
-## 九、数据模型
-
-```sql
--- 用户表（v1.1 新增 token_version）
-CREATE TABLE users (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    phone           VARCHAR(20) UNIQUE NOT NULL,
-    country_code    VARCHAR(5) NOT NULL,  -- '+86', '+852'
-    kyc_status      VARCHAR(20) NOT NULL DEFAULT 'NOT_STARTED',
-    kyc_tier        SMALLINT NOT NULL DEFAULT 0,
-    token_version   INTEGER NOT NULL DEFAULT 0,  -- [v1.1 新增] 手机号变更时 +1，JWT 校验此版本
-    closed_at       TIMESTAMP WITH TIME ZONE,    -- [v1.1 新增] 注销账户时间
-    created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 注册并发竞态处理（v1.1 说明）
--- INSERT INTO users ... ON CONFLICT (phone) DO NOTHING RETURNING id
--- 若 RETURNING 无结果，走已存在用户的登录路径，避免 TOCTOU 竞态（P0-Auth-05 修复）
-
--- 设备表（v1.1 修正：device_id 改为用户级唯一约束）
-CREATE TABLE user_devices (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id         UUID NOT NULL REFERENCES users(id),
-    device_id       VARCHAR(64) NOT NULL,         -- [v1.1 修正] 移除全局 UNIQUE，改为复合唯一
-    device_name     VARCHAR(100),
-    platform        VARCHAR(10),  -- 'iOS', 'Android', 'Flutter'
-    biometric_key_id UUID,
-    last_login_at   TIMESTAMP WITH TIME ZONE,
-    last_active_at  TIMESTAMP WITH TIME ZONE,
-    is_active       BOOLEAN DEFAULT true,
-    created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    CONSTRAINT uq_user_device UNIQUE (user_id, device_id)  -- [v1.1 修正] 用户级唯一
-);
--- 重新登录处理：INSERT ... ON CONFLICT (user_id, device_id) DO UPDATE SET last_login_at = NOW(), is_active = true
-
--- 生物识别密钥表
-CREATE TABLE biometric_keys (
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id     UUID NOT NULL REFERENCES users(id),
-    device_id   VARCHAR(64) NOT NULL,
-    public_key  TEXT NOT NULL,   -- Base64 encoded
-    created_at  TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    revoked_at  TIMESTAMP WITH TIME ZONE
-);
-
--- OTP 记录（Redis 实现，此为逻辑结构）
--- Key: otp:{phone}:{request_id}
--- Value: hashed_otp, expires_in: 300s
-
--- 审计日志
-CREATE TABLE auth_audit_log (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id         UUID REFERENCES users(id),
-    event_type      VARCHAR(50) NOT NULL,  -- 'LOGIN', 'LOGOUT', 'OTP_SENT', 'OTP_FAILED', 'BIOMETRIC_LOGIN'
-    device_id       VARCHAR(64),
-    ip_address      INET,
-    success         BOOLEAN,
-    details         JSONB,
-    created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-```
-
----
-
-## 十、验收标准
-
-| 测试场景 | 验收标准 |
-|---------|---------|
-| OTP 发送 | < 10 秒内送达 |
-| 登录流程 | 冷启动到首页 < 3 步操作 |
-| 生物识别登录 | < 2 秒完成认证 |
-| Token 刷新 | 用户无感知，背景自动完成 |
-| 设备超限 | 新设备登录后旧设备立即收到推送 |
-| 访客延迟标识 | 所有行情数据旁显示"延迟 15 分钟"标识 |
-| 错误处理 | 所有错误有明确用户提示，无白屏或静默失败 |
+| 短信通道 | Phase 1 短信供应商待确认（影响 OTP 送达率 KPI） |
+| 生物识别 SDK | 依赖设备端硬件支持，低端 Android 设备可能不支持 |
+| 访客行情延迟 | 依赖 Market Data 服务提供 15 分钟延迟数据接口（见 PRD-03） |
+| 设备推送 | 依赖推送服务（FCM/APNs）稳定性（见 PRD-07 跨模块） |
+| 待确认 | 访客模式下 Watchlist 是否允许本地临时保存（不登录无法同步） |

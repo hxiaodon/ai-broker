@@ -28,6 +28,10 @@ Responsibilities:
 |------|---------|
 | `docs/prd/` | Domain PRDs -- deposit/withdrawal rules, AML (TBD) |
 | `docs/specs/fund-transfer-system.md` | System architecture and tech design |
+| `docs/specs/fund-custody-and-matching.md` | **必读**：托管架构、入金匹配、悬挂资金、资金边界、银行高可用 |
+| `docs/references/bank-channel-docs.md` | 银行渠道对接文档索引（JP Morgan、恒生、HKICL、Nacha 等公开文档链接及价值说明） |
+| `docs/references/payment-networks-primer.md` | **必读**：ACH/Wire/FPS 运营主体、技术本质、接入方式、Bank Adapter 设计含义 |
+| `docs/references/clearing-settlement-primer.md` | **必读**：出入金清结算 vs 证券清结算的区别、两套体系的唯一交汇点、fund-engineer 职责边界 |
 | `docs/threads/` | Collaboration threads |
 | `api/grpc/` | gRPC proto definitions |
 | `api/rest/` | REST OpenAPI specs (TBD) |

@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>[低保真] 01-Auth — 登录与认证</title>
+<link rel="stylesheet" href="../_shared/proto-base.css">
+<style>
+  .otp-inputs { display: flex; gap: 10px; justify-content: center; }
+  .otp-box {
+    width: 48px; height: 56px;
+    border: 2px solid var(--gray-300);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-xl);
+    text-align: center;
+    background: var(--gray-50);
+  }
+  .otp-box.filled { border-color: var(--gray-700); }
+  .phone-prefix {
+    display: flex; align-items: center; gap: 8px;
+    height: 48px; padding: 0 14px;
+    border: var(--border); border-radius: var(--radius-md);
+    background: var(--gray-50); flex-shrink: 0;
+    font-size: var(--font-size-md); color: var(--gray-700);
+  }
+  .phone-row { display: flex; gap: 8px; }
+  .phone-row .form-input { border-radius: var(--radius-md); }
+  .biometric-circle {
+    width: 96px; height: 96px;
+    border-radius: 50%;
+    border: 3px solid var(--gray-300);
+    background: var(--gray-100);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 36px; color: var(--gray-500);
+    margin: 0 auto;
+    cursor: pointer;
+  }
+  .biometric-circle:hover { border-color: var(--gray-600); }
+  .link-text {
+    color: var(--gray-600); text-decoration: underline;
+    font-size: var(--font-size-sm); cursor: pointer;
+    text-align: center;
+  }
+  .countdown { color: var(--gray-500); font-size: var(--font-size-sm); }
+  .screen-panel { display: none; }
+  .screen-panel.active { display: flex; }
+  .logo-area {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 48px 0 32px; gap: 12px;
+  }
+  .logo-box {
+    width: 72px; height: 72px;
+    background: var(--gray-800); border-radius: var(--radius-lg);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: var(--font-size-lg); font-weight: 700;
+  }
+  .app-name { font-size: var(--font-size-xl); font-weight: 700; color: var(--gray-800); }
+  .app-sub  { font-size: var(--font-size-sm); color: var(--gray-500); }
+</style>
+</head>
+<body>
+
+<!-- 原型导航 -->
+<div class="proto-nav">
+  <strong>01-Auth 低保真原型</strong> — 页面：
+  <a href="#" onclick="switchScreen('splash'); return false;">冷启动</a> |
+  <a href="#" onclick="switchScreen('phone'); return false;">手机号输入</a> |
+  <a href="#" onclick="switchScreen('otp'); return false;">OTP 验证</a> |
+  <a href="#" onclick="switchScreen('biometric-setup'); return false;">生物识别设置</a> |
+  <a href="#" onclick="switchScreen('biometric-login'); return false;">生物识别登录</a> |
+  <a href="#" onclick="switchScreen('devices'); return false;">设备管理</a>
+  <br>关联：
+  <a href="../02-kyc/index.html">→ KYC 流程</a> |
+  <a href="../03-market/index.html">→ 行情首页</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar">
+    <span>9:41</span><span>●●● WiFi 100%</span>
+  </div>
+
+  <!-- ① 冷启动页 -->
+  <div id="splash" class="screen-panel active" style="display:flex; flex-direction:column;">
+    <div class="screen" style="gap:0; padding:0;">
+      <div class="logo-area">
+        <div class="logo-box">环球</div>
+        <div class="app-name">环球通证券</div>
+        <div class="app-sub">美港股跨境交易平台</div>
+      </div>
+      <div style="padding: 0 24px; display:flex; flex-direction:column; gap:12px;">
+        <button class="btn btn-primary" onclick="switchScreen('phone')">手机号登录 / 注册</button>
+        <button class="btn btn-ghost" onclick="switchScreen('biometric-login')">Face ID 快捷登录</button>
+        <div class="link-text" onclick="guestMode()">先逛逛 →</div>
+      </div>
+      <div style="padding: 24px; margin-top: auto;">
+        <div class="proto-note">访客点击"先逛逛"进入行情页（15分钟延迟），底部 Tab 中订单/持仓/我的显示登录引导</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ② 手机号输入页 -->
+  <div id="phone" class="screen-panel" style="flex-direction:column;">
+    <div class="nav-bar">
+      <button class="nav-back" onclick="switchScreen('splash')">← 返回</button>
+      <span class="nav-title">登录 / 注册</span>
+      <span></span>
+    </div>
+    <div class="screen">
+      <div style="font-size: var(--font-size-xl); font-weight: 700; color: var(--gray-800); margin-top:8px;">
+        输入手机号
+      </div>
+      <div class="text-sm text-muted">新用户将自动创建账号</div>
+      <div class="form-group" style="margin-top: 16px;">
+        <div class="phone-row">
+          <div class="phone-prefix" onclick="showSheet('region-sheet')">
+            🌐 +86 ▾
+          </div>
+          <input class="form-input" type="tel" placeholder="请输入手机号" id="phone-input" style="flex:1;">
+        </div>
+        <div class="form-hint">支持 +86（中国大陆）和 +852（香港）</div>
+      </div>
+      <button class="btn btn-primary" id="send-otp-btn" onclick="sendOTP()">获取验证码</button>
+      <div class="proto-note">校验规则：+86 为 11 位数字，+852 为 8 位数字。格式不符时按钮置灰。</div>
+      <div style="margin-top: auto; padding: 16px 0; text-align: center;">
+        <div class="text-xs text-muted">继续即代表同意《用户协议》和《隐私政策》</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ③ OTP 验证页 -->
+  <div id="otp" class="screen-panel" style="flex-direction:column;">
+    <div class="nav-bar">
+      <button class="nav-back" onclick="switchScreen('phone')">← 修改号码</button>
+      <span class="nav-title">验证码</span>
+      <span></span>
+    </div>
+    <div class="screen">
+      <div style="font-size: var(--font-size-xl); font-weight: 700;">验证手机号</div>
+      <div class="text-sm text-muted">已发送 6 位验证码至 +86 138****8888</div>
+
+      <div class="otp-inputs" style="margin: 24px 0 8px;">
+        <div class="otp-box filled">1</div>
+        <div class="otp-box filled">2</div>
+        <div class="otp-box filled">3</div>
+        <div class="otp-box active" style="border-color: var(--gray-800);">_</div>
+        <div class="otp-box"></div>
+        <div class="otp-box"></div>
+      </div>
+
+      <div class="flex justify-between items-center">
+        <span class="countdown">59 秒后可重发</span>
+        <span class="link-text">重新发送</span>
+      </div>
+
+      <!-- 状态：验证中 -->
+      <div id="otp-loading" style="display:none;" class="card text-center">
+        <div class="skeleton" style="height: 20px; width: 60%; margin: 0 auto;"></div>
+        <div class="text-sm text-muted mt-8">验证中...</div>
+      </div>
+
+      <!-- 状态：错误 -->
+      <div id="otp-error" style="display:none;" class="card">
+        <div class="form-error">⚠ 验证码错误，还可尝试 2 次</div>
+      </div>
+
+      <button class="btn btn-primary" onclick="verifyOTP()">验证</button>
+      <div class="proto-note">Android 支持 SMS Retriever API 自动填充 OTP。OTP 有效期 5 分钟，错误 5 次锁定 30 分钟。</div>
+    </div>
+  </div>
+
+  <!-- ④ 生物识别设置页（首次登录后引导）-->
+  <div id="biometric-setup" class="screen-panel" style="flex-direction:column;">
+    <div class="nav-bar">
+      <span></span>
+      <span class="nav-title">设置 Face ID</span>
+      <span class="link-text" onclick="skipBiometric()" style="font-size: var(--font-size-sm);">跳过</span>
+    </div>
+    <div class="screen" style="align-items:center; text-align:center; gap:24px; padding-top:48px;">
+      <div class="biometric-circle">👤</div>
+      <div>
+        <div class="font-semi text-lg">开启 Face ID 快捷登录</div>
+        <div class="text-sm text-muted mt-8">下次打开 App 无需输入验证码</div>
+      </div>
+      <button class="btn btn-primary" onclick="enableBiometric()">开启 Face ID</button>
+      <div class="link-text" onclick="skipBiometric()">暂不开启</div>
+      <div class="proto-note">需设备已注册 Face ID / 指纹。同一设备仅允许一个账号开启生物识别。</div>
+    </div>
+  </div>
+
+  <!-- ⑤ 生物识别快捷登录页 -->
+  <div id="biometric-login" class="screen-panel" style="flex-direction:column;">
+    <div class="nav-bar">
+      <span></span>
+      <span class="nav-title">快捷登录</span>
+      <span></span>
+    </div>
+    <div class="screen" style="align-items:center; text-align:center; gap:24px; padding-top:64px;">
+      <div class="logo-box" style="width:60px;height:60px;">环球</div>
+      <div>
+        <div class="font-semi text-lg">Hi，用户 138****8888</div>
+        <div class="text-sm text-muted mt-8">使用 Face ID 登录</div>
+      </div>
+      <div class="biometric-circle" onclick="biometricAuth()" title="点击模拟生物识别">
+        👁️
+      </div>
+      <div class="text-xs text-muted">点击图标模拟验证</div>
+
+      <!-- 失败状态 -->
+      <div id="bio-error" style="display:none;" class="card w-full">
+        <div class="form-error text-center">识别失败（1/3），请重试</div>
+      </div>
+
+      <div class="link-text" onclick="switchScreen('phone')">使用手机号登录</div>
+      <div class="proto-note">连续失败 3 次自动降级至 OTP 登录。生物识别 Challenge 由后端下发，防重放。</div>
+    </div>
+  </div>
+
+  <!-- ⑥ 设备管理页 -->
+  <div id="devices" class="screen-panel" style="flex-direction:column;">
+    <div class="nav-bar">
+      <button class="nav-back" onclick="switchScreen('splash')">← 安全设置</button>
+      <span class="nav-title">登录设备管理</span>
+      <span></span>
+    </div>
+    <div class="screen">
+      <div class="proto-note">最多 3 台设备并发登录。新设备超限时踢出最老设备并推送通知。</div>
+
+      <div class="section-title">当前设备</div>
+      <div class="card">
+        <div class="list-item" style="border-bottom: none; padding-top: 0;">
+          <div class="list-item-icon">📱</div>
+          <div class="list-item-content">
+            <div class="list-item-title">iPhone 16 Pro <span class="badge badge-success" style="font-size:10px; margin-left:6px;">本机</span></div>
+            <div class="list-item-sub">登录于 2026-03-14 09:30 · 最后活跃：刚刚</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-title">其他设备（2/3）</div>
+      <div class="card" style="padding: 0 16px;">
+        <div class="list-item">
+          <div class="list-item-icon">📱</div>
+          <div class="list-item-content">
+            <div class="list-item-title">iPad Pro</div>
+            <div class="list-item-sub">登录于 2026-03-10 · 最后活跃：3 天前</div>
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="showSheet('logout-sheet')">注销</button>
+        </div>
+        <div class="list-item">
+          <div class="list-item-icon">💻</div>
+          <div class="list-item-content">
+            <div class="list-item-title">MacBook Pro</div>
+            <div class="list-item-sub">登录于 2026-03-01 · 最后活跃：13 天前</div>
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="showSheet('logout-sheet')">注销</button>
+        </div>
+      </div>
+
+      <button class="btn btn-ghost" onclick="showSheet('logout-all-sheet')">注销所有其他设备</button>
+    </div>
+
+    <!-- 注销确认 Sheet -->
+    <div class="sheet-overlay" id="logout-sheet">
+      <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-title">注销设备</div>
+        <div class="text-sm text-muted text-center">需要通过 Face ID 确认，注销后该设备需重新登录</div>
+        <button class="btn btn-primary" onclick="hideSheet('logout-sheet'); showToast('已通过 Face ID 验证，设备已注销')">Face ID 确认注销</button>
+        <button class="btn btn-ghost" onclick="hideSheet('logout-sheet')">取消</button>
+      </div>
+    </div>
+
+    <!-- 注销全部 Sheet -->
+    <div class="sheet-overlay" id="logout-all-sheet">
+      <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-title">注销所有其他设备</div>
+        <div class="text-sm text-muted text-center">所有其他设备将被强制退出登录</div>
+        <button class="btn btn-primary" onclick="hideSheet('logout-all-sheet'); showToast('已注销所有其他设备')">确认注销全部</button>
+        <button class="btn btn-ghost" onclick="hideSheet('logout-all-sheet')">取消</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /phone -->
+
+<script src="../_shared/proto-router.js"></script>
+<script>
+  function switchScreen(id) {
+    document.querySelectorAll('.screen-panel').forEach(el => el.style.display = 'none');
+    const target = document.getElementById(id);
+    if (target) { target.style.display = 'flex'; }
+  }
+
+  function sendOTP() {
+    simulateLoading('send-otp-btn', '发送中...', function() {
+      switchScreen('otp');
+    }, 800);
+  }
+
+  function verifyOTP() {
+    switchScreen('biometric-setup');
+  }
+
+  function skipBiometric() {
+    goto('../03-market/index.html');
+  }
+
+  function enableBiometric() {
+    showToast('Face ID 已开启');
+    setTimeout(() => goto('../03-market/index.html'), 1200);
+  }
+
+  function biometricAuth() {
+    showToast('Face ID 验证通过，正在登录...');
+    setTimeout(() => goto('../03-market/index.html'), 1200);
+  }
+
+  function guestMode() {
+    showToast('访客模式：行情为 15 分钟延迟数据');
+    setTimeout(() => goto('../03-market/index.html'), 1000);
+  }
+</script>
+</body>
+</html>

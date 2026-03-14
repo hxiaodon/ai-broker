@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>[低保真] 持仓详情 — AAPL</title>
+<link rel="stylesheet" href="../_shared/proto-base.css">
+<style>
+  .detail-hero { background: var(--gray-800); color:#fff; padding: 16px; }
+  .detail-pnl { font-size: 24px; font-weight: 700; margin: 4px 0; }
+  .info-grid2 { display:grid; grid-template-columns:1fr 1fr; gap:1px; background: var(--gray-200); border-radius: var(--radius-md); overflow:hidden; border: var(--border); }
+  .info-cell2 { background: var(--gray-50); padding: 10px 12px; }
+  .info-cell2 .label { font-size:11px; color:var(--gray-500); }
+  .info-cell2 .value { font-size: var(--font-size-sm); font-weight:600; }
+</style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>持仓详情 — AAPL</strong> |
+  <a href="index.html">← 持仓总览</a> |
+  <a href="../03-market/stock-detail.html">行情详情</a> |
+  <a href="../04-trading/order-entry.html">下单</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar" style="background: var(--gray-800); color: rgba(255,255,255,0.7);"><span>9:41</span><span>●●● WiFi 100%</span></div>
+
+  <div class="nav-bar">
+    <button class="nav-back" onclick="goto('index.html')">← 持仓</button>
+    <span class="nav-title">AAPL 持仓</span>
+    <span class="nav-action" onclick="goto('../03-market/stock-detail.html')">行情 ›</span>
+  </div>
+
+  <div class="screen" style="padding:0; gap:0;">
+    <!-- 盈亏头部 -->
+    <div class="detail-hero">
+      <div style="color:rgba(255,255,255,0.7); font-size:var(--font-size-sm);">Apple Inc. · AAPL</div>
+      <div class="detail-pnl">+$995.00 (+5.92%)</div>
+      <div style="display:flex; gap:16px; margin-top:8px;">
+        <div><div style="color:rgba(255,255,255,0.6); font-size:11px;">持仓市值</div><div style="font-weight:600;">$17,825.00</div></div>
+        <div><div style="color:rgba(255,255,255,0.6); font-size:11px;">今日盈亏</div><div style="font-weight:600;">+$214.00 (+1.21%)</div></div>
+      </div>
+    </div>
+
+    <div style="padding: 14px 16px;">
+      <!-- 持仓数据 -->
+      <div class="section-title">持仓数据</div>
+      <div class="info-grid2" style="margin-top:8px;">
+        <div class="info-cell2"><div class="label">持仓数量</div><div class="value">100 股</div></div>
+        <div class="info-cell2"><div class="label">可卖数量</div><div class="value">100 股</div></div>
+        <div class="info-cell2"><div class="label">持仓均价</div><div class="value">$168.30</div></div>
+        <div class="info-cell2"><div class="label">当前价格</div><div class="value">$178.25</div></div>
+        <div class="info-cell2"><div class="label">盈亏比例</div><div class="value">+5.92%</div></div>
+        <div class="info-cell2"><div class="label">市值占比</div><div class="value">63%</div></div>
+      </div>
+    </div>
+
+    <!-- 成本基础 -->
+    <div style="padding: 0 16px 14px;">
+      <div class="section-title">成本基础 (Cost Basis)</div>
+      <div class="card" style="margin-top:8px;">
+        <div class="text-sm" style="display:flex; flex-direction:column; gap:8px;">
+          <div class="flex justify-between"><span class="text-muted">计算方式</span><span>先进先出 (FIFO)</span></div>
+          <div class="flex justify-between"><span class="text-muted">总成本</span><span>$16,830.00</span></div>
+          <div class="flex justify-between"><span class="text-muted">已实现盈亏</span><span>$0.00</span></div>
+          <div class="flex justify-between"><span class="text-muted">未实现盈亏</span><span>+$995.00</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 交易历史 -->
+    <div style="padding: 0 16px 80px;">
+      <div class="section-title">本仓交易记录</div>
+      <div class="card" style="margin-top:8px; padding:0;">
+        <div class="list-item" style="padding:12px 14px;">
+          <div style="flex:1;">
+            <div class="flex justify-between">
+              <span class="font-semi text-sm">买入 100 股</span>
+              <span class="text-sm">-$16,830.00</span>
+            </div>
+            <div class="text-xs text-muted">2026-03-10 · $168.30 · 市价单 · 已结算</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 底部操作栏 -->
+  <div style="display:flex; gap:8px; padding:12px 16px; background:var(--gray-50); border-top:var(--border); flex-shrink:0;">
+    <button class="btn btn-ghost" style="flex:1;" onclick="goto('../04-trading/order-entry.html')">卖出</button>
+    <button class="btn btn-primary" style="flex:1;" onclick="goto('../04-trading/order-entry.html')">买入</button>
+  </div>
+</div>
+
+<script src="../_shared/proto-router.js"></script>
+</body>
+</html>

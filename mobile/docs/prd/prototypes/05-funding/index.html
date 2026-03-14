@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>[低保真] 05-Funding — 资金中心</title>
+<link rel="stylesheet" href="../_shared/proto-base.css">
+<style>
+  .fund-card {
+    background: var(--gray-800); color: #fff; border-radius: var(--radius-lg);
+    padding: 20px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .fund-card .label { font-size: var(--font-size-xs); color: rgba(255,255,255,0.6); }
+  .fund-card .amount { font-size: 32px; font-weight: 700; }
+  .fund-actions { display: flex; gap: 12px; margin-top: 8px; }
+  .fund-action-btn {
+    flex: 1; padding: 10px; text-align: center; background: rgba(255,255,255,0.15);
+    border-radius: var(--radius-md); font-size: var(--font-size-sm); cursor: pointer;
+    color: #fff; border: 1px solid rgba(255,255,255,0.3);
+  }
+  .bank-card-item {
+    display: flex; align-items: center; gap: 12px; padding: 14px;
+    border: var(--border); border-radius: var(--radius-md); cursor: pointer;
+  }
+  .bank-icon {
+    width: 40px; height: 28px; background: var(--gray-200);
+    border-radius: 4px; display: flex; align-items: center; justify-content: center;
+    font-size: 10px; color: var(--gray-600); flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>05-Funding — 资金中心</strong> |
+  <a href="bank-bind.html">绑定银行卡</a> |
+  <a href="deposit.html">入金</a> |
+  <a href="withdraw.html">出金</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar"><span>9:41</span><span>●●● WiFi 100%</span></div>
+  <div class="nav-bar">
+    <span></span>
+    <span class="nav-title">资金</span>
+    <span></span>
+  </div>
+
+  <div class="screen" style="gap: 16px;">
+
+    <!-- 资金卡片 -->
+    <div class="fund-card">
+      <div class="label">账户总资产 (USD)</div>
+      <div class="amount">$15,847.32</div>
+      <div style="display:flex; gap:24px; margin-top:4px;">
+        <div>
+          <div class="label">可提现金</div>
+          <div style="font-size: var(--font-size-lg); font-weight:600;">$8,450.00</div>
+        </div>
+        <div>
+          <div class="label">待结算资金</div>
+          <div style="font-size: var(--font-size-lg); font-weight:600;">$1,682.50</div>
+        </div>
+      </div>
+      <div class="fund-actions">
+        <div class="fund-action-btn" onclick="goto('deposit.html')">入金</div>
+        <div class="fund-action-btn" onclick="goto('withdraw.html')">出金</div>
+        <div class="fund-action-btn" onclick="goto('bank-bind.html')">银行卡</div>
+      </div>
+    </div>
+
+    <!-- KYC 限额提示 -->
+    <div class="card">
+      <div class="card-title">资金限额（Tier 2）</div>
+      <div class="text-sm" style="display:flex; flex-direction:column; gap:6px;">
+        <div class="flex justify-between">
+          <span class="text-muted">单笔限额</span><span>$50,000</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-muted">今日已用 / 日限额</span><span>$5,000 / $100,000</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-muted">本月已用 / 月限额</span><span>$28,000 / $500,000</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 已绑定银行卡 -->
+    <div>
+      <div class="flex justify-between items-center mb-8">
+        <div class="section-title" style="margin:0;">已绑定银行卡</div>
+        <span class="text-xs text-muted">2/5 张</span>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <div class="bank-card-item">
+          <div class="bank-icon">USD</div>
+          <div style="flex:1;">
+            <div class="font-semi text-sm">Chase Bank ****1234</div>
+            <div class="text-xs text-muted">ACH · 已验证 · 可用</div>
+          </div>
+          <span class="badge badge-success">默认</span>
+        </div>
+        <div class="bank-card-item">
+          <div class="bank-icon">USD</div>
+          <div style="flex:1;">
+            <div class="font-semi text-sm">Bank of America ****5678</div>
+            <div class="text-xs text-muted">Wire · 已验证</div>
+          </div>
+          <span class="nav-action">…</span>
+        </div>
+        <button class="btn btn-ghost" onclick="goto('bank-bind.html')">+ 添加银行卡</button>
+      </div>
+    </div>
+
+    <!-- 近期流水 -->
+    <div>
+      <div class="flex justify-between items-center mb-8">
+        <div class="section-title" style="margin:0;">近期流水</div>
+        <span class="text-xs text-muted" style="cursor:pointer;">全部</span>
+      </div>
+      <div class="card" style="padding: 0;">
+        <div class="list-item" style="padding: 12px 14px;">
+          <div style="flex:1;">
+            <div class="font-semi text-sm">入金 · ACH</div>
+            <div class="text-xs text-muted">2026-03-12 · Chase ****1234</div>
+          </div>
+          <span class="badge badge-success">+$5,000.00</span>
+        </div>
+        <div class="list-item" style="padding: 12px 14px;">
+          <div style="flex:1;">
+            <div class="font-semi text-sm">出金 · ACH</div>
+            <div class="text-xs text-muted">2026-03-05 · Chase ****1234</div>
+          </div>
+          <span class="badge badge-error">-$2,000.00</span>
+        </div>
+        <div class="list-item" style="padding: 12px 14px; border-bottom:none;">
+          <div style="flex:1;">
+            <div class="font-semi text-sm">入金 · Wire</div>
+            <div class="text-xs text-muted">2026-02-28 · BofA ****5678</div>
+          </div>
+          <span class="badge badge-success">+$10,000.00</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Tab Bar -->
+  <div class="tab-bar">
+    <div class="tab-item" onclick="goto('../03-market/index.html')"><div class="tab-icon">行</div><span>行情</span></div>
+    <div class="tab-item" onclick="goto('../04-trading/order-list.html')"><div class="tab-icon">单</div><span>订单</span></div>
+    <div class="tab-item active"><div class="tab-icon">仓</div><span>持仓</span></div>
+    <div class="tab-item" onclick="goto('../08-settings-profile/index.html')"><div class="tab-icon">我</div><span>我的</span></div>
+  </div>
+</div>
+
+<script src="../_shared/proto-router.js"></script>
+</body>
+</html>
