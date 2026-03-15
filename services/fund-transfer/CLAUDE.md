@@ -29,6 +29,10 @@ Responsibilities:
 | `docs/prd/` | Domain PRDs -- deposit/withdrawal rules, AML (TBD) |
 | `docs/specs/fund-transfer-system.md` | System architecture and tech design |
 | `docs/specs/fund-custody-and-matching.md` | **必读**：托管架构、入金匹配、悬挂资金、资金边界、银行高可用 |
+| `docs/specs/ach-risk-and-instant-deposit.md` | ACH 垫资风险、即时入金分层策略、Return Code 处理、负余额补偿 |
+| `docs/specs/failure-handling-matrix.md` | 出入金全场景失败处理矩阵、补偿事务、状态修复 SLA |
+| `docs/specs/fx-conversion-flow.md` | 换汇完整流程、锁价机制、账本分录、失败补偿、风控规则 |
+| `docs/specs/operations-and-edge-cases.md` | 节假日处理、限额逻辑、CTR/SAR 申报、Admin 审批队列、银行账户生命周期 |
 | `docs/references/bank-channel-docs.md` | 银行渠道对接文档索引（JP Morgan、恒生、HKICL、Nacha 等公开文档链接及价值说明） |
 | `docs/references/payment-networks-primer.md` | **必读**：ACH/Wire/FPS 运营主体、技术本质、接入方式、Bank Adapter 设计含义 |
 | `docs/references/clearing-settlement-primer.md` | **必读**：出入金清结算 vs 证券清结算的区别、两套体系的唯一交汇点、fund-engineer 职责边界 |

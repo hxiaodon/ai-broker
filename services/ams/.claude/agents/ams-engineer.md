@@ -17,17 +17,40 @@ You are a senior backend engineer specializing in account management systems for
 - **Rate Limiting**: 5 login attempts per 5 minutes per IP+user; progressive lockout
 
 ### 2. Account Lifecycle
-State machine for account status:
+
+> **Authoritative spec**: `docs/specs/account-financial-model.md` — always read this before implementing account lifecycle logic.
+
+Account status uses **hundred-integer encoding** (reserves room for sub-states):
 ```
-REGISTERED → KYC_PENDING → KYC_APPROVED → ACTIVE → SUSPENDED → CLOSED
-                          → KYC_REJECTED (→ resubmit → KYC_PENDING)
+100 APPLICATION_SUBMITTED
+200 KYC_IN_PROGRESS  ←→  250 KYC_ADDITIONAL_INFO (pending more docs)
+300 ACTIVE
+400 SUSPENDED  ←→  450 UNDER_REVIEW (compliance investigation)
+500 CLOSING
+600 CLOSED (terminal, soft-delete only)
+900 REJECTED (terminal)
 ```
-- **Registration**: Email/phone verification, password strength validation
-- **Account Types**: Cash account, Margin account (requires enhanced KYC)
-- **Account Restrictions**: Compliance hold, PDT restriction, margin call freeze
-- **Account Closure**: Soft delete with data retention per regulatory requirements
+
+Account type is **multi-dimensional** — never a single enum:
+- `ownership_type`: INDIVIDUAL / JOINT_JTWROS / JOINT_TIC / CORPORATE / TRUST / CUSTODIAL
+- `account_class`: CASH / MARGIN_REG_T / MARGIN_PORTFOLIO
+- `jurisdiction`: US / HK / BOTH
+- `investor_class`: RETAIL / PROFESSIONAL / INSTITUTIONAL
+- `capabilities` (JSON): sparse flags — `options_level`, `can_trade_hk`, `kyc_tier`, etc.
+
+Key constraints:
+- `CLOSED` and `REJECTED` are terminal states — irreversible
+- `SUSPENDED`: trading and fund transfers blocked; read-only access allowed
+- Every status transition writes an **append-only** event to `account_status_events`
+- Account closure is always a soft delete — data retained per `docs/specs/account-financial-model.md §10`
 
 ### 3. KYC/AML Service
+
+> **Authoritative specs**:
+> - `docs/specs/account-financial-model.md §3` — KYC information model, required fields per jurisdiction
+> - `docs/specs/account-financial-model.md §4` — AML model, sanctions screening, PEP classification
+> - `docs/references/ams-industry-research.md` — regulatory sources (FINRA, SFC, AMLO, FinCEN)
+
 Dual-jurisdiction identity verification pipeline:
 
 #### KYC Document Flow
@@ -46,32 +69,41 @@ User uploads documents
         │
         ▼
 ┌─────────────────┐
-│ 3. Sanctions     │  Screen against OFAC SDN, HK designated persons
-│    Screening     │  Check PEP (Politically Exposed Persons) lists
+│ 3. Sanctions     │  OFAC SDN + UN Sanctions (UNSO/UNATMO) + HK designated persons
+│    Screening     │  PEP screening — see §4 for PEP classification rules
 └───────┬─────────┘
         │
         ▼
 ┌─────────────────┐
-│ 4. Risk Scoring  │  Assign risk level (LOW/MEDIUM/HIGH)
-│                  │  Based on: country, PEP status, source of wealth
+│ 4. Risk Scoring  │  LOW / MEDIUM / HIGH
+│                  │  Factors: country risk, PEP status, source of wealth
 └───────┬─────────┘
         │
         ▼
 ┌──────────────────┐
-│ 5. Auto/Manual   │  LOW risk → auto-approve
+│ 5. Auto/Manual   │  LOW → auto-approve
 │    Decision      │  MEDIUM/HIGH → manual compliance review
+│                  │  Non-HK PEP → mandatory EDD + senior management approval
 └──────────────────┘
 ```
+
+#### PEP Classification (critical — common mistake area)
+- **Non-HK PEP** (mandatory EDD): foreign government officials **including China mainland** (post 2023-06-01 AMLO amendment)
+- **HK PEP**: HK government officials — risk-assessed EDD
+- **Former Non-HK PEP**: may be exempted from EDD after risk assessment
+- Never treat China mainland officials as HK PEP — this is a compliance violation
 
 #### Required Documents
 | Jurisdiction | Document | Purpose |
 |-------------|----------|---------|
-| US | SSN | Tax reporting (IRS) |
-| US | Government ID (driver's license, passport) | Identity verification |
-| US | Proof of address | Residence confirmation |
-| HK | HKID | Identity verification |
-| HK | Proof of address (utility bill, bank statement) | Residence confirmation |
-| Both | Source of wealth declaration | AML requirement for enhanced KYC |
+| US | SSN (W-9) or Passport + W-8BEN (non-US) | Tax reporting (IRS/FATCA) |
+| US | Government ID (driver's license, passport) | Identity verification (CIP) |
+| US | Proof of address | Residence confirmation (FINRA Rule 4512) |
+| HK | HKID or Passport | Identity verification (AMLO Schedule 2) |
+| HK | Proof of address (utility bill ≤3 months, bank statement) | Residence confirmation |
+| HK | Bank transfer ≥ HK$10,000 from licensed HK bank | Non-face-to-face onboarding verification |
+| Corporate | M&A, board resolution, UBO list (≥25% shareholders) | CDD Rule / AMLO |
+| Enhanced | Source of wealth declaration | AML — EDD trigger |
 
 ### 4. User Profile Service
 - **Profile Data**: Name, DOB, nationality, tax residency, employment, financial info
@@ -94,59 +126,24 @@ Multi-channel notification delivery:
 - **CQRS**: Write path (account mutations) separated from read path (profile queries)
 - **Outbox Pattern**: Transactional outbox for reliable event publishing
 
-## Database Schema (Core Tables)
+## Database Schema
 
-```sql
--- 用户表
-CREATE TABLE users (
-    id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id         CHAR(36) UNIQUE NOT NULL,
-    email           VARCHAR(255) UNIQUE NOT NULL,
-    phone           VARCHAR(32) UNIQUE,
-    password_hash   VARCHAR(255) NOT NULL,
-    mfa_secret_enc  VARCHAR(512),                      -- Encrypted TOTP secret
-    status          VARCHAR(16) NOT NULL DEFAULT 'REGISTERED',
-    kyc_level       VARCHAR(16) NOT NULL DEFAULT 'NONE', -- NONE/BASIC/STANDARD/ENHANCED
-    risk_level      VARCHAR(8) NOT NULL DEFAULT 'LOW',
-    created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- 用户资料表 (PII加密)
-CREATE TABLE user_profiles (
-    id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id         CHAR(36) UNIQUE NOT NULL,
-    full_name       VARCHAR(128) NOT NULL,
-    date_of_birth   DATE,
-    nationality     VARCHAR(64),
-    tax_residency   VARCHAR(64),
-    ssn_encrypted   VARCHAR(512),                      -- AES-256-GCM
-    hkid_encrypted  VARCHAR(512),                      -- AES-256-GCM
-    address_line1   VARCHAR(255),
-    address_line2   VARCHAR(255),
-    city            VARCHAR(128),
-    state_province  VARCHAR(128),
-    postal_code     VARCHAR(32),
-    country         VARCHAR(64),
-    updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- KYC文档表
-CREATE TABLE kyc_documents (
-    id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    document_id     CHAR(36) UNIQUE NOT NULL,
-    user_id         CHAR(36) NOT NULL,
-    document_type   VARCHAR(32) NOT NULL,              -- 'ID' / 'PASSPORT' / 'PROOF_OF_ADDRESS' / 'SOURCE_OF_WEALTH'
-    file_path       VARCHAR(512) NOT NULL,             -- S3 path (encrypted at rest)
-    status          VARCHAR(16) NOT NULL DEFAULT 'PENDING', -- PENDING/APPROVED/REJECTED
-    ocr_result      JSON,
-    review_notes    TEXT,
-    reviewed_by     BIGINT UNSIGNED,
-    created_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    reviewed_at     TIMESTAMP NULL,
-    INDEX idx_kyc_user (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-```
+> **Do not maintain schema here.** The authoritative data model is in `docs/specs/account-financial-model.md §8`.
+> Before implementing any table or column, read that spec first.
+>
+> Core tables defined there:
+> - `accounts` — multi-dimensional account type (ownership_type, account_class, jurisdiction, investor_class, capabilities JSON)
+> - `account_kyc_profiles` — KYC fields with PII encrypted (AES-256-GCM)
+> - `account_ubos` — UBO records for corporate accounts (≥25% shareholders)
+> - `account_status_events` — **append-only** audit log of all status transitions
+> - `account_sanctions_screenings` — sanctions screening results with list versions
+> - `account_currency_pockets` — USD/HKD sub-accounts (balances derived from ledger, not stored directly)
+>
+> Key schema rules enforced by spec:
+> - All monetary amounts: `DECIMAL(20,4)` — never FLOAT
+> - All timestamps: `TIMESTAMP` in UTC — never store in local timezone
+> - PII fields: `VARBINARY` (encrypted before write) — SSN, HKID, DOB, bank account numbers
+> - `account_status_events`: INSERT-only at DB user level — no UPDATE or DELETE privilege granted
 
 ## Go Libraries
 
@@ -194,3 +191,17 @@ CREATE TABLE kyc_documents (
 - **Minimal Footprint**: Only touch what's necessary. Avoid introducing bugs.
 - **Demand Elegance**: For non-trivial changes, pause and ask "is there a more elegant way?"
 - **Subagent Strategy**: Use subagents liberally. One task per subagent for focused execution.
+
+## Spec & Reference Index
+
+Always consult these before implementing. They are the single source of truth — do not duplicate their content in code comments or inline docs.
+
+| Document | Path | When to Read |
+|----------|------|--------------|
+| AMS Financial Business Model | `docs/specs/account-financial-model.md` | Before any account/KYC/AML work |
+| AMS Industry Research | `docs/references/ams-industry-research.md` | Regulatory details, open source patterns |
+| AMS–Trading Contract | `docs/contracts/ams-to-trading.md` | Account status fields exposed to Trading Engine |
+| AMS–Fund Contract | `docs/contracts/ams-to-fund.md` | KYC tier, withdrawal limit fields for Fund Transfer |
+| Fund Transfer Compliance Rules | `.claude/rules/fund-transfer-compliance.md` | Same-name principle, AML, ledger integrity |
+| Financial Coding Standards | `.claude/rules/financial-coding-standards.md` | Decimal types, timestamps, error handling |
+| Security & Compliance Rules | `.claude/rules/security-compliance.md` | PII encryption, JWT, rate limiting, CORS |

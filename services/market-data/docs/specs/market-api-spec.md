@@ -98,6 +98,38 @@ https://api.example.com
 
 触发限流返回 `429 RATE_LIMIT_EXCEEDED`，响应头包含 `Retry-After: <秒数>`。
 
+### 1.7 数据质量字段（`is_stale`）
+
+所有包含行情价格的响应均须携带 `is_stale` 字段：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `is_stale` | bool | `true` = 数据超过展示阈值（5s），提示用户数据可能延迟 |
+| `stale_since_ms` | int | 数据陈旧持续时长（毫秒），`is_stale=false` 时为 0 |
+
+> 注：`is_stale` 用于前端展示警告。交易引擎使用更严格的 1s 阈值（通过 gRPC 内部接口），两者阈值不同，不要混淆。
+
+### 1.8 涨跌幅（`change` / `change_pct`）计算基准
+
+```
+change     = last_price - prev_regular_close
+change_pct = (change / prev_regular_close) × 100
+
+基准价 = 前一个交易日 Regular Session 收盘价（NYSE/NASDAQ 16:00:00 ET）
+       ≠ 盘后收盘价（After-Hours Close）
+
+盘前/盘后阶段的 change/change_pct 同样以 prev_regular_close 为基准
+```
+
+Polygon.io 推送的 `change` 字段遵循此定义，无需在应用层二次计算。
+
+### 1.9 复权说明
+
+历史 K 线数据（日线/周线/月线）使用 **Split + Dividend 全复权（后复权）**：
+- 最新价格保持不变，历史价格已按累积系数调整
+- 分时图（当日）和实时报价使用原始价格，不复权
+- 详细计算规范见 `market-data-system.md` 附录 C
+
 ---
 
 ## 2. 接口列表

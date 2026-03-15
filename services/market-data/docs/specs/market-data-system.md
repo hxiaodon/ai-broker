@@ -1,24 +1,28 @@
 ---
 type: domain-spec
-version: v2.0
-date: 2026-03-14
-supersedes: v1.0 (2026-03-07)
+version: v2.1
+date: 2026-03-15
+supersedes: v2.0 (2026-03-14)
 surface_prd: mobile/docs/prd/03-market.md
+research_ref: docs/references/market-data-industry-research.md
 status: ACTIVE
 ---
 
 # 行情系统技术架构设计
 
-> 美港股券商交易 App — Market Data System Architecture v2.0
+> 美港股券商交易 App — Market Data System Architecture v2.1
 > Phase 1 聚焦美股（NYSE/NASDAQ），港股（HKEX）为 Phase 2
 
 ---
 
 ## 目录
 
+0. [合规前提（必读）](#0-合规前提必读)
 1. [系统概述](#1-系统概述)
 2. [整体架构](#2-整体架构)
 3. [分层详细设计](#3-分层详细设计)
+   - 3.3.4 [复权处理规范（Corporate Actions）](#334-复权处理规范corporate-actions)
+   - 3.3.5 [数据质量与 Stale Quote 处理](#335-数据质量与-stale-quote-处理)
 4. [访客双轨推送架构](#4-访客双轨推送架构)
 5. [WebSocket 协议完整规范](#5-websocket-协议完整规范)
 6. [REST API 接口规范](#6-rest-api-接口规范)
@@ -29,6 +33,110 @@ status: ACTIVE
 11. [监控告警](#11-监控告警)
 12. [交易时段与市场日历](#12-交易时段与市场日历)
 13. [Phase 1 部署方案](#13-phase-1-部署方案)
+14. [历史数据初始化与回填](#14-历史数据初始化与回填)
+
+---
+
+## 0. 合规前提（必读）
+
+> **本章节是整个行情系统的法律和合规基础，架构决策必须在确认合规路径后才能最终确定。**
+> 来源：NYSE Nonprofessional Subscriber Policy、UTP Data Policies、Polygon.io Terms of Service、SEC Regulation NMS
+
+---
+
+### 0.1 行情数据授权模式（Market Data Licensing）
+
+美股行情数据受 **CTA Plan**（NYSE 上市股票，Tape A/B）和 **UTP Plan**（Nasdaq 上市股票，Tape C）两套协议约束。任何向终端用户展示、分发行情数据的应用，必须取得合法授权。
+
+**两条可行路径：**
+
+#### 路径 A：Polygon Poly.feed+（推荐 Phase 1）
+
+| 项目 | 说明 |
+|------|------|
+| 模式 | 向 Polygon 订阅 Poly.feed+ 计划，获得向终端用户展示行情的授权 |
+| 优点 | **无需对用户做 Pro/Non-Pro 分类**；无需向 NYSE/Nasdaq 月度报告用户数；单一合同关系，合规成本最低 |
+| 费用 | 按月固定费率（具体以 Polygon 报价为准） |
+| 限制 | 标准 Polygon API Key（非 Poly.feed+）**明确禁止**向第三方用户展示数据；Phase 1 必须升级至 Poly.feed+ |
+| 系统影响 | **最小**：无需在系统中维护用户数据授权状态字段 |
+
+> ⚠️ **严重警告**：当前如使用标准 Polygon API Key 向用户展示行情，已违反 Polygon 服务条款，面临终止服务风险。
+
+#### 路径 B：直接与 NYSE/Nasdaq 签 Vendor Agreement
+
+| 项目 | 说明 |
+|------|------|
+| 模式 | 作为"Distributor"直接与 CTA/UTP 签署数据分发协议 |
+| 优点 | 数据主权更强，长期成本可能更低 |
+| 要求 | 必须区分 Non-Professional 和 Professional 用户，按 Professional 用户数月度付费 |
+| 系统影响 | **较大**：需以下工程支持（见 0.2 节）|
+
+**Phase 1 决策**：选择 **路径 A（Poly.feed+）**，快速合规上线，Phase 2 评估是否迁移至路径 B。
+
+---
+
+### 0.2 Non-Professional 用户声明（路径 B 适用，路径 A 参考）
+
+若选择路径 B，系统必须支持以下能力：
+
+**法律定义（NYSE 标准）：**
+> "Nonprofessional Subscriber" 是指仅将行情数据用于**个人、非商业用途**的自然人，且未作为《投资顾问法》第 202(a)(11) 条定义的"投资顾问"执业，未受雇于金融机构执行需要注册功能的工作。
+
+**工程实现要求：**
+
+1. **KYC 流程集成**：在 AMS 服务的 KYC Step 中增加"行情数据使用声明"步骤，用户勾选并签署：
+   - "我确认本人使用行情数据仅用于个人投资目的，非商业用途"
+   - "本人不是证券专业人士（如投资顾问、基金经理等）"
+
+2. **用户数据模型扩展**（AMS 侧）：
+   ```sql
+   ALTER TABLE users ADD COLUMN market_data_license ENUM('non_professional', 'professional')
+       NOT NULL DEFAULT 'non_professional';
+   ALTER TABLE users ADD COLUMN market_data_agreement_signed_at DATETIME;
+   ```
+
+3. **JWT Payload 携带授权状态**：
+   ```json
+   {
+     "sub": "user-uuid",
+     "market_data_license": "non_professional",
+     "exp": 1234567890
+   }
+   ```
+
+4. **月度报告自动化**：系统生成 Professional 用户月度汇总，按 CTA/UTP 格式上报。
+
+---
+
+### 0.3 大盘指数的合规替代方案
+
+**问题**：S&P 500 指数数据需要 S&P Global 单独授权，DJIA 需要 S&P/Dow Jones Indices 授权，两者均需独立商务谈判。
+
+**Phase 1 决策：使用 ETF 替代指数（合规且零额外成本）**
+
+| 指数 | ETF 替代 | 说明 |
+|------|---------|------|
+| S&P 500 | **SPY** | SPDR S&P 500 ETF，追踪 S&P 500，日内相关性 > 99.9% |
+| Nasdaq 100 | **QQQ** | Invesco QQQ，追踪 Nasdaq-100 |
+| 道琼斯 DJIA | **DIA** | SPDR DJIA ETF |
+| 恒生指数（Phase 2）| **2800.HK** | 盈富基金，追踪恒生指数 |
+
+**展示规范**：UI 需标注 "SPY（追踪 S&P 500）"，不可直接写 "S&P 500"，避免误导用户和合规风险。
+
+---
+
+### 0.4 数据来源披露义务
+
+根据 Polygon 协议及 SEC 展示要求，行情数据展示须满足：
+
+| 位置 | 披露内容 |
+|------|---------|
+| 股票详情页底部 | "行情数据由 Polygon.io 提供" |
+| 财务数据区域 | "财务数据来源：[供应商]，截止 [日期]" |
+| 访客延迟行情 | **每处价格旁必须显示"延迟15分钟"标识**，不可隐藏 |
+| 盘前/盘后价格 | 显示"盘前/盘后交易流动性较低，价差可能较大" |
+
+---
 
 ---
 
@@ -2136,5 +2244,418 @@ GET /health/ready   → Readiness Probe（连接已建立、Redis 可达）
 
 ---
 
-*文档版本 v2.0 | 日期 2026-03-14 | 替代 v1.0（2026-03-07）*
+---
+
+## 14. 历史数据初始化与回填
+
+> 来源调研：Polygon.io Aggregates API Docs、Polygon Aggregates FAQ、alpacahq/marketstore 工程实践
+
+### 14.1 Polygon.io 历史数据 API 关键约束
+
+| 约束项 | 说明 |
+|--------|------|
+| 单次返回上限 | **50,000 根 K 线**（超出需分批请求） |
+| 速率限制（免费计划） | 5 次/分钟 |
+| 速率限制（付费计划） | 依套餐，通常 100-unlimited 次/分钟 |
+| 历史数据范围 | 日线：免费计划 2 年；付费计划更长 |
+| Tick 数据 | 需付费计划；Phase 1 暂不回填全量 Tick |
+| 无交易时段 | Polygon **不生成**无交易的 K 线，Holiday/Halt 期间为空白 |
+
+### 14.2 分级回填策略
+
+```
+阶段 1 — 服务首次部署（全市场日线优先）
+┌─────────────────────────────────────────────────┐
+│ 目标：建立所有支持股票的日/周/月线历史          │
+│                                                 │
+│ 优先级：                                        │
+│   P0: 热门 TOP 100 股票（立即可用）             │
+│   P1: 全市场约 8,000 只美股（后台继续）         │
+│                                                 │
+│ 数据范围：                                      │
+│   日线 1D：回填 2 年（约 500 根/只）            │
+│   周线 1W：回填 5 年（约 260 根/只）            │
+│   月线 1M：回填 10 年（约 120 根/只）           │
+│                                                 │
+│ 耗时估算（付费计划）：                          │
+│   8000 只 × 3 个周期 = 24,000 次 API 调用      │
+│   100 次/分 → 约 4 分钟完成                    │
+│   5 次/分（免费）→ 约 80 分钟                  │
+└─────────────────────────────────────────────────┘
+
+阶段 2 — 用户触发按需加载（分钟线）
+┌─────────────────────────────────────────────────┐
+│ 触发时机：用户首次访问某股票详情页              │
+│ 加载范围：当日常规时段分钟线（09:30-16:00 ET）  │
+│           约 390 根，单次 API 即可返回          │
+│                                                 │
+│ 历史分钟线（5日/1月视图）：                     │
+│   按需分段加载，每段不超过 50,000 根            │
+└─────────────────────────────────────────────────┘
+
+阶段 3 — 实时续接（盘中）
+┌─────────────────────────────────────────────────┐
+│ 通过 Polygon WebSocket 订阅 AM.* 事件           │
+│ （AM = Aggregate per Minute）                   │
+│ 每分钟收到该股票的新 K 线后，追加写入 MySQL     │
+└─────────────────────────────────────────────────┘
+```
+
+### 14.3 回填工程实现
+
+```go
+// 分段回填，避免超过 50k 限制，带速率控制
+func backfillDailyKlines(ctx context.Context, ticker string,
+    from, to time.Time, limiter *rate.Limiter) error {
+
+    // 按月切片（日线每月约 22 根，远低于 50k 上限；安全裕量）
+    chunks := splitByMonth(from, to)
+
+    for _, chunk := range chunks {
+        if err := limiter.Wait(ctx); err != nil {
+            return err
+        }
+
+        bars, err := polygonClient.GetAggs(ticker, 1, "day",
+            chunk.From, chunk.To,
+            WithAdjusted(true),  // Split 复权
+            WithSort("asc"),
+        )
+        if err != nil {
+            return fmt.Errorf("backfill %s [%s,%s]: %w",
+                ticker, chunk.From, chunk.To, err)
+        }
+
+        if err := klineRepo.BulkUpsert(ctx, bars); err != nil {
+            return err
+        }
+
+        // 记录断点，支持重启后续传
+        if err := progressStore.SaveCheckpoint(ticker, chunk.To); err != nil {
+            return err
+        }
+    }
+    return nil
+}
+```
+
+**并发策略**：
+```go
+// 多 goroutine 并行回填，受速率限制器约束
+pool := workerpool.New(10)          // 10 个并发 worker
+limiter := rate.NewLimiter(rate.Every(600*time.Millisecond), 1) // 100 req/min
+
+for _, ticker := range tickers {
+    t := ticker
+    pool.Submit(func() {
+        backfillDailyKlines(ctx, t, twoYearsAgo, today, limiter)
+    })
+}
+pool.StopWait()
+```
+
+### 14.4 数据缺口处理规则
+
+| 缺口类型 | 产生原因 | 处理方式 |
+|---------|---------|---------|
+| 交易节假日 | NYSE/Nasdaq 休市 | 不生成假 K 线；K 线图显示空白或跳过；日历中标注假日 |
+| 临时停牌（Trading Halt） | LULD 熔断、消息停牌 | 停牌期间 K 线标记 `halted=true`；不 forward-fill |
+| 数据回填间隙 | 服务中断期间盘中数据缺失 | 任务重启后从 checkpoint 续传；补齐当日数据 |
+| 新股上市（IPO）前 | 无历史交易 | 从上市日开始，不填充上市前数据 |
+| 盘后/盘前（分钟线缺失） | 仅回填常规时段 | 盘前盘后的实时数据通过 WebSocket 推送，不存 K 线 |
+
+### 14.5 NYSE 交易日历维护
+
+```go
+// 维护 NYSE 节假日列表，用于判断交易日
+// 来源：NYSE 官方发布的 Holiday Schedule（每年更新）
+var nyseHolidays2026 = []time.Time{
+    mustParse("2026-01-01"), // New Year's Day
+    mustParse("2026-01-19"), // Martin Luther King Jr. Day
+    mustParse("2026-02-16"), // Presidents' Day
+    mustParse("2026-04-03"), // Good Friday
+    mustParse("2026-05-25"), // Memorial Day
+    mustParse("2026-07-03"), // Independence Day (observed)
+    mustParse("2026-09-07"), // Labor Day
+    mustParse("2026-11-26"), // Thanksgiving Day
+    mustParse("2026-11-27"), // Day after Thanksgiving（Early Close 13:00）
+    mustParse("2026-12-25"), // Christmas Day
+}
+
+func IsNYSETradingDay(d time.Time) bool {
+    if d.Weekday() == time.Saturday || d.Weekday() == time.Sunday {
+        return false
+    }
+    for _, h := range nyseHolidays2026 {
+        if sameDay(d, h) {
+            return false
+        }
+    }
+    return true
+}
+```
+
+**注意**：节假日列表须每年更新，建议从数据库或配置文件维护，避免硬编码。
+
+---
+
+## 附录 C — 复权处理规范（Corporate Actions）
+
+> 来源调研：Polygon.io Aggregates API Docs、CRSP Price Adjustment Methodology、Yahoo Finance Adjusted Close 规范
+
+### C.1 复权的必要性
+
+若不做价格复权，K 线图在以下事件发生日会出现虚假断崖：
+- **股票拆分（Stock Split）**：如 AAPL 4:1 拆股，次日开盘价骤降 75%，K 线图出现垂直跳水
+- **现金分红（Cash Dividend）**：除息日股价下跌分红金额，图上出现向下跳空缺口
+
+### C.2 复权策略（后复权 / Backward Adjustment）
+
+业界标准：**后复权（Backward Adjustment）**——保持最新价格不变，将历史价格向过去调整。
+
+```
+今日收盘价 = 交易所实际价格（不变）
+历史价格   = 历史原始价格 × 累积调整系数
+```
+
+### C.3 Split 调整（Polygon `adjusted=true` 处理）
+
+**Polygon `adjusted=true` 默认仅处理 Split，不处理 Dividend。**
+
+Split 调整公式：
+```
+调整系数 = 拆分前股数 / 拆分后股数
+
+示例（4:1 正向拆股）：
+  调整系数 = 1/4 = 0.25
+  拆股前历史价格 × 0.25 = 复权后价格
+  拆股前历史成交量 × 4  = 复权后成交量
+
+示例（1:5 反向拆股，合股）：
+  调整系数 = 5/1 = 5
+  合股前历史价格 × 5   = 复权后价格
+  合股前历史成交量 × 0.2 = 复权后成交量
+```
+
+**累积系数**（多次拆股叠加）：
+```
+若历史上先 2:1 拆股，再 4:1 拆股：
+该时间点之前的价格调整系数 = 1/2 × 1/4 = 0.125
+```
+
+### C.4 Dividend 调整（应用层处理）
+
+Polygon 不自动处理分红复权，需在应用层实现：
+
+```go
+// 从 Polygon 获取分红历史
+// GET /v3/reference/dividends?ticker=AAPL&order=desc&limit=100
+type DividendRecord struct {
+    ExDividendDate string          // 除息日
+    CashAmount     decimal.Decimal // 每股分红金额
+}
+
+// 计算分红累积调整系数
+// 来源：Yahoo Finance / CRSP 标准公式
+//
+// 调整系数 = (除息日前一日收盘价 - 分红金额) / 除息日前一日收盘价
+//          = 1 - (D / P_prev)
+//
+// 示例：分红 $2，前一日收盘 $40
+//   调整系数 = (40 - 2) / 40 = 0.95
+//   除息日之前所有历史收盘价 × 0.95
+
+func calcDividendAdjustmentFactor(
+    prevClose decimal.Decimal,
+    dividend decimal.Decimal,
+) decimal.Decimal {
+    return prevClose.Sub(dividend).Div(prevClose)
+}
+
+// 应用累积调整系数到历史 K 线
+func applyAdjustments(
+    klines []Kline,
+    splits []SplitRecord,
+    dividends []DividendRecord,
+) []Kline {
+    // 按时间从新到旧处理，逐步计算累积系数
+    cumFactor := decimal.NewFromInt(1)
+    for i := len(klines) - 1; i >= 0; i-- {
+        k := &klines[i]
+        // 检查该 K 线时间节点是否经历了 split 或 dividend
+        for _, s := range splits {
+            if isOnOrAfter(k.Time, s.ExecutionDate) {
+                cumFactor = cumFactor.Mul(
+                    decimal.New(int64(s.FromFactor), 0).
+                        Div(decimal.New(int64(s.ToFactor), 0)))
+            }
+        }
+        // 应用累积系数
+        k.Open = k.Open.Mul(cumFactor).Round(4)
+        k.High = k.High.Mul(cumFactor).Round(4)
+        k.Low = k.Low.Mul(cumFactor).Round(4)
+        k.Close = k.Close.Mul(cumFactor).Round(4)
+    }
+    return klines
+}
+```
+
+### C.5 各场景复权策略
+
+| 场景 | 复权策略 | 说明 |
+|------|---------|------|
+| 日线/周线/月线（历史图表） | **Split + Dividend 全复权**（后复权） | 防止历史图出现虚假缺口 |
+| 分时图（当日） | **不复权**，使用实时原始价格 | 当日内无 Corporate Action 事件 |
+| 涨跌幅（`change` / `change_pct`）| **不复权** | 以前一日 Regular Session Close（16:00 ET）为基准，与交易所公告一致 |
+| K 线图叠加均线（MA） | 在复权后价格序列上计算 | 均线基于复权价，避免 Split 造成的均线跳变 |
+| 成交量 | **同步调整**（Split 时反向调整） | 确保成交量与价格口径一致 |
+
+### C.6 涨跌幅（Change）计算基准
+
+**明确定义**：`change` / `change_pct` 的基准为**前一个交易日 Regular Session 收盘价**（16:00:00 ET），而非盘后收盘价。
+
+```
+change     = last_price - prev_regular_close
+change_pct = (change / prev_regular_close) × 100
+
+盘前/盘后阶段：
+  同样以 prev_regular_close 为基准
+  盘前涨跌幅 = (pre_market_price - prev_regular_close) / prev_regular_close × 100
+```
+
+Polygon 推送的 `change` 字段遵循此定义，无需二次计算。
+
+---
+
+## 附录 D — 数据质量与 Stale Quote 处理
+
+> 来源调研：Data Intellect Stale Data Methodology、QuestDB Feed Handlers Glossary、TraderMade Tick Data Quality
+
+### D.1 Stale 阈值体系（两级）
+
+| 级别 | 阈值 | 触发对象 | 触发动作 |
+|------|------|---------|---------|
+| **交易风控级** | > **1 秒** | 交易引擎调用行情价格 | 标记 `is_stale=true`，交易引擎拒绝市价单 |
+| **展示级** | > **5 秒** | 客户端展示行情 | 界面显示"数据可能延迟"提示横幅 |
+| **Feed 告警级** | > **42ms 无新消息**（高频 Feed） | 服务端监控 | 触发告警，监控系统标记数据源异常 |
+| **熔断级** | Feed 中断 > **30 秒** | 交易入口 | 禁止新提交市价单；限价单仍允许 |
+
+### D.2 `is_stale` 字段定义
+
+所有行情响应（REST + WebSocket + gRPC）增加 `is_stale` 字段：
+
+```protobuf
+// api/grpc/market_data.proto 新增字段
+message Quote {
+  // ... 现有字段 ...
+  bool   is_stale        = 21;  // true = 数据超过 1s（交易风控阈值）
+  int64  stale_since_ms  = 22;  // 数据陈旧持续时长（毫秒），0 = 非陈旧
+}
+```
+
+REST API quote 响应新增字段：
+```json
+{
+  "symbol": "AAPL",
+  "price": "182.5200",
+  "is_stale": false,
+  "stale_since_ms": 0,
+  "timestamp": "2026-03-13T14:30:00.123Z"
+}
+```
+
+WebSocket quote 推送新增字段：
+```json
+{
+  "type": "quote",
+  "symbol": "AAPL",
+  "price": "182.5200",
+  "is_stale": false,
+  "timestamp": "2026-03-13T14:30:00.123Z"
+}
+```
+
+### D.3 Stale 检测实现
+
+**Quote 级检测**（每条报价）：
+```go
+// Quote 数据结构
+type Quote struct {
+    Symbol     string
+    // ... 价格字段 ...
+    ExchangeTS time.Time // 交易所时间戳（数据来源时间，非接收时间）
+    ReceivedAt time.Time // 本地接收时间（用于监控，不用于 stale 判断）
+}
+
+// 检测函数：使用 ExchangeTS，不用 ReceivedAt
+// 避免因网络延迟导致误判
+func IsStale(q *Quote, threshold time.Duration) bool {
+    return time.Since(q.ExchangeTS) > threshold
+}
+
+// 在推送前附加 is_stale 字段
+func enrichWithStaleStatus(q *Quote) {
+    q.IsStale = IsStale(q, 1*time.Second) // 交易风控阈值
+    if q.IsStale {
+        q.StaleSinceMs = time.Since(q.ExchangeTS).Milliseconds()
+    }
+}
+```
+
+**Feed 级检测**（监控数据源活性）：
+```go
+// Feed Handler 中维护最后消息时间
+type FeedHealthMonitor struct {
+    lastMsgTime atomic.Value // stores time.Time
+    alertThreshold time.Duration
+    circuitBreaker time.Duration
+}
+
+func (m *FeedHealthMonitor) OnMessage() {
+    m.lastMsgTime.Store(time.Now())
+}
+
+func (m *FeedHealthMonitor) Check() FeedHealth {
+    last := m.lastMsgTime.Load().(time.Time)
+    elapsed := time.Since(last)
+
+    switch {
+    case elapsed > m.circuitBreaker: // 30s
+        return FeedHealth{Status: "CIRCUIT_OPEN", ElapsedMs: elapsed.Milliseconds()}
+    case elapsed > m.alertThreshold: // 42ms（对高频 Feed）
+        return FeedHealth{Status: "STALE_ALERT", ElapsedMs: elapsed.Milliseconds()}
+    default:
+        return FeedHealth{Status: "HEALTHY"}
+    }
+}
+```
+
+**警惕伪新鲜数据**：某些低质量数据源会为陈旧价格附加新的时间戳。检测方式：
+```go
+// 同时监控"价格变动频率"
+// 若同一 symbol 超过 60s 价格完全不变但 timestamp 持续更新，标记为可疑
+func detectFakeRefresh(symbol string, newQuote *Quote, cache *QuoteCache) bool {
+    prev := cache.Get(symbol)
+    if prev == nil {
+        return false
+    }
+    priceUnchanged := prev.Price.Equal(newQuote.Price)
+    timestampUpdated := newQuote.ExchangeTS.After(prev.ExchangeTS)
+    longDuration := newQuote.ExchangeTS.Sub(prev.ExchangeTS) > 60*time.Second
+    return priceUnchanged && timestampUpdated && longDuration
+}
+```
+
+### D.4 前端处理规范
+
+| `is_stale` | 界面行为 |
+|-----------|---------|
+| `false` | 正常显示，无特殊提示 |
+| `true` + `stale_since_ms` < 5000 | 保持显示，无提示（交易风控已处理，展示宽容度更高）|
+| `true` + `stale_since_ms` >= 5000 | 显示黄色横幅："行情数据可能存在延迟，请谨慎交易" |
+| Feed 熔断（服务端推送 `market_status` 事件）| 显示红色横幅："行情服务暂时不可用，当前显示最后已知价格" |
+
+---
+
+*文档版本 v2.1 | 日期 2026-03-15 | 替代 v2.0（2026-03-14）*
 *关联 PRD: mobile/docs/prd/03-market.md v1.1（2026-03-13）*

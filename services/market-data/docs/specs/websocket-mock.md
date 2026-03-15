@@ -154,6 +154,8 @@ Client 连接建立 (WSS)
       "prev_close": "181.2800",
       "turnover": "8342156.00",
       "market_status": "REGULAR",
+      "is_stale": false,
+      "stale_since_ms": 0,
       "timestamp": "2026-03-13T14:30:00.123Z",
       "delayed": false
     },

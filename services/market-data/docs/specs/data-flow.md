@@ -301,3 +301,59 @@ default: // "mock"
 - 消费失败重试：指数退避，最多 3 次
 - 超过重试次数：发送到 Dead Letter Topic（`market-data.dlq`），并告警
 - 延迟超过 5 秒：触发 Prometheus 告警，数据标记 `stale=true` 推给客户端
+
+---
+
+## 历史数据初始化（冷启动）
+
+> 详细规范见 `market-data-system.md` §14
+
+### 启动时序
+
+```
+服务首次部署
+      │
+      ├─① 检查 MySQL klines 表是否为空
+      │         是 → 触发全量回填任务（后台异步）
+      │         否 → 检查最新 K 线时间，补填缺口
+      │
+      ├─② 优先回填 TOP 100 热门股票日线（约 30 秒完成）
+      │         完成后 → HTTP 服务开放，可响应请求
+      │
+      ├─③ 后台继续回填全市场 ~8000 只股票（约 4 分钟，付费计划）
+      │
+      └─④ 订阅 Polygon WebSocket AM.* 事件，盘中实时续接分钟线
+```
+
+### Polygon 历史数据速率限制
+
+| 计划 | 速率 | 回填 8000 只日线耗时 |
+|------|------|-------------------|
+| 免费 | 5 req/min | ~80 分钟 |
+| 付费（Starter） | 100 req/min | ~4 分钟 |
+| 付费（高级） | unlimited | < 1 分钟 |
+
+### 分钟线按需加载（用户触发）
+
+```
+用户访问股票详情页
+      │
+      ├─ Redis 中有当日分钟线缓存？
+      │         是 → 直接返回
+      │         否 → 触发按需回填
+      │
+      └─ 按需回填：
+             GET /v2/aggs/ticker/{symbol}/range/1/minute/{today}/{today}
+                 ?adjusted=true&limit=500
+             写入 MySQL klines（period='1min'）
+             写入 Redis kline:US:{symbol}:1min（TTL 300s）
+```
+
+### 数据缺口填补规则
+
+| 缺口原因 | 处理方式 |
+|---------|---------|
+| NYSE 节假日 | 维护交易日历，跳过非交易日，不生成假 K 线 |
+| 临时停牌（LULD Halt） | 停牌期间标记 `halted=true`，不 forward-fill |
+| 服务中断恢复 | 从 checkpoint 续传，补齐中断期间数据 |
+| 新股上市前 | 无数据，从上市日开始 |

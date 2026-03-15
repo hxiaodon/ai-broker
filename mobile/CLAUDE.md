@@ -11,14 +11,14 @@ Everything the end user sees and touches lives here. Backend business logic live
 | Layer | Technology |
 |-------|-----------|
 | Framework | Flutter 3.41.4 / Dart 3.7.x |
-| State Management | Riverpod (`AsyncNotifierProvider` for async state) |
-| HTTP Client | Dio (interceptors, certificate pinning, retry) |
+| State Management | Riverpod 3.0 (`^3.0.0`，含自动重试 / Pause/Resume / 统一 `Ref` API) |
+| HTTP Client | Dio (interceptors, SPKI certificate pinning, retry) |
 | WebSocket | `web_socket_channel` (real-time market data) |
-| Charts | Syncfusion Flutter Charts |
+| Charts | Syncfusion Flutter Charts（唯一图表库） |
 | Data Classes | `freezed` + `json_serializable` |
-| Secure Storage | `flutter_secure_storage` (Keychain / EncryptedSharedPreferences) |
+| Secure Storage | `flutter_secure_storage ^10.0.0` (`migrateOnAlgorithmChange`，`unlocked_this_device`) |
 | Biometrics | `local_auth` |
-| H5 Pages | React 18+ / TypeScript 5.x / Vite / Tailwind CSS |
+| H5 Pages | React 18 / TypeScript 5.x / Vite / Tailwind CSS |
 
 Financial calculations must use `Decimal` from `package:decimal` -- never `double`.
 
@@ -41,8 +41,9 @@ Financial calculations must use `Decimal` from `package:decimal` -- never `doubl
 | File | Scope |
 |------|-------|
 | `10-jsbridge-spec.md` | JSBridge contract between Flutter and H5 WebView pages |
-| `mobile-flutter-tech-spec.md` | Flutter architecture, folder structure, navigation, DI |
-| `mobile-market-data-layer.md` | WebSocket connection management, quote caching, reconnection |
+| `mobile-flutter-tech-spec.md` | Flutter architecture, folder structure, navigation, DI, security implementation |
+| `mobile-market-data-layer.md` | **[ARCHIVED]** KMP/Kotlin era market data layer — superseded; pending rewrite after PRD-03 approval |
+| `flutter-init-report.md` | Phase 1 skeleton init report, dependency decisions, build verification |
 
 ## Design Index (docs/design/)
 
@@ -72,8 +73,23 @@ End users on iOS and Android devices. No other service depends on this domain.
 
 | Agent | File | Scope |
 |-------|------|-------|
-| Mobile Engineer | `.claude/agents/mobile-engineer.md` | Flutter app -- widgets, navigation, state, platform integration |
-| H5 Engineer | `.claude/agents/h5-engineer.md` | React/TS WebView pages -- JSBridge, compliance forms, marketing |
+| Mobile Engineer | `.claude/agents/mobile-engineer.md` | Flutter app — widgets, navigation, state, platform integration. **Spec-reference only: reads PRD / tech-spec / contracts / hifi prototype before implementing.** |
+| H5 Engineer | `.claude/agents/h5-engineer.md` | React/TS WebView pages — JSBridge, compliance forms, marketing |
+| UI Designer (UXUE) | `.claude/agents/ui-designer.md` (global) | High-fidelity HTML prototypes → `prototypes/{module}/hifi/`; upstream of mobile-engineer |
+
+## Design Handoff Flow
+
+```
+PM (PRD + lofi prototype)
+    ↓
+UXUE / ui-designer  →  prototypes/{module}/hifi/  +  tokens.css
+    ↓
+mobile-engineer  →  Flutter implementation
+```
+
+- Mobile engineer **must read hifi HTML before writing any Widget code**
+- Color/spacing values come from `tokens.css` variable names → `ColorTokens` in Dart
+- All states defined in the prototype's dev state switcher must be implemented
 
 ## Prototypes (prototypes/)
 
