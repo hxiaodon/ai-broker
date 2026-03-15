@@ -77,12 +77,14 @@
 
 Storage:
 ┌──────────────────────────────────────────────┐
-│  PostgreSQL                                  │
+│  MySQL 8.0+                                  │
 │  - fund_transfers (partitioned by month)     │
 │  - account_balances (real-time)              │
 │  - ledger_entries (immutable)                │
 │  - bank_accounts (encrypted)                 │
 │  - reconciliation_records                    │
+│  - virtual_accounts (入金匹配)               │
+│  - suspense_funds (悬挂资金)                 │
 └──────────────────────────────────────────────┘
 
 Event Bus:
@@ -149,7 +151,7 @@ CONFIRMED → LEDGER_UPDATED → COMPLETED
 
 | 通道 | 市场 | 到账时间 | 费用 | 限额 |
 |------|------|----------|------|------|
-| ACH | US | 3-5 工作日 | $0-3 | $250K/day |
+| ACH | US | T+1～T+3（Standard）/ 当日（Same Day ACH） | $0-3 | $250K/day |
 | Wire | US | 当日 | $15-30 | $1M/day |
 | FPS | HK | 实时 | HK$0-5 | HK$1M/day |
 | CHATS | HK | 当日 | HK$10-50 | HK$10M/day |
@@ -180,15 +182,18 @@ CONFIRMED → LEDGER_UPDATED → COMPLETED
 
 ## 7. 双币种处理
 
+> **注意**：下方"结算周期"指证券交易的 DTCC/HKSCC 结算周期（卖出股票后资金多久变为可提现），
+> 不是银行出入金渠道的到账时间。详见 `docs/references/clearing-settlement-primer.md`。
+
 **USD 账户**
-- 入金：ACH/Wire
-- 出金：ACH/Wire
-- 结算周期：T+1
+- 入金：ACH（T+1～T+3）/ Wire（当日）
+- 出金：ACH（T+1～T+3）/ Wire（当日）
+- 证券结算周期：T+1（美股，2024年5月起）
 
 **HKD 账户**
-- 入金：FPS/CHATS
-- 出金：FPS/CHATS
-- 结算周期：T+2
+- 入金：FPS（实时）/ CHATS（当日）
+- 出金：FPS（实时）/ CHATS（当日）
+- 证券结算周期：T+2（港股）
 
 **货币转换**
 - 使用实时汇率（Reuters/Bloomberg）
@@ -346,3 +351,14 @@ Autoscaling:
 - Webull: Wire transfer same-day processing
 - Tiger Brokers: Multi-currency account (USD/HKD/CNY)
 - Futu: FPS real-time deposit (HK market)
+
+## 17. 配套文档索引
+
+本文档描述整体架构与流程，以下文档覆盖更深层细节：
+
+| 文档 | 路径 | 内容 |
+|------|------|------|
+| 托管架构与入金匹配 | `docs/specs/fund-custody-and-matching.md` | Omnibus Account、虚拟账号/附言匹配、悬挂资金、资金边界、银行高可用 |
+| 清结算体系区分 | `docs/references/clearing-settlement-primer.md` | 银行清结算 vs 证券清结算，两套体系的唯一交汇点 |
+| 支付网络技术原理 | `docs/references/payment-networks-primer.md` | ACH/Wire/FPS 运营主体、技术本质、Bank Adapter 接口设计 |
+| 银行渠道文档索引 | `docs/references/bank-channel-docs.md` | JP Morgan、恒生、HKICL、Nacha 等公开文档链接 |

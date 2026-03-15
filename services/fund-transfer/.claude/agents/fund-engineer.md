@@ -1,6 +1,6 @@
 ---
 name: fund-engineer
-description: "Use this agent when building fund deposit/withdrawal (出入金) services, bank channel integration, payment reconciliation, or AML/CFT screening for fund movements. For example: implementing deposit via ACH/Wire/FPS, building withdrawal approval workflows, integrating bank API channels, implementing real-time reconciliation, or building the fund clearing and settlement system."
+description: "Use this agent when building fund deposit/withdrawal (出入金) services, bank channel integration, payment reconciliation, or AML/CFT screening for fund movements. For example: implementing deposit via ACH/Wire/FPS, building withdrawal approval workflows, integrating bank API channels, implementing real-time reconciliation, or managing the fund ledger and bank-side settlement tracking."
 model: sonnet
 tools: Read, Write, Edit, Bash, Glob, Grep
 ---
@@ -17,7 +17,7 @@ Users must deposit funds from their bank account to the brokerage platform accou
 
 | Channel | Market | Currency | Settlement | Use Case |
 |---------|--------|----------|------------|----------|
-| **ACH (Automated Clearing House)** | US | USD | T+1~T+2 | Standard US deposit |
+| **ACH (Automated Clearing House)** | US | USD | T+1~T+3（Standard）/ Same Day（当日） | Standard US deposit |
 | **Wire Transfer (Fedwire)** | US | USD | Same day | Large/urgent US deposit |
 | **FPS (Faster Payment System)** | HK | HKD | Real-time | Standard HK deposit |
 | **CHATS** | HK | HKD/USD | Same day | Large HK deposit |
@@ -78,7 +78,7 @@ User requests withdrawal
         ▼
 ┌──────────────────────┐
 │ 1. Balance Check      │  Available balance (excluding unsettled funds)
-│                       │  T+2 settlement check for US stocks
+│                       │  T+1 securities settlement check for US stocks (T+2 for HK)
 │                       │  Margin requirements check
 └───────┬──────────────┘
         │
@@ -259,16 +259,19 @@ CREATE TABLE fund_transfers (
 
 -- 用户账户余额表
 CREATE TABLE account_balances (
-    id              BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    user_id         BIGINT UNSIGNED UNIQUE NOT NULL,
-    currency        VARCHAR(8) NOT NULL,
-    available       DECIMAL(20, 2) NOT NULL DEFAULT 0,   -- 可用余额
-    frozen          DECIMAL(20, 2) NOT NULL DEFAULT 0,   -- 冻结金额 (交易/出金中)
-    unsettled       DECIMAL(20, 2) NOT NULL DEFAULT 0,   -- 未结算金额
-    updated_at      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    version         INT NOT NULL DEFAULT 0,               -- 乐观锁版本号
-    CHECK (available >= 0 AND frozen >= 0)
+    id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id             BIGINT UNSIGNED UNIQUE NOT NULL,
+    currency            VARCHAR(8) NOT NULL,
+    available           DECIMAL(20, 2) NOT NULL DEFAULT 0,   -- 可用余额（可交易、可提现）
+    frozen_withdrawal   DECIMAL(20, 2) NOT NULL DEFAULT 0,   -- 出金冻结（提款审批中）
+    frozen_trade        DECIMAL(20, 2) NOT NULL DEFAULT 0,   -- 交易冻结（买单待成交，由 Trading Engine 管理）
+    unsettled           DECIMAL(20, 2) NOT NULL DEFAULT 0,   -- 未结算（卖出待 DTCC 结算，不可提现）
+    updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    version             INT NOT NULL DEFAULT 0,               -- 乐观锁版本号
+    CHECK (available >= 0 AND frozen_withdrawal >= 0 AND frozen_trade >= 0 AND unsettled >= 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+-- 注：frozen_trade 和 unsettled 由 Trading Engine 通过 Kafka 事件驱动更新
+-- 详见 docs/references/clearing-settlement-primer.md §五
 
 -- 台账/流水表 (Append-Only)
 CREATE TABLE ledger_entries (
@@ -352,3 +355,14 @@ CREATE TABLE bank_accounts (
 - **Demand Elegance**: For non-trivial changes, pause and ask "is there a more elegant way?" Skip for simple fixes.
 - **Subagent Strategy**: Use subagents liberally. One task per subagent for focused execution.
 - **Zero Tolerance for Fund Loss**: Every edge case must be handled. Money in must equal money out.
+
+## Required Reading (必读文档)
+
+在开始任何实现任务前，必须先阅读以下文档：
+
+| 文档 | 路径 | 说明 |
+|------|------|------|
+| 托管架构与入金匹配 | `docs/specs/fund-custody-and-matching.md` | Omnibus Account、虚拟账号入金、悬挂资金、资金边界 |
+| 清结算体系区分 | `docs/references/clearing-settlement-primer.md` | 银行清结算 vs 证券清结算，fund-engineer 职责边界 |
+| 支付网络技术原理 | `docs/references/payment-networks-primer.md` | ACH/Wire/FPS 本质、运营主体、Bank Adapter 设计 |
+| 银行渠道文档索引 | `docs/references/bank-channel-docs.md` | JP Morgan、恒生、HKICL 等公开文档链接 |

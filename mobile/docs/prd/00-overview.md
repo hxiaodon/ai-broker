@@ -1,9 +1,9 @@
 # PRD 总览 — 环球通证券 App (Phase 1 MVP)
 
 > **文档状态**: Phase 1 正式版
-> **版本**: v2.0
-> **日期**: 2026-03-14
-> **变更说明**: v2.0 整改 — 移除技术约束（归入工程师文档），补充产品目标、用户画像、成功指标；原型索引更新
+> **版本**: v2.1
+> **日期**: 2026-03-15
+> **变更说明**: v2.1 修复 — 在用户核心旅程章节补充各阶段低保真原型索引链接
 
 > **原型索引**：[查看所有低保真原型](prototypes/README.md)
 
@@ -126,6 +126,8 @@ flowchart LR
 
 ## 六、用户核心旅程
 
+> **低保真原型起点**：[从冷启动开始体验完整旅程](prototypes/01-auth/index.html)（依次跳转：登录 → KYC → 行情 → 下单 → 持仓 → 资金）
+
 ```mermaid
 flowchart TD
     A([下载 App]) --> B{是否先逛逛?}
@@ -149,6 +151,19 @@ flowchart TD
     L --> M[成交通知\n持仓更新]
     M --> N([长期活跃用户])
 ```
+
+**各阶段对应低保真原型：**
+
+| 旅程阶段 | 原型文件 |
+|---------|---------|
+| 冷启动 / OTP 登录 | [01-auth/index.html](prototypes/01-auth/index.html) |
+| KYC 7步开户 | [02-kyc/index.html](prototypes/02-kyc/index.html) |
+| 行情浏览 / 搜索 | [03-market/index.html](prototypes/03-market/index.html) |
+| 股票详情 / K线 | [03-market/stock-detail.html](prototypes/03-market/stock-detail.html) |
+| 委托下单 | [04-trading/order-entry.html](prototypes/04-trading/order-entry.html) |
+| 订单管理 | [04-trading/order-list.html](prototypes/04-trading/order-list.html) |
+| 入金 | [05-funding/deposit.html](prototypes/05-funding/deposit.html) |
+| 持仓总览 | [06-portfolio/index.html](prototypes/06-portfolio/index.html) |
 
 ---
 

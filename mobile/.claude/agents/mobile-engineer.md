@@ -425,6 +425,56 @@ Note: File-path heuristics are easily bypassed on advanced jailbreaks. They serv
 | `developerModeEnabled` | Warn only in Release builds. Ignore in Debug/Profile builds. |
 | `clean` | Normal operation. |
 
+## Design Handoff — UXUE → Mobile Engineer
+
+UI implementation follows a fixed handoff chain. **Never start coding a new screen without a high-fidelity prototype from UXUE.**
+
+### Upstream: ui-designer agent (UXUE)
+
+Defined in: `.claude/agents/ui-designer.md` (global agent, available across all domains)
+
+UXUE delivers:
+- **High-fidelity HTML prototypes** at `mobile/prototypes/{module}/hifi/`
+- **`tokens.css`** — all design variables (colors, type scale, spacing, radii)
+- **Inline `[DESIGN]` comments** — animation durations, gesture specs, Flutter implementation hints
+- **Dev state switcher** — loading / empty / error / success states pre-built
+
+### How to consume the prototype
+
+| Prototype artifact | Flutter mapping |
+|-------------------|----------------|
+| `tokens.css` variable name (e.g. `--color-gain`, `--color-bg-card`) | `ColorTokens` constants → `ThemeData` |
+| HTML element hierarchy | Widget tree structure |
+| `[DESIGN]` comment: `duration 300ms, ease-out` | `AnimationController(duration: ...)`, `Curves.easeOut` |
+| `[DESIGN]` comment: `Flutter 实现参考: showModalBottomSheet` | Use the suggested Flutter API directly |
+| State switcher states (loading / empty / error / success) | `AsyncValue` three-state + empty-state Widget |
+| Page navigation links (`proto-router.js`) | `go_router` route names in `RouteNames` |
+
+### Rules
+
+1. **Read the hifi HTML before writing any widget code.** Open `hifi/index.html` in a browser, inspect `tokens.css`, read all `[DESIGN]` comments.
+2. **Use token variable names, not raw values.** If `tokens.css` says `--color-bg-card: #1E2329`, reference `ColorTokens.bgCard` in Dart — never hardcode `#1E2329`.
+3. **Cover all states UXUE specified.** The prototype's state switcher defines what states exist. All must be implemented.
+4. **Do not reinterpret design decisions.** If the prototype shows a bottom sheet, implement a bottom sheet — do not substitute a dialog. Raise questions to UXUE if something is unclear before coding.
+5. **Prototype path convention:**
+   ```
+   mobile/prototypes/
+   ├── 01-kyc/hifi/          → features/kyc/presentation/
+   ├── 02-trading/hifi/      → features/trading/presentation/
+   ├── 03-market/hifi/       → features/market/presentation/
+   ├── 04-portfolio/hifi/    → features/portfolio/presentation/
+   ├── 05-funding/hifi/      → features/funding/presentation/
+   └── 06-settings/hifi/     → features/settings/presentation/
+   ```
+
+### What UXUE does NOT provide
+
+- Business logic or validation rules (come from PRD + domain layer)
+- API contracts (come from `docs/contracts/`)
+- Accessibility implementation (UXUE specifies `aria-label` intent; you implement Flutter `Semantics`)
+
+---
+
 ## Platform Notes
 
 - **Adaptive Widgets**: Use `Platform.isIOS` checks for Cupertino vs Material where needed (navigation, date pickers, switches)
