@@ -35,23 +35,25 @@ Responsibilities:
 | `docs/specs/data-flow.md` | Data flow v2.1: feed→engine→Redis→WS dual-track, Kafka topics, cold-start backfill procedure |
 | `docs/references/market-data-industry-research.md` | Industry research: licensing (Polygon Poly.feed+, CTA/UTP), price adjustment formulas, NBBO/SIP, stale thresholds, open-source references |
 | `docs/threads/` | Collaboration threads |
-| `api/grpc/market_data.proto` | Protobuf message definitions |
-| `scripts/init_db.sql` | MySQL schema and seed data (needs update to v2.1 DDL) |
-| `config/config.yaml` | Service configuration |
+| `docs/specs/api/grpc/market_data.proto` | Protobuf message definitions |
+| `src/scripts/init_db.sql` | MySQL schema and seed data (needs update to v2.1 DDL) |
+| `src/config/config.yaml` | Service configuration |
 
 ## Code Layout
 
 ```
-cmd/server/main.go         -- Entry point
-internal/api/              -- HTTP handlers
-internal/service/          -- Business logic
-internal/repository/       -- MySQL data access (quote, kline, stock, watchlist, news, financial, hot_search)
-internal/websocket/        -- WebSocket hub, handler, mock pusher
-internal/config/           -- Config loading
-pkg/cache/                 -- Redis wrapper
-pkg/database/              -- MySQL connection
-pkg/kafka/                 -- Kafka consumer
-pkg/polygon/               -- Polygon API client
+src/
+├── cmd/server/main.go         -- Entry point
+├── internal/api/              -- HTTP handlers
+├── internal/service/          -- Business logic
+├── internal/repository/       -- MySQL data access (quote, kline, stock, watchlist, news, financial, hot_search)
+├── internal/websocket/        -- WebSocket hub, handler, mock pusher
+├── internal/config/           -- Config loading
+├── pkg/cache/                 -- Redis wrapper
+├── pkg/database/              -- MySQL connection
+├── pkg/kafka/                 -- Kafka consumer
+├── pkg/polygon/               -- Polygon API client
+└── api/grpc/market_data.pb.go -- Generated protobuf code
 ```
 
 ## Dependencies

@@ -27,9 +27,10 @@ Responsibilities:
 |------|---------|
 | `docs/prd/` | Domain PRDs -- KYC rules, account lifecycle (TBD) |
 | `docs/specs/` | Tech specs -- auth flow, KYC pipeline design |
+| `docs/specs/api/grpc/` | gRPC proto definitions |
+| `docs/specs/api/rest/` | REST OpenAPI specs (TBD) |
 | `docs/threads/` | Collaboration threads for AMS decisions |
-| `api/grpc/` | gRPC proto definitions (code-as-doc) |
-| `api/rest/` | REST OpenAPI specs (TBD) |
+| `src/internal/` | Implementation (TBD) |
 
 ## Dependencies
 

@@ -37,10 +37,10 @@ Responsibilities:
 | `docs/references/payment-networks-primer.md` | **必读**：ACH/Wire/FPS 运营主体、技术本质、接入方式、Bank Adapter 设计含义 |
 | `docs/references/clearing-settlement-primer.md` | **必读**：出入金清结算 vs 证券清结算的区别、两套体系的唯一交汇点、fund-engineer 职责边界 |
 | `docs/threads/` | Collaboration threads |
-| `api/grpc/` | gRPC proto definitions |
-| `api/rest/` | REST OpenAPI specs (TBD) |
-| `migrations/` | MySQL schema migrations |
-| `internal/` | Implementation: transfer, bank, compliance, ledger, reconciliation |
+| `docs/specs/api/grpc/fund_transfer.proto` | gRPC proto definitions |
+| `docs/specs/api/rest/` | REST OpenAPI specs (TBD) |
+| `src/migrations/` | MySQL schema migrations |
+| `src/internal/` | Implementation: transfer, bank, compliance, ledger, reconciliation |
 
 ## Dependencies
 

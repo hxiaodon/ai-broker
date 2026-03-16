@@ -24,6 +24,7 @@
 9. [账户系统架构模式](#9-账户系统架构模式)
 10. [合规字段保留策略](#10-合规字段保留策略)
 11. [待决策项](#11-待决策项)
+12. [参考文献](#参考文献)
 
 ---
 
@@ -899,6 +900,62 @@ CREATE TABLE account_currency_pockets (
 | 6 | KYC 文件核验用哪家第三方服务（如 Jumio、Onfido、iDenfy）？ | 开户流程、供应商 | High |
 | 7 | 制裁筛查用哪家第三方服务（如 Dow Jones Risk & Compliance、Refinitiv）？ | AML 管道 | High |
 | 8 | 港股非面对面开户的"指定银行"列表确定了吗？ | 开户流程 | High |
+
+---
+
+---
+
+## 参考文献
+
+本文档的设计结论来自两轮系统性调研，详细资料见 [`docs/references/ams-industry-research.md`](../../../docs/references/ams-industry-research.md)。下表列出各章节的主要出处。
+
+### 监管法规（§1–§6、§10）
+
+| 结论 | 出处 | Reference 章节 |
+|------|------|----------------|
+| 美股 KYC 必填字段（姓名、DOB、SSN 等） | USA PATRIOT Act §326、FINRA Rule 4512、31 CFR §1023.220 | §4 KYC/CIP 要求对比 |
+| 港股 KYC 必填字段（HKID、地址证明等） | AMLO Cap. 615 Schedule 2、SFC Code of Conduct 2024年10月版 Para.5.1 | §4 KYC/CIP 要求对比 |
+| UBO 穿透门槛 ≥25% | FinCEN 31 CFR §1010.230（美股）、AMLO Schedule 2（港股） | §4 KYC/CIP 要求对比 |
+| 受信联络人（TCP）— 美股非机构账户须努力获取 | FINRA Rule 4512（2018年生效，2025年仍执行） | §4 KYC/CIP 要求对比 |
+| 港股非面对面开户：指定银行转账 ≥ HK$10,000 | SFC《可接受的账户开立方式》 | §2 港股监管框架 §2.5 |
+| W-8BEN 3年有效期、到期预扣30% FATCA | IRS Form W-8BEN Instructions | §4 KYC/CIP 要求对比 §4.3 |
+| PEP 分类：中国内地官员属于 Non-HK PEP（强制EDD） | SFC AML/CFT 指引 2023年6月版、AMLO 2023修订 | §2 港股监管框架 §2.3 |
+| PI 认定门槛（HK$800万）及年度更新 | SFO Cap. 571 Schedule 1 Part 1、Cap. 571D | §2 港股监管框架 §2.4 |
+| 制裁筛查名单（OFAC SDN、UN UNSO/UNATMO） | BSA、UNSO Cap. 537 | §5 AML 合规对比 §5.1 |
+| SAR：≥$5,000 触发，30天申报，严禁 Tipping-Off | 31 CFR §1023.320 | §1 美股监管框架 §1.5 |
+| STR：JFIU STREAMS 2 平台（2026年2月启用） | JFIU 官方公告 | §8 监管动态 |
+| PDT 规则 $25,000 仍有效（修订案未生效） | FINRA Rule 4210(f)(8)、FINRA RN 24-13 | §8 监管动态 |
+| 合规记录保存期限（7年审计、6年KYC） | SEC Rule 17a-4、AMLO Cap. 615 Section 20 | §4 KYC/CIP 要求对比 |
+| Margin 初始50%、维持25%、最低$2,000 | Regulation T、FINRA Rule 4210 | §1 美股监管框架 §1.3 |
+| 港股 Margin 需 SFC Type 8 牌照 | SFC 证券孖展融资活动指引 | §2 港股监管框架 §1.2 |
+| FD 全权委托需 SFC Type 9 牌照 | SFC Code of Conduct | §2 港股监管框架 §1.3 |
+| SFC 风险问卷不得在短时间内反复修改 | SFC 2022年在线平台审查（Circular Ref 22EC52） | §2 港股监管框架 §2.3 |
+
+### 行业标准（§9.1–§9.3）
+
+| 结论 | 出处 | Reference 章节 |
+|------|------|----------------|
+| AccountOwnershipType 枚举（SIGL/JOIT/CORP/TRUS/CUST） | ISO 20022 acmt 消息族 | §9 行业标准数据模型 §9.1 |
+| Party-Account 角色分离（OWNE/JOWN/AUTH/BENE/ACCS） | ISO 20022 acmt.001 AccountOpeningInstruction | §9 行业标准数据模型 §9.1 |
+| 账户多维分类：枚举+JSON+关联表三层建模 | Berlin Group NextGenPSD2（usage/cashAccountType 正交）、Apache Fineract capabilities | §9 行业标准数据模型 §9.2；§12 设计模式总结 |
+| 状态百位整数编码（100/200/300...预留子状态） | Apache Fineract m_savings_account status_enum | §10 开源实现参考 §10.2 |
+| 生命周期时间戳完整记录（每节点存时间+操作人） | Apache Fineract m_savings_account 时间戳字段设计 | §10 开源实现参考 §10.2 |
+| 账户状态的 RESTRICTED 子类型 | Alpaca Broker API account status 枚举 | §10 开源实现参考 §10.1 |
+| 能力懒激活（达到门槛才开放权限） | Alpaca Broker API（净值达 $2,000 才激活 Margin） | §10 开源实现参考 §10.1 |
+
+### Fintech 架构模式（§9.4–§9.8）
+
+| 结论 | 出处 | Reference 章节 |
+|------|------|----------------|
+| 余额不直接存储，从分录（Entry）聚合推导 | Martin Fowler Analysis Patterns（Account/Entry/PostingRule）、Stripe Ledger、Monzo Ledger | §11 Fintech 架构分享 §11.1 §11.2 §11.4 |
+| 冲正必须用 Reversal 模式（负数分录），不能修改原记录 | Martin Fowler Analysis Patterns（三种错误更正模式） | §11 Fintech 架构分享 §11.5 |
+| LedgerAddress 多维度记账（避免不同用途资金混账） | Monzo Engineering Blog（2023年3月余额性能优化） | §11 Fintech 架构分享 §11.2 |
+| 余额快照策略（每N条分录触发快照，避免性能退化） | Monzo（快照迁移解决 P99 延迟）、Event Sourcing 最佳实践 | §11 Fintech 架构分享 §11.2 |
+| 购买力三层语义分字段（cash/unsettled/margin） | Robinhood 账户模型（buying_power/regt_buying_power/daytrading_buying_power） | §11 Fintech 架构分享 §11.4 |
+| 三方自动核对（内部账本↔银行流水↔托管账户） | Stripe Data Quality Platform | §11 Fintech 架构分享 §11.1 |
+| 多货币 Currency Pocket 子账户（USD/HKD 独立记账） | Revolut 多货币账户架构 | §11 Fintech 架构分享 §11.3 |
+| 动态 KYC 旅程（可配置工作流，非硬编码步骤） | Ballerine 开源 KYC 引擎（YC 支持） | §10 开源实现参考 §10.3 |
+| 双层账户：AMS 是受益所有权层，清算层是名义持有层 | CCASS HKSCC-NOMS、DTCC Cede & Co. 结构 | §9 行业标准数据模型 §9.1 |
 
 ---
 

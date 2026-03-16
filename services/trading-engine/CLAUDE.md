@@ -26,13 +26,22 @@ Responsibilities:
 
 | Path | Content |
 |------|---------|
-| `docs/prd/` | Domain PRDs -- order lifecycle, risk rules, settlement (TBD) |
-| `docs/specs/trading-system.md` | System architecture and tech design |
+| `docs/specs/research-index.md` | **Start here** — cross-domain dependency map, compliance checklist, Kafka topics, performance targets |
+| `docs/specs/domains/01-order-management.md` | OMS deep-dive: state machine, event sourcing, CQRS, idempotency |
+| `docs/specs/domains/02-pre-trade-risk.md` | Risk pipeline: 8 checks, PDT, Reg SHO, buying power formula |
+| `docs/specs/domains/03-smart-order-routing.md` | SOR: Reg NMS, NBBO, multi-factor scoring, order slicing |
+| `docs/specs/domains/04-execution-fix.md` | FIX 4.4: QuickFIX/Go, ExecutionReport handling, reconnect |
+| `docs/specs/domains/05-position-pnl.md` | Position: FIFO, weighted avg cost, corporate actions, real-time P&L |
+| `docs/specs/domains/06-margin.md` | Margin: Reg T, FINRA 4210, margin call workflow, liquidation |
+| `docs/specs/domains/07-settlement.md` | Settlement: T+1 US / T+2 HK, NSCC/CCASS, reconciliation, fees |
+| `docs/specs/domains/08-compliance-audit.md` | Audit: SEC 17a-4, CAT reporting, WORM storage, PII masking |
+| `docs/specs/trading-system.md` | Overall system architecture (high-level overview) |
+| `docs/specs/api/grpc/trading.proto` | gRPC service definitions (authoritative interface contracts) |
+| `src/migrations/` | MySQL schema migrations (authoritative DB schema) |
+| `src/internal/` | Go interfaces: order, risk, routing, fix, margin, position, settlement |
+| `docs/prd/` | Domain PRDs (TBD) |
 | `docs/threads/` | Collaboration threads for trading decisions |
-| `api/grpc/trading.proto` | gRPC service definitions |
-| `api/rest/` | REST OpenAPI specs (TBD) |
-| `migrations/` | MySQL schema migrations |
-| `internal/` | Implementation: order, risk, routing, fix, margin, position, settlement |
+| `docs/specs/api/rest/` | REST OpenAPI specs (TBD) |
 
 ## Dependencies
 
