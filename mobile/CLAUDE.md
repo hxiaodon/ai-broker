@@ -22,6 +22,19 @@ Everything the end user sees and touches lives here. Backend business logic live
 
 Financial calculations must use `Decimal` from `package:decimal` -- never `double`.
 
+## Source Layout
+
+Flutter project root is `src/`. All `flutter`/`dart` commands must be run from `mobile/src/`.
+
+```
+src/
+├── lib/          -- Dart application code
+├── ios/          -- iOS native project
+├── android/      -- Android native project
+├── pubspec.yaml  -- Dependency manifest
+└── build/        -- Build artifacts (gitignored)
+```
+
 ## PRD Index (docs/prd/)
 
 | File | Scope |

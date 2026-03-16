@@ -13,12 +13,12 @@ dist/
 *.out
 vendor/
 
-# Mobile
-mobile/.gradle/
-mobile/.kotlin/
-mobile/build/
-mobile/*/build/
-mobile/local.properties
+# Mobile (Flutter project root is mobile/src/)
+mobile/src/.gradle/
+mobile/src/.kotlin/
+mobile/src/build/
+mobile/src/android/build/
+mobile/src/local.properties
 *.xcuserdata/
 *.xcworkspace/
 DerivedData/
