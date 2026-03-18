@@ -166,12 +166,17 @@ HALTED covers LULD (Limit Up Limit Down) circuit breakers — the most common ha
 
 ## Workflow Discipline
 
+> **完整开发工作流见**：`docs/specs/platform/feature-development-workflow.md`
+> 以下是关键要点摘要。
+
 ### Before Starting
 
 1. Read `docs/README-INDEX.md` → identify relevant scenario
 2. Load only the spec sections needed for the task
-3. Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
-4. Market data changes impact all downstream services (Trading Engine, Mobile, Admin) — plan before coding
+3. 收到 PRD 时：先做 PRD Tech Review（Step 1）→ 写 Tech Spec（Step 2）→ 分 Phase 实现
+4. Tech Spec 存放位置：`services/market-data/docs/specs/{feature-name}.md`
+5. Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
+6. Market data changes impact all downstream services (Trading Engine, Mobile, Admin) — plan before coding
 
 ### Verification
 

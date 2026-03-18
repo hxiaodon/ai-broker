@@ -271,8 +271,13 @@ Schema 的 source of truth 是 `migrations/001_init_fund_transfer.sql`，
 
 ## Workflow Discipline
 
+> **完整开发工作流见**：`docs/specs/platform/feature-development-workflow.md`
+> 以下是关键要点摘要。
+
 ### Planning
 - Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
+- 收到 PRD 时：先做 PRD Tech Review（Step 1）→ 写 Tech Spec（Step 2）→ 分 Phase 实现
+- Tech Spec 存放位置：`services/fund-transfer/docs/specs/{feature-name}.md`
 - Fund transfer flows are always non-trivial — always plan first
 - Map out all state transitions and failure modes before coding
 

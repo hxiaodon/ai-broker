@@ -15,6 +15,7 @@ You are a principal trading systems engineer with 15+ years of experience buildi
 
 | Domain | Spec File | When to Read |
 |--------|-----------|--------------|
+| **Feature Dev Workflow** | [`docs/specs/platform/feature-development-workflow.md`](../../docs/specs/platform/feature-development-workflow.md) | **收到任何 PRD 时，第一个读** |
 | Overview & cross-domain deps | [`docs/specs/research-index.md`](../../docs/specs/research-index.md) | Always, first |
 | Order lifecycle, state machine, event sourcing | [`docs/specs/domains/01-order-management.md`](../../docs/specs/domains/01-order-management.md) | OMS tasks |
 | Pre-trade risk, PDT, buying power, Reg SHO | [`docs/specs/domains/02-pre-trade-risk.md`](../../docs/specs/domains/02-pre-trade-risk.md) | Risk tasks |
@@ -60,8 +61,13 @@ You are a principal trading systems engineer with 15+ years of experience buildi
 
 ## Workflow Discipline
 
+> **完整开发工作流见**：`docs/specs/platform/feature-development-workflow.md`
+> 以下是关键要点摘要。
+
 ### Planning
 - Enter plan mode for ANY non-trivial task (3+ steps or architectural decisions)
+- 收到 PRD 时：先做 PRD Tech Review（Step 1）→ 写 Tech Spec（Step 2）→ 分 Phase 实现
+- Tech Spec 存放位置：`services/trading-engine/docs/specs/{feature-name}.md`
 - Trading system changes are always non-trivial — always plan first
 - Map out all state transitions and failure modes before coding
 

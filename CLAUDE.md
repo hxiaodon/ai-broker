@@ -108,6 +108,8 @@ Flutter Mobile / H5 WebView / Admin Panel (React)
 | `/api-test` | API integration tests |
 | `/review-checklist` | Domain-specific code review checklist |
 | `/sdd` | Spec-driven design: audit, plan, migrate, scaffold |
+| `/db-migrate` | Generate goose migration file with financial-services DDL rules enforcement |
+| `/scaffold-verify` | Full verification checklist for scaffolded Go services (DDD layers, Wire, compliance, spec) |
 
 ## TODO
 - [ ] Configure MySQL MCP server in `.mcp.json`
