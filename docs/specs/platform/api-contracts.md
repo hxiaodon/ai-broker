@@ -17,6 +17,28 @@ applies_to:
 
 > 本文档是平台级 API 契约工程标准。所有服务间接口定义、消息体 schema、HTTP DTO 的管理方式必须遵循本规范。
 
+## 开发阶段定位
+
+**Proto 定义在 Contract Definition 阶段完成**，是 Tech Spec（L3）的前置条件。
+
+```
+PRD (L1)
+    ↓
+PRD Tech Review
+    ↓
+Contract Definition  ← proto 在这里定义（api/*.proto + docs/contracts/*.md）
+    ↓
+Tech Spec (L3)       ← 引用 Contract，设计内部实现
+    ↓
+Implementation (L4)
+```
+
+**Contract-First 原则**：前后端并行开工的前提是 Contract 先定义好。Proto 定义完成并 `buf generate` 成功后，服务端、Mobile、Admin Panel 可同时开始实现。
+
+详见 `docs/specs/platform/feature-development-workflow.md` Step 1.5。
+
+---
+
 ## 1. 核心原则
 
 **Proto-first**：所有跨服务接口和 Kafka 消息体以 `.proto` 文件为唯一来源。不做手写共享 Go DTO 包。
