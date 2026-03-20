@@ -31,6 +31,9 @@ Responsibilities:
 |------|---------|
 | `docs/prd/09-admin-panel.md` | Surface PRD -- full admin panel feature spec (Phase 1) |
 | `docs/specs/` | Tech specs (TBD) |
+| `docs/specs/*.tracker.md` | 实现跟踪文件（动态进度 + 验收记录） |
+| `docs/active-features.yaml` | 域级功能实现进度仪表盘 |
+| `docs/patches.yaml` | Patch 注册表（活跃补丁 + 技术债） |
 | `src/` | React application source |
 
 ## Dependencies

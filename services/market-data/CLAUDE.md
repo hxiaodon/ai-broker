@@ -33,6 +33,9 @@ Responsibilities:
 | `docs/specs/market-api-spec.md` | REST API v2.1: all 10 endpoints, `is_stale` field, change/change_pct basis definition, adjusted price notes |
 | `docs/specs/websocket-mock.md` | WebSocket protocol v2.1: full auth flow (message-based, not URL param), dual-track push (registered/guest), `is_stale` field |
 | `docs/specs/data-flow.md` | Data flow v2.1: feed→engine→Redis→WS dual-track, Kafka topics, cold-start backfill procedure |
+| `docs/specs/*.tracker.md` | 实现跟踪文件（动态进度 + 验收记录） |
+| `docs/active-features.yaml` | 域级功能实现进度仪表盘 |
+| `docs/patches.yaml` | Patch 注册表（活跃补丁 + 技术债） |
 | `docs/references/market-data-industry-research.md` | Industry research: licensing (Polygon Poly.feed+, CTA/UTP), price adjustment formulas, NBBO/SIP, stale thresholds, open-source references |
 | `docs/threads/` | Collaboration threads |
 | `docs/specs/api/grpc/market_data.proto` | Protobuf message definitions |

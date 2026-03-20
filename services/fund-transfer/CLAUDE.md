@@ -33,6 +33,9 @@ Responsibilities:
 | `docs/specs/failure-handling-matrix.md` | 出入金全场景失败处理矩阵、补偿事务、状态修复 SLA |
 | `docs/specs/fx-conversion-flow.md` | 换汇完整流程、锁价机制、账本分录、失败补偿、风控规则 |
 | `docs/specs/operations-and-edge-cases.md` | 节假日处理、限额逻辑、CTR/SAR 申报、Admin 审批队列、银行账户生命周期 |
+| `docs/specs/*.tracker.md` | 实现跟踪文件（动态进度 + 验收记录） |
+| `docs/active-features.yaml` | 域级功能实现进度仪表盘 |
+| `docs/patches.yaml` | Patch 注册表（活跃补丁 + 技术债） |
 | `docs/references/bank-channel-docs.md` | 银行渠道对接文档索引（JP Morgan、恒生、HKICL、Nacha 等公开文档链接及价值说明） |
 | `docs/references/payment-networks-primer.md` | **必读**：ACH/Wire/FPS 运营主体、技术本质、接入方式、Bank Adapter 设计含义 |
 | `docs/references/clearing-settlement-primer.md` | **必读**：出入金清结算 vs 证券清结算的区别、两套体系的唯一交汇点、fund-engineer 职责边界 |

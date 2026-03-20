@@ -27,6 +27,9 @@ Responsibilities:
 |------|---------|
 | `docs/prd/` | Domain PRDs -- KYC rules, account lifecycle (TBD) |
 | `docs/specs/` | Tech specs -- auth flow, KYC pipeline design |
+| `docs/specs/*.tracker.md` | 实现跟踪文件（动态进度 + 验收记录） |
+| `docs/active-features.yaml` | 域级功能实现进度仪表盘 |
+| `docs/patches.yaml` | Patch 注册表（活跃补丁 + 技术债） |
 | `docs/specs/api/grpc/` | gRPC proto definitions |
 | `docs/specs/api/rest/` | REST OpenAPI specs (TBD) |
 | `docs/threads/` | Collaboration threads for AMS decisions |

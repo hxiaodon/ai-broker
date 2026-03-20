@@ -36,6 +36,9 @@ Responsibilities:
 | `docs/specs/domains/07-settlement.md` | Settlement: T+1 US / T+2 HK, NSCC/CCASS, reconciliation, fees |
 | `docs/specs/domains/08-compliance-audit.md` | Audit: SEC 17a-4, CAT reporting, WORM storage, PII masking |
 | `docs/specs/trading-system.md` | Overall system architecture (high-level overview) |
+| `docs/specs/*.tracker.md` | 实现跟踪文件（动态进度 + 验收记录） |
+| `docs/active-features.yaml` | 域级功能实现进度仪表盘 |
+| `docs/patches.yaml` | Patch 注册表（活跃补丁 + 技术债） |
 | `docs/specs/api/grpc/trading.proto` | gRPC service definitions (authoritative interface contracts) |
 | `src/migrations/` | MySQL schema migrations (authoritative DB schema) |
 | `src/internal/` | Go interfaces: order, risk, routing, fix, margin, position, settlement |

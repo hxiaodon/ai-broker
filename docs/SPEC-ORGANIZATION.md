@@ -68,6 +68,10 @@ repo-root/
 │   │   ├── docs/
 │   │   │   ├── prd/                       # AMS 域 Domain PRD（业务规则）
 │   │   │   ├── specs/                     # 域内技术设计
+│   │   │   │   ├── {feature}.md           #   Tech Spec（静态）
+│   │   │   │   └── {feature}.tracker.md   #   实现跟踪（动态）
+│   │   │   ├── active-features.yaml       # 域级功能实现进度仪表盘
+│   │   │   ├── patches.yaml               # 域级 Patch 注册表（活跃补丁 + 技术债）
 │   │   │   ├── threads/                   # 域内讨论
 │   │   │   └── db/                        # 数据模型
 │   │   ├── api/
@@ -543,6 +547,9 @@ contracts:
 depends_on:
   - services/ams/api/grpc/ams.proto                # 我依赖谁的接口
   - services/market-data/api/grpc/market.proto
+code_paths:                                       # Spec-Code 漂移检测锚点
+  - src/internal/domain/order/                    # Phase 6 完成后填写
+  - src/internal/app/place_order_usecase.go
 ---
 
 # 订单状态机技术设计
@@ -556,6 +563,7 @@ depends_on:
 - `implements` 指向上游 PRD（Source of Truth）
 - `contracts` 指向本域对外暴露的接口契约
 - `depends_on` 指向本域消费的外部接口
+- `code_paths` 指向实现代码的关键路径（Phase 6 完成后填写，用于漂移检测）
 - 引用关系仅在 frontmatter 中声明，正文中用超链接辅助阅读
 
 ---
@@ -865,6 +873,9 @@ YYYY-MM-DDTHH:MMZ           （UTC）
 | Surface PRD | `<序号>-<模块>.md` | `04-trading.md` |
 | Domain PRD | `<主题>.md`（kebab-case） | `order-lifecycle.md`, `risk-rules.md` |
 | 技术 Spec | `<主题>.md`（kebab-case） | `order-state-machine.md` |
+| 实现 Tracker | `<主题>.tracker.md` | `order-state-machine.tracker.md` |
+| 域级功能仪表盘 | `active-features.yaml` | — |
+| Patch 注册表 | `patches.yaml` | — |
 | 接口契约 | `<提供方>-to-<消费方>.md` | `trading-to-fund.md` |
 | Thread 目录 | `<年月>-<主题>/` | `2026-03-pdt-hard-block/` |
 | Thread 消息 | `<序号>-<动作>.md` | `01-tech-raise.md` |
@@ -966,6 +977,10 @@ dependencies:
 ## [WARM] 按需加载（处理相关任务时主动读取）
 - Domain PRD: docs/prd/*.md
 - Tech Specs: docs/specs/*.md
+- 实现跟踪: docs/specs/*.tracker.md
+- 功能进度仪表盘: docs/active-features.yaml
+- Patch 注册表: docs/patches.yaml
+- 测试覆盖率报告: （CI 生成）
 - DB Schema: docs/db/schema-overview.md
 - 活跃 Thread: docs/threads/（status=OPEN）
 规则: 单次加载 < 5 个文件
@@ -1092,3 +1107,33 @@ A: 单 repo 阶段 URI 是可选的。解析规则：`brokerage://<domain>/<type
 
 ### Q: 什么时候应该把一个域拆成独立 repo？
 A: 满足以下任意两条即可考虑：(1) 代码量超过 100K 行；(2) 独立的发布节奏（不想被其他域的变更阻塞）；(3) 独立的团队负责（不和其他域共享开发者）；(4) AI agent 上下文经常溢出。
+
+### Q: `.tracker.md` 文件和 Tech Spec §8 的关系是什么？
+A: Tech Spec §8 是**静态任务定义模板**（定义要做什么，用 `[CREATE]`/`[MODIFY]`/`[SKIP]` 标记），在 Spec 定稿后冻结不再修改。`.tracker.md` 是**动态实现跟踪文件**（记录做到哪了），在 Step 3 开始实现时从 §8 生成，实施期间持续更新。两者分离是为了避免频繁"打勾提交"污染 Spec 的 git history。详见 `docs/specs/platform/feature-development-workflow.md` 的「任务跟踪规范」章节。
+
+### Q: `.tracker.md` 什么时候创建？谁来维护？
+A: 功能进入 Step 3（开始分 Phase 实现）时创建，由负责该功能的 domain engineer 维护。创建时从 Tech Spec §8 提取任务列表，所有任务初始化为 ⏳ pending。每个任务状态变更时更新 Markdown 表格，每个 Phase 推进时更新 YAML frontmatter。
+
+### Q: `active-features.yaml` 和 `active-threads.yaml` 的关系是什么？
+A: 它们是同构的域级索引文件。`active-threads.yaml` 追踪活跃的讨论线程（谁在等谁的输入），`active-features.yaml` 追踪活跃的功能实现（哪个功能在哪个 Phase、有无阻塞）。AI Orchestrator 在路由任务时先读这两个文件，即可掌握全域的讨论和实现进度。
+
+### Q: 功能完成后 `.tracker.md` 怎么处理？
+A: 永久保留，不删除。Tracker 文件中的验收记录是审计追溯的依据。在 `active-features.yaml` 中从 `active` 区移入 `completed` 区即可。
+
+### Q: `patches.yaml` 是什么？什么时候需要写入？
+A: `patches.yaml` 是域级的补丁注册表，记录活跃的 workaround 和技术债。仅在修复代码**未来需要被替换**时才需要写入（Category C 临时方案 / Category D 技术债发现）。简单 Bug 修复（Category A）和 Spec 缺陷回更（Category B）不需要。详见 `docs/specs/platform/feature-development-workflow.md` 的「紧急修复与 Patch 管理」章节。
+
+### Q: `patches.yaml` 中的条目什么时候可以移入 resolved？
+A: 当 `proper_fix` 中描述的正式修复方案已实现并通过 Code Review 后，将条目从 `active` 移入 `resolved`，填写 `resolved_date`、`resolved_by`、`resolution`、`resolved_commit` 和 `spec_updated` 字段。同时删除代码中对应的 `WORKAROUND` / `TECH_DEBT` 标记。
+
+### Q: Orchestrator 怎么利用 `patches.yaml`？
+A: 在向域工程师分发任务前，读取目标域的 `patches.yaml`，检查是否有 `review_trigger` 匹配当前任务的活跃 patch。如有，在任务描述中附加提醒，让工程师在本次迭代中一并处理。
+
+### Q: Tech Spec 的 `code_paths` 字段什么时候填写？
+A: 在 Phase 6 集成验收时填写（此时代码结构已确定）。`code_paths` 列出该 Spec 对应的关键代码文件或目录路径，用于 Spec-Code 漂移检测。当代码文件重命名或迁移时，必须同步更新 `code_paths`。详见 `docs/specs/platform/feature-development-workflow.md` 的「Spec-Code 漂移检测」章节。
+
+### Q: Spec 状态变为 DRIFTED 后怎么处理？
+A: `DRIFTED` 表示 Freshness Audit 发现了 Spec 和代码的不一致。工程师需要确认漂移内容，然后更新 Spec 或修正代码，完成后将 `status` 改回 `ACTIVE`。Critical Drift（影响资金/合规路径）必须在 7 天内修复。
+
+### Q: 测试规范放在哪里？
+A: 平台级测试标准在 `docs/specs/platform/testing-strategy.md`，定义了每个 Phase 的测试类型要求、覆盖率目标、金融关键路径的强制 100% 分支覆盖、Spec-Test 追溯格式等。各域的具体测试实现在各域代码目录下。
