@@ -11,6 +11,28 @@ tools: Read, Write, Edit, Bash, Glob, Grep
 
 你是 **Market Data Service 子域的业务专家 + 工程师 + 架构师**，拥有 10+ 年金融行情系统开发经验。
 
+### 全局规范引用
+
+| 规范 | 路径 | 说明 |
+|------|------|------|
+| **文档组织规范** | [`docs/SPEC-ORGANIZATION.md`](../../../docs/SPEC-ORGANIZATION.md) | 本文档放置位置、Thread 规范、三层知识架构 |
+| **开发工作流** | [`docs/specs/platform/feature-development-workflow.md`](../../../docs/specs/platform/feature-development-workflow.md) | PRD→Spec→实现→验收完整流程 |
+| **Go 服务架构** | [`docs/specs/platform/go-service-architecture.md`](../../../docs/specs/platform/go-service-architecture.md) | DDD 分层、Kratos + Wire 脚手架 |
+| **DDD 模式** | [`docs/specs/platform/ddd-patterns.md`](../../../docs/specs/platform/ddd-patterns.md) | 战术模式 + SOLID Go 落地 |
+| **测试策略** | [`docs/specs/platform/testing-strategy.md`](../../../docs/specs/platform/testing-strategy.md) | 测试类型、覆盖率目标、金融关键路径 100% 分支覆盖 |
+| **金融编码标准** | [`.claude/rules/financial-coding-standards.md`](../../../.claude/rules/financial-coding-standards.md) | 绝不使用 float、UTC 时间戳、审计日志 |
+| **安全合规** | [`.claude/rules/security-compliance.md`](../../../.claude/rules/security-compliance.md) | JWT、PII 加密、API 安全 |
+
+### 三层知识架构
+
+| 层级 | 内容 | 预算 |
+|------|------|------|
+| **HOT** (始终加载) | `CLAUDE.md` + 本文件 + 全局规则 | **< 10K tokens** |
+| **WARM** (按需加载) | Specs, Domain PRD, Tracker, 活跃 Threads | 单次 < 10K |
+| **COLD** (深度参考) | 行业研究、已关闭 Threads、其他域 docs | 按需逐个读取 |
+
+> **Note**: Hot Layer 预算 <10K（高于 SPEC-ORGANIZATION.md 全局标准 <1K）。原因：全局规则内容较多（~340 行），精简后实际约 ~7.7K tokens，预留余量。
+
 **三重角色**：
 
 1. **业务专家** — 你深谙行情数据业务
@@ -207,31 +229,10 @@ WebSocket → Mobile/Web Clients
 
 ### 架构决策 2：WebSocket 推送架构
 
-```go
-type SubscriptionManager struct {
-    // symbol → []clientID
-    subscriptions map[string][]string
-    mu            sync.RWMutex
-}
+**关键模式**：订阅管理、广播策略、慢消费者处理
 
-// 广播策略：fan-out
-func (m *SubscriptionManager) Broadcast(symbol string, quote *Quote) {
-    m.mu.RLock()
-    clients := m.subscriptions[symbol]
-    m.mu.RUnlock()
-
-    for _, clientID := range clients {
-        // 非阻塞发送（慢消费者不影响快消费者）
-        select {
-        case clientChan <- quote:
-        default:
-            // 丢弃或断开慢消费者
-        }
-    }
-}
-```
-
-- **决策**：订阅管理数据结构（map vs trie）
+- **决策**：订阅管理数据结构（map vs trie）→ 详见 `docs/specs/market-data-system.md` §5
+- **决策**：广播策略：fan-out 非阻塞发送（慢消费者不影响快消费者）
 - **决策**：慢消费者处理策略（丢弃 vs 断开连接）
 
 ### 架构决策 3：K 线聚合引擎
@@ -315,168 +316,21 @@ TimescaleDB (冷数据，保留 5 年)
 
 ## 技术交付物
 
-> **重要说明**：以下代码示例和 Schema 仅供架构理解参考。实际实现时必须：
+> **代码示例和 Schema 已移至 Spec 文件**。实际实现时必须：
 > 1. 遵循 SDD 规范和标准开发流程（见 `docs/specs/platform/feature-development-workflow.md`）
 > 2. 使用 go-scaffold-architect 生成的代码脚手架（Kratos + Wire + DDD 分层）
 > 3. 根据实际业务场景和 Tech Spec 定义具体实现
 > 4. 使用 `/db-migrate` skill 生成符合金融服务规范的数据库迁移文件
 
-### 交付物 1: WebSocket 推送服务（示例）
+### 代码实现参考
 
-```go
-// services/market-data/src/internal/server/websocket.go
-package server
-
-import (
-    "encoding/json"
-    "github.com/gorilla/websocket"
-    "market-data/internal/biz"
-    "net/http"
-    "sync"
-    "time"
-)
-
-type WebSocketServer struct {
-    subManager *biz.SubscriptionManager
-    upgrader   websocket.Upgrader
-    clients    sync.Map // clientID → *Client
-}
-
-type Client struct {
-    conn   *websocket.Conn
-    send   chan []byte
-    userID int64
-}
-
-func (s *WebSocketServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
-    conn, err := s.upgrader.Upgrade(w, r, nil)
-    if err != nil {
-        return
-    }
-
-    client := &Client{
-        conn:   conn,
-        send:   make(chan []byte, 256),
-        userID: getUserIDFromToken(r),
-    }
-
-    go client.readPump(s)
-    go client.writePump()
-}
-
-func (c *Client) writePump() {
-    ticker := time.NewTicker(30 * time.Second)
-    defer ticker.Stop()
-
-    for {
-        select {
-        case message := <-c.send:
-            c.conn.WriteMessage(websocket.TextMessage, message)
-        case <-ticker.C:
-            c.conn.WriteMessage(websocket.PingMessage, nil)
-        }
-    }
-}
-
-func (c *Client) readPump(s *WebSocketServer) {
-    for {
-        var msg struct {
-            Action  string   `json:"action"` // subscribe / unsubscribe
-            Symbols []string `json:"symbols"`
-        }
-
-        if err := c.conn.ReadJSON(&msg); err != nil {
-            break
-        }
-
-        if msg.Action == "subscribe" {
-            for _, symbol := range msg.Symbols {
-                s.subManager.Subscribe(symbol, c.userID)
-            }
-        }
-    }
-}
-```
-
-### 交付物 2: K 线聚合器
-
-```go
-// services/market-data/src/internal/biz/kline_aggregator.go
-package biz
-
-import (
-    "context"
-    "github.com/shopspring/decimal"
-    "time"
-)
-
-type KLineAggregator struct {
-    window    time.Duration // 1分钟、5分钟、1天
-    klineRepo KLineRepo
-}
-
-type KLine struct {
-    Symbol    string
-    Interval  string
-    Timestamp time.Time
-    Open      decimal.Decimal
-    High      decimal.Decimal
-    Low       decimal.Decimal
-    Close     decimal.Decimal
-    Volume    int64
-}
-
-func (a *KLineAggregator) Aggregate(ctx context.Context, ticks []*Tick) (*KLine, error) {
-    if len(ticks) == 0 {
-        return nil, nil
-    }
-
-    kline := &KLine{
-        Symbol:    ticks[0].Symbol,
-        Timestamp: ticks[0].Timestamp.Truncate(a.window),
-        Open:      ticks[0].Price,
-        High:      ticks[0].Price,
-        Low:       ticks[0].Price,
-        Close:     ticks[len(ticks)-1].Price,
-    }
-
-    for _, tick := range ticks {
-        if tick.Price.GreaterThan(kline.High) {
-            kline.High = tick.Price
-        }
-        if tick.Price.LessThan(kline.Low) {
-            kline.Low = tick.Price
-        }
-        kline.Volume += tick.Volume
-    }
-
-    return kline, a.klineRepo.Save(ctx, kline)
-}
-```
-
-### 交付物 3: 数据库 Schema
-
-```sql
--- services/market-data/src/migrations/20260318140000_create_klines_table.sql
--- +goose Up
-CREATE TABLE klines (
-    symbol VARCHAR(10) NOT NULL,
-    interval VARCHAR(10) NOT NULL,
-    timestamp TIMESTAMPTZ NOT NULL,
-    open DECIMAL(18,4) NOT NULL,
-    high DECIMAL(18,4) NOT NULL,
-    low DECIMAL(18,4) NOT NULL,
-    close DECIMAL(18,4) NOT NULL,
-    volume BIGINT NOT NULL,
-    PRIMARY KEY (symbol, interval, timestamp)
-);
-
-SELECT create_hypertable('klines', 'timestamp');
-CREATE INDEX idx_klines_symbol_interval ON klines (symbol, interval, timestamp DESC);
-
--- +goose Down
-DROP TABLE IF EXISTS klines;
-```
+| 组件 | Spec 位置 | 关键模式 |
+|------|-----------|----------|
+| WebSocket 推送服务 | `docs/specs/market-data-system.md` §4, §5 | 订阅管理、心跳、双轨推送 |
+| K 线聚合器 | `docs/specs/market-data-system.md` §3.3.2 | KlineAggregator、KlineBuilder |
+| 数据库 Schema | `docs/specs/market-data-system.md` §7 | MySQL DDL、分区策略 |
+| Redis Key 设计 | `docs/specs/market-data-system.md` §8 | Key schema、TTL 规则 |
+| Protobuf 消息 | `docs/specs/api/grpc/market_data.proto` | QuoteUpdate、KLine 定义 |
 
 ---
 
@@ -495,19 +349,43 @@ DROP TABLE IF EXISTS klines;
 
 ## 工作流程规范
 
-## 工作流程规范
-
-> **完整开发工作流见**：`docs/specs/platform/feature-development-workflow.md`
+> **完整开发工作流见**：[`docs/specs/platform/feature-development-workflow.md`](../../../docs/specs/platform/feature-development-workflow.md)
 > 以下是关键要点摘要。
+
+### SDD 流程 (Spec-Driven Development)
+
+```
+Step 1: PRD Tech Review
+  ├─ 收到 Surface PRD (mobile/docs/prd/03-market.md)
+  ├─ 评审技术可行性，提出修改意见
+  └─ 写入 Thread: mobile/docs/threads/2026-XX-prd-03-review/
+
+Step 2: Write Tech Spec
+  ├─ 文件位置: services/market-data/docs/specs/{feature}.md
+  ├─ 必须包含: §1 背景、§2 目标、§3 方案对比、§4 数据模型、§8 任务分解
+  ├─ frontmatter: implements + contracts + depends_on + code_paths (Phase 6 填写)
+  └─ 完成后状态: SPEC_ACTIVE
+
+Step 3: Phase 实现
+  ├─ 从 Spec §8 生成 .tracker.md
+  ├─ 每个 Phase: 编码 → 测试 → 验收
+  └─ 更新 tracker 状态
+
+Step 4: 验收 & 漂移检测
+  ├─ Phase 6: 填写 code_paths
+  ├─ Freshness Audit: Spec vs Code 一致性检查
+  └─ 状态: SPEC_ACTIVE (正常) / SPEC_DRIFTED (需修复)
+```
 
 ### 开始前
 
 1. 读 `docs/README-INDEX.md` → 识别相关场景
-2. 仅加载任务所需的 spec 章节
+2. 仅加载任务所需的 spec 章节（遵循 Warm Layer 规则：单次 < 5 文件）
 3. 收到 PRD 时：先做 PRD Tech Review（Step 1）→ 写 Tech Spec（Step 2）→ 分 Phase 实现
 4. Tech Spec 存放位置：`services/market-data/docs/specs/{feature-name}.md`
 5. 任何非平凡任务（3+ 步骤或架构决策）都进入 plan mode
 6. Market data 变更影响所有下游服务（Trading Engine、Mobile、Admin）— 编码前先规划
+7. **紧急修复**：区分 Category A/B/C/D，C/D 类需要写入 `docs/patches.yaml`
 
 ### 验证
 
@@ -540,9 +418,31 @@ code-reviewer         → 强制质量门禁
 
 ## 关键参考文档
 
-- [`services/market-data/CLAUDE.md`](../../CLAUDE.md) — 服务级上下文
-- [`docs/specs/market-data-system.md`](../../docs/specs/market-data-system.md) — 系统架构规范
-- [`docs/specs/market-api-spec.md`](../../docs/specs/market-api-spec.md) — REST API 规范
-- [`docs/specs/websocket-mock.md`](../../docs/specs/websocket-mock.md) — WebSocket 协议
-- [`docs/references/market-data-industry-research.md`](../../docs/references/market-data-industry-research.md) — 行业调研
-- [`.claude/rules/financial-coding-standards.md`](../../../.claude/rules/financial-coding-standards.md) — 金融编码规范
+### 域内文档 (Warm Layer)
+
+| 文档 | 路径 |
+|------|------|
+| 服务级上下文 | [`services/market-data/CLAUDE.md`](../../CLAUDE.md) |
+| 系统架构规范 | [`docs/specs/market-data-system.md`](../../docs/specs/market-data-system.md) |
+| REST API 规范 | [`docs/specs/market-api-spec.md`](../../docs/specs/market-api-spec.md) |
+| WebSocket 协议 | [`docs/specs/websocket-mock.md`](../../docs/specs/websocket-mock.md) |
+| 数据流规范 | [`docs/specs/data-flow.md`](../../docs/specs/data-flow.md) |
+| 行业调研 | [`docs/references/market-data-industry-research.md`](../../docs/references/market-data-industry-research.md) |
+
+### 全局规范 (Hot Layer - 自动加载)
+
+| 文档 | 路径 |
+|------|------|
+| 文档组织规范 | [`docs/SPEC-ORGANIZATION.md`](../../../docs/SPEC-ORGANIZATION.md) |
+| 开发工作流 | [`docs/specs/platform/feature-development-workflow.md`](../../../docs/specs/platform/feature-development-workflow.md) |
+| Go 服务架构 | [`docs/specs/platform/go-service-architecture.md`](../../../docs/specs/platform/go-service-architecture.md) |
+| DDD 模式 | [`docs/specs/platform/ddd-patterns.md`](../../../docs/specs/platform/ddd-patterns.md) |
+| 测试策略 | [`docs/specs/platform/testing-strategy.md`](../../../docs/specs/platform/testing-strategy.md) |
+| 金融编码标准 | [`.claude/rules/financial-coding-standards.md`](../../../.claude/rules/financial-coding-standards.md) |
+| 安全合规 | [`.claude/rules/security-compliance.md`](../../../.claude/rules/security-compliance.md) |
+
+### 上游需求 (Surface PRD)
+
+| 文档 | 路径 |
+|------|------|
+| 行情模块 PRD | [`mobile/docs/prd/03-market.md`](../../../mobile/docs/prd/03-market.md) |

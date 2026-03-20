@@ -1,23 +1,24 @@
 ---
 thread: prd-03-market-data-review
 type: heavyweight
-status: RESOLVED
+status: CLOSED
 priority: P0
 opened_by: market-data-engineer
 opened_date: 2026-03-14T10:00+08:00
-resolved_date: 2026-03-20T00:00+08:00
+resolved_date: 2026-03-20
 resolved_by: product-manager
 participants:
   - market-data-engineer
   - product-manager
-requires_input_from: []
+requires_input_from:
+  - product-manager
 affects_specs:
   - mobile/docs/prd/03-market.md
-  - mobile/prototypes/market.html
-  - mobile/prototypes/stock-detail.html
-  - mobile/prototypes/search.html
+  - mobile/docs/prd/prototypes/03-market/index.html
+  - mobile/docs/prd/prototypes/03-market/stock-detail.html
+  - mobile/docs/prd/prototypes/03-market/search.html
 resolution: |
-  所有问题已在 PRD-03 v2.2（2026-03-20）中解决：
+  历史决议（2026-03-20）：所有问题已在 PRD-03 v2.2（2026-03-20）中解决：
   - C1: 访客延迟行情改为"每5秒推送一次全局快照"语义，已补充到 §6.1
   - C2: Watchlist 上限统一为 100 只，已更新 §6.3
   - H1: 分时K线明确仅含常规时段（09:30–16:00，约390条），已更新 §5.2
@@ -32,7 +33,15 @@ resolution: |
   - M4: 热门/涨幅/跌幅为顶层 Tab，交互形式已明确
   - M5: API 统一包装格式归入 docs/contracts/ 跨域契约
   原型 prototypes/03-market/stock-detail.html 同步更新：补充换手率/成交额字段，新增 HALTED 开发状态切换器
+
+  最终决议（2026-03-20）：PM 已确认以下 3 项问题，PRD-03 v2.3 已更新：
+  - C3: 大盘指数显示改为 ETF 替代（SPY/QQQ/DIA），规避指数授权合规风险，已更新 §5.1
+  - Q1: 流通股数数据源确认为 Polygon.io Fundamental API（首选），已更新 §5.2
+  - Q2: 中文搜索覆盖范围确认为 Phase 1 Top 1000 美股（按市值），已更新 §5.3
+  原型 prototypes/03-market/index.html 同步更新：大盘指数卡片改为 ETF 版本
 continues: null
+resolved_date: 2026-03-20
+resolved_by: product-manager
 ---
 
 # PRD-03 行情模块 — Market Data Engineer 技术评审
@@ -68,4 +77,14 @@ PRD-03 v1.1 整体质量较高，WebSocket 认证协议（v1.1 新增）、K 线
 | LOW | L2 | market.html 颜色方案与 PRD 默认设置不一致 | ui-designer |
 | LOW | L3 | search.html 空状态提示不完整 | ui-designer |
 
-详见 `01-market-data-engineer-review.md`。
+详见 `01-market-data-engineer-review.md`（已解决）。
+
+## v2.2 评审发现与解决（2026-03-20）
+
+| 级别 | 编号 | 标题 | 状态 |
+|------|------|------|------|
+| P1 | C3 | 大盘指数显示合规风险（需改为 ETF 替代） | ✅ 已解决（v2.3） |
+| P2 | Q1 | 流通股数数据源待确认 | ✅ 已解决（v2.3） |
+| P2 | Q2 | 中文搜索覆盖范围待确认 | ✅ 已解决（v2.3） |
+
+详见 `02-market-data-engineer-review-v2.2.md`（问题提出）和 `03-market-data-engineer-confirmation.md`（最终确认）。

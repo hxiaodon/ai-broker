@@ -117,10 +117,11 @@ market-data-system.md    §13 Phase 1 部署方案 + §11 监控告警
 - [ ] 实现 DelayedQuoteRingBuffer（见 market-data-system.md §4）
 - [ ] 实现 `/v1/market/movers` 涨跌幅榜接口
 - [ ] 实现复权处理（Split 用 Polygon adjusted=true；Dividend 在应用层叠加）
-- [ ] 搜索接口补充 pinyin_initials 支持
+- [ ] 搜索接口：Top 1000 美股中文名/拼音索引（pinyin_initials）
+- [ ] 换手率计算模块（集成 Polygon Fundamental API 获取流通股数 shares_outstanding）
 - [ ] 历史数据回填脚本（见 market-data-system.md §14）
 - [ ] NYSE 交易日历维护（见 §14.5）
-- [ ] 确认新闻数据源（Polygon News API 或 Finnhub）
+- [ ] 确认新闻数据源（Polygon News API 或 Finnhub）→ **P2 不阻塞 Phase 1**
 - [ ] 了解 LULD 熔断机制（market_status=HALTED 触发条件）
 
 ---
