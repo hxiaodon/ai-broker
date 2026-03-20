@@ -75,9 +75,17 @@
         <div class="price-meta">
           <span class="badge badge-success" style="font-size:13px; padding:4px 10px;">▲ +3.72 (+2.14%)</span>
           <span class="text-xs text-muted">今日</span>
-          <span class="badge badge-pending text-xs">盘中</span>
+          <span class="badge badge-pending text-xs" id="session-badge">盘中</span>
         </div>
         <div class="text-xs text-muted">美东时间 14:32 · 实时数据</div>
+        <!-- [DEV STATE] 交易时段切换（UXUE 参考用） -->
+        <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap;">
+          <button onclick="setSession('regular')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #ccc;background:#f5f5f5;">盘中</button>
+          <button onclick="setSession('pre')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #ccc;background:#f5f5f5;">盘前</button>
+          <button onclick="setSession('after')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #ccc;background:#f5f5f5;">盘后</button>
+          <button onclick="setSession('closed')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #ccc;background:#f5f5f5;">休市</button>
+          <button onclick="setSession('halted')" style="font-size:10px;padding:2px 8px;border-radius:4px;border:1px solid #e53e3e;background:#fff5f5;color:#e53e3e;">暂停交易</button>
+        </div>
       </div>
 
       <!-- K线时段选择 -->
@@ -117,6 +125,8 @@
         <div class="info-cell"><div class="label">最高</div><div class="value">$179.12</div></div>
         <div class="info-cell"><div class="label">最低</div><div class="value">$173.80</div></div>
         <div class="info-cell"><div class="label">成交量</div><div class="value">58.4M</div></div>
+        <div class="info-cell"><div class="label">成交额</div><div class="value">$10.41B</div></div>
+        <div class="info-cell"><div class="label">换手率</div><div class="value">0.36%</div></div>
         <div class="info-cell"><div class="label">市值</div><div class="value">$2.76T</div></div>
         <div class="info-cell"><div class="label">52周最高</div><div class="value">$199.62</div></div>
         <div class="info-cell"><div class="label">52周最低</div><div class="value">$164.08</div></div>
@@ -193,6 +203,24 @@
     // 模拟已登录 → 跳转下单页
     const params = side === 'BUY' ? '?side=buy&symbol=AAPL' : '?side=sell&symbol=AAPL';
     goto('../04-trading/order-entry.html');
+  }
+
+  // [DEV STATE] 交易时段切换
+  const sessionConfig = {
+    regular: { label: '盘中',   cls: 'badge-pending',  disabled: false },
+    pre:     { label: '盘前',   cls: 'badge-warning',  disabled: false },
+    after:   { label: '盘后',   cls: 'badge-warning',  disabled: false },
+    closed:  { label: '休市',   cls: 'badge-default',  disabled: false },
+    halted:  { label: '暂停交易', cls: 'badge-error',  disabled: true  },
+  };
+  function setSession(type) {
+    const cfg = sessionConfig[type];
+    const badge = document.getElementById('session-badge');
+    badge.textContent = cfg.label;
+    badge.className = 'badge text-xs ' + cfg.cls;
+    const btns = document.querySelectorAll('.action-bar button');
+    btns.forEach(b => { b.disabled = cfg.disabled; b.style.opacity = cfg.disabled ? '0.4' : '1'; });
+    if (cfg.disabled) showToast('该股票交易暂时中止，请稍后查看');
   }
 </script>
 </body>

@@ -1,20 +1,37 @@
 ---
 thread: prd-03-market-data-review
 type: heavyweight
-status: OPEN
+status: RESOLVED
 priority: P0
 opened_by: market-data-engineer
 opened_date: 2026-03-14T10:00+08:00
+resolved_date: 2026-03-20T00:00+08:00
+resolved_by: product-manager
 participants:
   - market-data-engineer
-requires_input_from:
   - product-manager
+requires_input_from: []
 affects_specs:
   - mobile/docs/prd/03-market.md
   - mobile/prototypes/market.html
   - mobile/prototypes/stock-detail.html
   - mobile/prototypes/search.html
-resolution: null
+resolution: |
+  所有问题已在 PRD-03 v2.2（2026-03-20）中解决：
+  - C1: 访客延迟行情改为"每5秒推送一次全局快照"语义，已补充到 §6.1
+  - C2: Watchlist 上限统一为 100 只，已更新 §6.3
+  - H1: 分时K线明确仅含常规时段（09:30–16:00，约390条），已更新 §5.2
+  - H2: 明确 Phase 1 仅提供 Level 1（bid/ask），Level 2 推至 Phase 2，已更新 §5.2
+  - H3: 换手率字段及计算口径（成交量/流通股数）已补充至 §5.2
+  - H4: 新闻数据源标记为 P2，不阻塞 Phase 1 开发
+  - H5: WebSocket unsubscribe/心跳已移至工程师技术规格文档，PRD 不需定义
+  - H6: HALTED（交易暂停）状态已加入 §5.2 交易时段表
+  - M1: DDL 已从 PRD 移除（归入工程师文档）
+  - M2: 搜索 debounce 300ms 及最少字符规则已补充至 §5.3
+  - M3: Redis 缓存策略已移至工程师文档
+  - M4: 热门/涨幅/跌幅为顶层 Tab，交互形式已明确
+  - M5: API 统一包装格式归入 docs/contracts/ 跨域契约
+  原型 prototypes/03-market/stock-detail.html 同步更新：补充换手率/成交额字段，新增 HALTED 开发状态切换器
 continues: null
 ---
 

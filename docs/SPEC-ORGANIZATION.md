@@ -1,7 +1,7 @@
 # Spec Organization Standard — 文档组织规范
 
-> **版本**: v2.1
-> **日期**: 2026-03-13T22:45+08:00
+> **版本**: v2.2
+> **日期**: 2026-03-20T22:00+08:00
 > **适用范围**: 本仓库所有文档、规格、设计、讨论线程的创建与放置
 > **维护者**: SDD Expert / Tech Lead
 
@@ -33,12 +33,16 @@
 
 ## 仓库目录结构
 
+> 本目录树与 `docs/specs/platform/go-service-architecture.md` 和
+> `.claude/agents/go-scaffold-architect.md` 中定义的脚手架规范对齐。
+> Go 微服务有两种 DDD 布局（见下方注释），详见架构规范文档。
+
 ```
 repo-root/
 │
 ├── CLAUDE.md                              # 全局路由表（<100行，只做导航）
 ├── .claude/
-│   ├── agents/                            # 全局 agents
+│   ├── agents/                            # 全局 agents（含 go-scaffold-architect）
 │   ├── rules/                             # 全局硬规则（所有域继承）
 │   │   ├── financial-coding-standards.md
 │   │   ├── security-compliance.md
@@ -50,21 +54,44 @@ repo-root/
 │   ├── active-threads.yaml                # 全局活跃 Thread 索引
 │   ├── compliance/                        # 合规要求（不属于任何 surface）
 │   ├── contracts/                         # 域间接口契约
+│   │   └── INDEX.md                       # 契约索引 + 服务拓扑图
+│   ├── specs/
+│   │   └── platform/                      # 平台级工程标准（跨域共享）
+│   │       ├── go-service-architecture.md #   Go 微服务架构规范（DDD 布局）
+│   │       ├── ddd-patterns.md            #   DDD 战术模式 + SOLID Go 落地
+│   │       ├── kafka-topology.md          #   Kafka 拓扑规范
+│   │       ├── api-contracts.md           #   API 契约规范
+│   │       ├── feature-development-workflow.md  # PRD→Spec→实现→验收流程
+│   │       └── testing-strategy.md        #   测试策略 + 覆盖率标准
 │   ├── threads/                           # 跨域协作线程
 │   └── references/                        # 行业研究、竞品分析
 │
 ├── mobile/                                # ═══ 移动端域 ═══
 │   ├── CLAUDE.md
+│   ├── .claude/agents/                    # 域级 agents（mobile-engineer, h5-engineer）
 │   ├── docs/
 │   │   ├── prd/                           # ★ App 侧 Surface PRD
 │   │   ├── design/                        # ★ UI/UX 设计
 │   │   ├── specs/                         # 移动端技术 spec
 │   │   └── threads/                       # 移动端域内讨论
-│   └── lib/                               # 代码...
+│   ├── prototypes/                        # H5 原型
+│   └── src/                               # Flutter 代码
+│       └── lib/
+│           ├── core/                      # 核心基础设施
+│           ├── features/                  # 按功能模块组织
+│           └── shared/                    # 共享组件
 │
 ├── services/
-│   ├── ams/                               # ═══ AMS 域（认证/鉴权/KYC）═══
+│   │
+│   │  # ┌──────────────────────────────────────────────────────────────┐
+│   │  # │ Go 微服务通用结构（布局 A: Single-Domain / 布局 B: Multi-Domain）│
+│   │  # │ 详见 docs/specs/platform/go-service-architecture.md         │
+│   │  # └──────────────────────────────────────────────────────────────┘
+│   │
+│   ├── ams/                               # ═══ AMS 域（认证/鉴权/KYC）═══ [布局 B]
 │   │   ├── CLAUDE.md
+│   │   ├── domain.yaml                    # 域自描述清单（机器可读）
+│   │   ├── .claude/agents/                # 域级 agents（ams-engineer）
 │   │   ├── docs/
 │   │   │   ├── prd/                       # AMS 域 Domain PRD（业务规则）
 │   │   │   ├── specs/                     # 域内技术设计
@@ -74,45 +101,111 @@ repo-root/
 │   │   │   ├── patches.yaml               # 域级 Patch 注册表（活跃补丁 + 技术债）
 │   │   │   ├── threads/                   # 域内讨论
 │   │   │   └── db/                        # 数据模型
-│   │   ├── api/
-│   │   │   ├── grpc/                      # .proto + .pb.go
-│   │   │   └── rest/                      # openapi.yaml
-│   │   └── internal/
+│   │   └── src/                           # ★ Go 代码根目录
+│   │       ├── api/ams/v1/               # proto 定义 + 生成的 .pb.go
+│   │       ├── cmd/server/               # main.go + wire.go + wire_gen.go
+│   │       ├── configs/                  # config.yaml（无密钥）
+│   │       ├── migrations/               # goose 数据库迁移
+│   │       ├── internal/                 # DDD 分层（布局 B: 按子域组织）
+│   │       │   ├── {subdomain}/          #   每个子域是独立可提取单元
+│   │       │   │   ├── domain/           #     Domain 层（零外部依赖）
+│   │       │   │   ├── app/              #     Application 层（编排用例）
+│   │       │   │   ├── infra/            #     Infrastructure 层（实现 domain 接口）
+│   │       │   │   │   ├── mysql/        #       DB 实现
+│   │       │   │   │   ├── kafka/        #       Kafka publisher
+│   │       │   │   │   └── cache/        #       Redis 缓存
+│   │       │   │   ├── handler.go        #     Transport 接入点
+│   │       │   │   └── wire.go           #     var ProviderSet = wire.NewSet(...)
+│   │       │   ├── data/model/           #   跨子域共享 DB struct
+│   │       │   ├── kafka/                #   服务级 Kafka（Outbox + DLQ）
+│   │       │   ├── conf/                 #   config proto → Go struct
+│   │       │   └── server/               #   全局 Transport（聚合所有 handler）
+│   │       └── pkg/                      # 可观测性 + 中间件
+│   │           ├── observability/        #   OTel tracer + Prometheus + PII logger
+│   │           └── middleware/           #   幂等性中间件等
 │   │
-│   ├── trading-engine/                    # ═══ 交易域（OMS/路由/风控/清结算）═══
+│   ├── trading-engine/                    # ═══ 交易域（OMS/路由/风控/清结算）═══ [布局 B]
 │   │   ├── CLAUDE.md
+│   │   ├── domain.yaml
+│   │   ├── .claude/agents/
 │   │   ├── docs/
 │   │   │   ├── prd/                       # 交易域 Domain PRD（业务规则）
-│   │   │   ├── specs/
+│   │   │   ├── specs/                     # 域内技术设计
 │   │   │   ├── threads/
 │   │   │   └── db/
-│   │   ├── api/
-│   │   │   ├── grpc/                      # .proto + .pb.go
-│   │   │   └── rest/                      # openapi.yaml
-│   │   └── internal/
+│   │   └── src/                           # 结构同 AMS（布局 B: 子域 = order, risk, settlement, routing）
+│   │       ├── api/trading/v1/
+│   │       ├── cmd/server/
+│   │       ├── configs/
+│   │       ├── migrations/
+│   │       ├── internal/
+│   │       │   ├── order/                #   订单子域
+│   │       │   ├── risk/                 #   风控子域
+│   │       │   ├── settlement/           #   清结算子域
+│   │       │   ├── routing/              #   智能路由子域
+│   │       │   ├── data/model/
+│   │       │   ├── kafka/
+│   │       │   ├── conf/
+│   │       │   └── server/
+│   │       └── pkg/
 │   │
-│   ├── fund-transfer/                     # ═══ 资金域（出入金/通道/对账）═══
+│   ├── fund-transfer/                     # ═══ 资金域（出入金/通道/对账）═══ [布局 B]
 │   │   ├── CLAUDE.md
+│   │   ├── domain.yaml
+│   │   ├── .claude/agents/
 │   │   ├── docs/
 │   │   │   ├── prd/                       # 资金域 Domain PRD（业务规则）
 │   │   │   ├── specs/
 │   │   │   ├── threads/
 │   │   │   └── db/
-│   │   └── internal/
+│   │   └── src/                           # 结构同 AMS（布局 B）
+│   │       ├── api/fund/v1/
+│   │       ├── cmd/server/
+│   │       ├── configs/
+│   │       ├── migrations/
+│   │       ├── internal/
+│   │       └── pkg/
 │   │
-│   ├── market-data/                       # ═══ 行情域 ═══
+│   ├── market-data/                       # ═══ 行情域 ═══ [布局 A 或 B，视子域数量]
 │   │   ├── CLAUDE.md
+│   │   ├── domain.yaml
+│   │   ├── .claude/agents/
 │   │   ├── docs/
-│   │   └── internal/
+│   │   │   ├── prd/
+│   │   │   ├── specs/
+│   │   │   └── threads/
+│   │   └── src/                           # 布局 A 示例（单子域）
+│   │       ├── api/marketdata/v1/
+│   │       ├── cmd/server/
+│   │       ├── configs/
+│   │       ├── migrations/
+│   │       ├── internal/
+│   │       │   ├── conf/
+│   │       │   ├── biz/                  #   Domain 层（Kratos 原生命名）
+│   │       │   ├── data/                 #   Infrastructure 层
+│   │       │   ├── service/              #   Application 层
+│   │       │   └── server/               #   Transport 层
+│   │       └── pkg/
 │   │
-│   └── admin-panel/                       # ═══ 管理后台域 ═══
+│   └── admin-panel/                       # ═══ 管理后台域（React）═══
 │       ├── CLAUDE.md
+│       ├── .claude/agents/
 │       ├── docs/
 │       │   ├── prd/                       # ★ 后台侧 Surface PRD
 │       │   ├── specs/
 │       │   └── threads/
-│       └── src/
+│       └── src/                           # React 代码
 ```
+
+### Go 微服务 DDD 布局速查
+
+| 布局 | 适用场景 | `internal/` 顶层组织 | 依赖方向 |
+|------|---------|---------------------|---------|
+| **A: Single-Domain** | 1 个子域 | `biz/` `data/` `service/` `server/`（Kratos 原生） | `server → service → biz ← data` |
+| **B: Subdomain-First** | 2+ 个子域 | `{subdomain}/` 每个子域内含 `domain/` `app/` `infra/` | `handler → app → domain ← infra` |
+
+> 完整规范见 [`docs/specs/platform/go-service-architecture.md`](specs/platform/go-service-architecture.md)。
+> 脚手架执行见 [`.claude/agents/go-scaffold-architect.md`](../.claude/agents/go-scaffold-architect.md)。
 
 ---
 
@@ -545,8 +638,8 @@ implements:                                       # 我实现的是哪些 PRD
 contracts:
   - docs/contracts/trading-to-fund.md             # 我对外暴露的接口契约
 depends_on:
-  - services/ams/api/grpc/ams.proto                # 我依赖谁的接口
-  - services/market-data/api/grpc/market.proto
+  - services/ams/src/api/ams/v1/ams.proto           # 我依赖谁的接口
+  - services/market-data/src/api/marketdata/v1/market.proto
 code_paths:                                       # Spec-Code 漂移检测锚点
   - src/internal/domain/order/                    # Phase 6 完成后填写
   - src/internal/app/place_order_usecase.go
@@ -590,7 +683,7 @@ code_paths:                                       # Spec-Code 漂移检测锚点
 provider: services/ams
 consumer: services/trading-engine
 protocol: gRPC
-proto_file: services/ams/api/grpc/ams.proto
+proto_file: services/ams/src/api/ams/v1/ams.proto
 last_reviewed: 2026-03-13T15:00+08:00
 ---
 
@@ -622,7 +715,7 @@ Contract 文件**始终反映当前态**（Single Source of Truth），不拆 v1
 provider: services/trading-engine
 consumer: services/fund-transfer
 protocol: gRPC
-proto_file: services/trading-engine/api/grpc/settlement.proto
+proto_file: services/trading-engine/src/api/trading/v1/settlement.proto
 version: 3
 last_updated: 2026-05-20T16:30+08:00
 last_reviewed: 2026-05-20T16:30+08:00
@@ -685,7 +778,7 @@ PRD 变更（产品提出需求）
           │
           ▼
   更新制品（并行）
-      ├─ api/grpc/ 或 api/rest/：加新字段/方法
+      ├─ src/api/ 下的 proto/openapi：加新字段/方法
       ├─ contract 文件：version +1，更新接口列表，写 changelog
       └─ Thread 标记 RESOLVED
 ```
@@ -794,8 +887,8 @@ PRD 变更（产品提出需求）
 - App 交易界面: mobile/docs/prd/04-trading.md
 
 ## 上下游依赖
-- ← AMS: 鉴权 (proto: services/ams/api/grpc/ams.proto)
-- ← Market: 实时报价 (proto: services/market-data/api/grpc/market.proto)
+- ← AMS: 鉴权 (proto: services/ams/src/api/ams/v1/ams.proto)
+- ← Market: 实时报价 (proto: services/market-data/src/api/marketdata/v1/market.proto)
 - → Fund: 清结算划转 (contract: docs/contracts/trading-to-fund.md)
 
 ## 数据模型
@@ -826,7 +919,7 @@ PRD 变更（产品提出需求）
 ```
 1. 先查本域 CLAUDE.md 中的"上下游依赖"  → 有没有直接指引
 2. 再查 docs/contracts/                  → 有没有现成的接口契约
-3. 再查目标域的 api/grpc/                   → gRPC 接口定义（代码即文档）
+3. 再查目标域的 src/api/{name}/v1/          → proto 接口定义（代码即文档）
 4. 最后才读目标域的 docs/specs/           → 理解实现细节
 ```
 
@@ -943,9 +1036,9 @@ knowledge:
 contracts:
   provides:
     - uri: brokerage://contracts/trading-to-fund
-      proto: api/grpc/settlement.proto
+      proto: src/api/trading/v1/settlement.proto
     - uri: brokerage://contracts/trading-to-mobile
-      proto: api/grpc/trading.proto
+      proto: src/api/trading/v1/trading.proto
   consumes:
     - uri: brokerage://contracts/ams-to-trading
     - uri: brokerage://contracts/market-to-trading

@@ -1,10 +1,8 @@
 # Active Threads Index
 # 维护者: 自动维护或手动更新
-# 最后更新: 2026-03-14
+# 最后更新: 2026-03-20
 
-threads:
-  - path: mobile/docs/threads/2026-03-prd-03-market-data-review/
-    status: OPEN
-    priority: P0
-    requires: [product-manager, ui-designer]
-    summary: "PRD-03 行情模块技术评审：2 CRITICAL + 6 HIGH + 5 MEDIUM + 3 LOW，含访客延迟行情方案风险、Watchlist 上限矛盾等"
+threads: []
+# 所有 thread 已关闭（2026-03-20）
+# 已归档: mobile/docs/threads/archive/（16 个旧格式文件）
+# 已解决: mobile/docs/threads/2026-03-prd-03-market-data-review/（status: RESOLVED，PRD-03 v2.2 已处理全部问题）
