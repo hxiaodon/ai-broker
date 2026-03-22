@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package brokerage.market_data.v1;
+
+option go_package = "github.com/hxiaodon/ai-broker/api/market_data/v1;market_datav1";
+
+// MarketDataErrorReason 定义 Market Data 服务的领域错误码。
+// 命名规范：MARKET_DATA_{ENTITY}_{REASON}
+// 错误码只追加，禁止重新编号或删除（append-only）。
+//
+// HTTP 状态码映射（由 Kratos errors 中间件处理，集成时恢复注解）：
+//   INVALID_ARGUMENT    → 400
+//   SYMBOL_NOT_FOUND    → 404
+//   UNAUTHORIZED        → 401
+//   RATE_LIMITED        → 429
+//   STALE               → 412
+//   FEED_UNAVAILABLE    → 503
+//   INTERNAL            → 500
+enum MarketDataErrorReason {
+  MARKET_DATA_ERROR_REASON_UNSPECIFIED = 0;
+  MARKET_DATA_INVALID_ARGUMENT         = 1;  // 请求参数非法（如 symbol 格式错误）
+  MARKET_DATA_SYMBOL_NOT_FOUND         = 2;  // symbol 不存在或未收录
+  MARKET_DATA_UNAUTHORIZED             = 3;  // 未认证（WebSocket auth 失败）
+  MARKET_DATA_RATE_LIMITED             = 4;  // 超过频率限制（100 req/s per IP）
+  MARKET_DATA_STALE                    = 5;  // 数据超过交易风控阈值 1s，拒绝市价单
+  MARKET_DATA_FEED_UNAVAILABLE         = 10; // 上游 feed（Polygon/HKEX）不可用
+  MARKET_DATA_INTERNAL                 = 11; // 内部错误
+  // FILL: 后续域特定错误码在此追加
+}

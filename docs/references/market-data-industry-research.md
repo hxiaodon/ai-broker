@@ -7,7 +7,7 @@ status: ACTIVE
 affects_specs:
   - services/market-data/docs/specs/market-data-system.md
   - services/market-data/docs/specs/market-api-spec.md
-  - services/market-data/docs/specs/websocket-mock.md
+  - services/market-data/docs/specs/websocket-spec.md
   - services/market-data/docs/specs/data-flow.md
 ---
 

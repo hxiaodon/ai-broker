@@ -1,0 +1,19 @@
+version: v1
+name: buf.build/hxiaodon/ai-broker
+
+deps:
+  - buf.build/googleapis/googleapis
+  - buf.build/protocolbuffers/wellknowntypes
+
+lint:
+  use:
+    - DEFAULT
+  enum_zero_value_suffix: _UNSPECIFIED
+  # 允许 RPC 请求/响应消息定义在同一文件
+  rpc_allow_same_request_response: false
+  rpc_allow_google_protobuf_empty_requests: true
+  rpc_allow_google_protobuf_empty_responses: true
+
+breaking:
+  use:
+    - FILE

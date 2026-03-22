@@ -16,7 +16,7 @@ date: 2026-03-15
 |------|------|------|---------|
 | [market-data-system.md](./specs/market-data-system.md) | **v2.1** | 系统架构全貌（含合规前提、复权规范、Stale 处理、历史回填） | 后端工程师、架构师 |
 | [market-api-spec.md](./specs/market-api-spec.md) | **v2.1** | REST API 完整规范（含 is_stale 字段、涨跌幅基准定义、复权说明） | 前端、移动端、后端 |
-| [websocket-mock.md](./specs/websocket-mock.md) | **v2.1** | WebSocket 协议完整规范（含 is_stale 字段） | 前端、移动端、后端 |
+| [websocket-spec.md](./specs/websocket-spec.md) | **v2.1** | WebSocket 协议完整规范（含 is_stale 字段） | 前端、移动端、后端 |
 | [data-flow.md](./specs/data-flow.md) | **v2.1** | 数据流架构（含历史数据冷启动方案） | 后端工程师 |
 
 **关联文档：**
@@ -41,7 +41,7 @@ market-data-system.md  §7 MySQL 数据模型
 
 ### 场景 3：实现 WebSocket 推送
 ```
-websocket-mock.md        （全部，含认证流程、双轨推送、is_stale）
+websocket-spec.md        （全部，含认证流程、双轨推送、is_stale）
 data-flow.md             §3 访客双轨推送 + §5 Mock/生产切换
 market-data-system.md    §4 访客双轨推送架构（DelayedQuoteRingBuffer）
 ```
@@ -144,7 +144,7 @@ market-data-system.md    §13 Phase 1 部署方案 + §11 监控告警
 |------|------|------|---------|
 | [market-data-system.md](./specs/market-data-system.md) | v2.0 | 系统架构全貌（数据流、缓存、存储、高可用、部署） | 后端工程师、架构师 |
 | [market-api-spec.md](./specs/market-api-spec.md) | v2.0 | REST API 完整规范（10 个接口，请求/响应示例） | 前端、移动端、后端 |
-| [websocket-mock.md](./specs/websocket-mock.md) | v2.0 | WebSocket 协议完整规范（认证/订阅/双轨推送/心跳） | 前端、移动端、后端 |
+| [websocket-spec.md](./specs/websocket-spec.md) | v2.0 | WebSocket 协议完整规范（认证/订阅/双轨推送/心跳） | 前端、移动端、后端 |
 | [data-flow.md](./specs/data-flow.md) | v2.0 | 数据流架构（Feed → Engine → Redis → WS → MySQL） | 后端工程师 |
 
 **关联 PRD**：[mobile/docs/prd/03-market.md](../../../../mobile/docs/prd/03-market.md)（权威产品需求）
@@ -166,7 +166,7 @@ market-data-system.md  §7 MySQL 数据模型（DDL 参考）
 
 ### 场景 3：实现 WebSocket 推送
 ```
-websocket-mock.md   （全部，含认证流程、双轨推送、错误码）
+websocket-spec.md   （全部，含认证流程、双轨推送、错误码）
 data-flow.md        §3 访客双轨推送 + §5 Mock/生产切换
 market-data-system.md  §4 访客双轨推送架构（DelayedQuoteRingBuffer 实现）
 ```

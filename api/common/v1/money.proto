@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package brokerage.common.v1;
+
+option go_package = "github.com/hxiaodon/ai-broker/api/common/v1;commonv1";
+
+// ──────────────────────────────────────────────────────────────────────────
+// MoneyAmount — 货币金额（财务编码规范 Rule 1：禁止 float/double）
+//
+// 平台统一规范：
+//   所有货币金额使用 decimal string，不得使用 float32 / float64。
+//   精度要求：
+//     US 股票价格  — 4 位小数（如 "150.2500"）
+//     HK 股票价格  — 3 位小数（如 "89.750"）
+//     手续费/佣金  — 2 位小数（如 "1.50"）
+//     汇率         — 6 位小数（如 "7.823456"）
+// ──────────────────────────────────────────────────────────────────────────
+message MoneyAmount {
+  // decimal string，如 "150.2500"；消费方用 shopspring/decimal (Go) 解析
+  string value    = 1;
+  // ISO 4217 货币代码，如 "USD"、"HKD"
+  string currency = 2;
+}

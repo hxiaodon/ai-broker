@@ -1,0 +1,29 @@
+server:
+  http:
+    addr: "0.0.0.0:8080"
+  grpc:
+    addr: "0.0.0.0:9090"
+  ws:
+    addr: "0.0.0.0:8081"
+
+data:
+  mysql:
+    dsn: "root:root@tcp(127.0.0.1:3306)/market_data_db?parseTime=true&loc=UTC&time_zone=%27%2B00%3A00%27&charset=utf8mb4"
+  redis:
+    addr: "127.0.0.1:6379"
+    password: ""
+    db: 0
+
+kafka:
+  brokers:
+    - "127.0.0.1:9092"
+
+polygon:
+  api_key: "fake-polygon-api-key-not-real"
+  base_url: "https://api.polygon.io"
+
+hkex:
+  endpoint: "https://fake-hkex-feed.example.com"
+
+observability:
+  otlp_endpoint: "127.0.0.1:4317"

@@ -11,7 +11,7 @@ status: ACTIVE
 
 > 本文档是行情模块 REST API 的权威规范，与 PRD-03 v1.1 完全对齐。所有接口实现和客户端集成须以本文档为准。
 >
-> WebSocket 推送协议详见 `docs/specs/websocket-mock.md`。
+> WebSocket 推送协议详见 `docs/specs/websocket-spec.md`。
 
 ---
 
@@ -104,10 +104,14 @@ https://api.example.com
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| `is_stale` | bool | `true` = 数据超过展示阈值（5s），提示用户数据可能延迟 |
+| `is_stale` | bool | `true` = 数据超过 **1s（交易风控阈值）**；交易引擎据此拒绝市价单 |
 | `stale_since_ms` | int | 数据陈旧持续时长（毫秒），`is_stale=false` 时为 0 |
 
-> 注：`is_stale` 用于前端展示警告。交易引擎使用更严格的 1s 阈值（通过 gRPC 内部接口），两者阈值不同，不要混淆。
+> **前端展示规则**（见 market-data-system.md Appendix D.4）：
+> - `is_stale=true` + `stale_since_ms < 5000`：保持正常显示，**无提示**（交易引擎已处理，展示宽容度更高）
+> - `is_stale=true` + `stale_since_ms >= 5000`：显示黄色横幅"行情数据可能存在延迟，请谨慎交易"
+>
+> `is_stale` 和 `stale_since_ms` 对 REST、WebSocket、gRPC 三个通道含义相同，均使用 1s 触发。前端显示警告与否由 `stale_since_ms` 决定，不直接映射 `is_stale` 到 UI 警告。
 
 ### 1.8 涨跌幅（`change` / `change_pct`）计算基准
 
@@ -548,6 +552,7 @@ GET /v1/market/search?q=yy&limit=10
 
 - 搜索排序优先级：代码精确匹配 > 代码前缀匹配 > 名称精确匹配 > 名称前缀匹配 > 名称包含匹配。
 - 拼音首字母支持常见中文名，如 `pg` 可匹配"苹果"（`pínguǒ`）。
+- **中文名/拼音覆盖范围**：Phase 1 覆盖 Top 1000 美股（按市值排序，含所有主流中概股）；Phase 2 扩展至全部美股。
 - 搜索结果中的行情数据遵循认证规则（未认证则 `delayed: true`）。
 - Phase 1 仅支持 US 市场；HK 市场将在后续版本开放。
 

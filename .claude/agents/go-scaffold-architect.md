@@ -316,7 +316,7 @@ Use Kafka events only when the side effect must occur **outside the main transac
 # services/{name}/domain.yaml
 domain: {service-name}
 namespace: brokerage
-repo: brokerage-trading-app
+repo: hxiaodon/ai-broker
 version: "1.0"
 layout: subdomain-first-ddd      # or: single-domain-ddd
 subdomains: []                   # FILL: list subdomain names
@@ -421,7 +421,7 @@ api/
 ```protobuf
 syntax = "proto3";
 package brokerage.{name}.v1;
-option go_package = "github.com/brokerage/{name}-service/api/{name}/v1;v1";
+option go_package = "github.com/hxiaodon/ai-broker/api/{name}/v1;v1";
 
 import "errors/errors.proto";
 
@@ -550,7 +550,7 @@ internal/kafka/              # service-wide (single outbox worker — no per-sub
 When `libs/foundation/` exists in the monorepo, import it instead of re-implementing:
 
 ```
-libs/foundation/          # go.mod: github.com/brokerage/foundation
+libs/foundation/          # go.mod: github.com/hxiaodon/ai-broker/libs/foundation
 ├── decimal/              # shopspring/decimal helpers + rounding modes
 ├── crypto/               # AES-256-GCM for PII fields
 ├── audit/                # audit.WriteEvent() — WRITE-ONLY, 7-year retention
@@ -641,7 +641,7 @@ syntax = "proto3";
 
 package brokerage.{name}.v1;
 
-option go_package = "github.com/brokerage/{name}-service/api/{name}/v1;v1";
+option go_package = "github.com/hxiaodon/ai-broker/api/{name}/v1;v1";
 
 import "errors/errors.proto";  // kratos errors proto
 
@@ -672,7 +672,7 @@ enum {ServiceName}ErrorReason {
 // After running: kratos proto server api/{name}/v1/errors.proto
 // Generated: api/{name}/v1/errors.pb.go + errors_errors.pb.go
 
-import v1 "github.com/brokerage/{name}-service/api/{name}/v1"
+import v1 "github.com/hxiaodon/ai-broker/api/{name}/v1"
 
 // In domain/app layer — return typed errors, not raw fmt.Errorf
 if buyingPower.LessThan(required) {
@@ -966,7 +966,7 @@ Execute in this order:
 1. Create all directories and `.go` files — must `go build ./...` cleanly
 2. For each subdomain that calls another: generate `{subdomain}/deps.go` with interface definitions
 3. Generate `cmd/server/wire.go` with `wire.Bind` for every cross-subdomain interface
-4. Generate `src/go.mod` with pinned versions from Competency 5 (include testify + mock)
+4. Generate `src/go.mod` with pinned versions from Competency 5 (include testify + mock); module name must be `github.com/hxiaodon/ai-broker/services/{name}`
 5. Append to `go.work`, run `go work sync` (verify exit 0)
 6. Generate `migrations/001_init_{name}.sql` + `cmd/migrate/main.go`
 7. Generate `api/{name}/v1/errors.proto` skeleton with domain error codes
@@ -1100,8 +1100,8 @@ import (
 
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-kratos/kratos/v2/log"
-	"notification/internal/conf"
-	"notification/internal/server"
+	"github.com/hxiaodon/ai-broker/services/notification/internal/conf"
+	"github.com/hxiaodon/ai-broker/services/notification/internal/server"
 )
 
 func main() {
@@ -1145,11 +1145,11 @@ import (
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/google/wire"
-	"notification/internal/biz"
-	"notification/internal/conf"
-	"notification/internal/data"
-	"notification/internal/server"
-	"notification/internal/service"
+	"github.com/hxiaodon/ai-broker/services/notification/internal/biz"
+	"github.com/hxiaodon/ai-broker/services/notification/internal/conf"
+	"github.com/hxiaodon/ai-broker/services/notification/internal/data"
+	"github.com/hxiaodon/ai-broker/services/notification/internal/server"
+	"github.com/hxiaodon/ai-broker/services/notification/internal/service"
 )
 
 func wireApp(*conf.Config, log.Logger) (*kratos.App, func(), error) {

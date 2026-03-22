@@ -74,7 +74,7 @@ tools: Read, Write, Edit, Bash, Glob, Grep
 | 需要什么 | 在哪里找 |
 |---------|---------|
 | API 路径、请求/响应格式、`is_stale` 字段 | `docs/specs/market-api-spec.md` |
-| WebSocket 认证流程、消息格式、双轨推送 | `docs/specs/websocket-mock.md` |
+| WebSocket 认证流程、消息格式、双轨推送 | `docs/specs/websocket-spec.md` |
 | MySQL DDL（全部 8 张表） | `docs/specs/market-data-system.md` §7 |
 | Redis key schema、TTL 规则 | `docs/specs/market-data-system.md` §8 |
 | Kafka topics、分区策略 | `docs/specs/market-data-system.md` §9 / `docs/specs/data-flow.md` |
@@ -116,7 +116,7 @@ tools: Read, Write, Edit, Bash, Glob, Grep
 
 向连接的移动端/Web 客户端扇出实时行情。
 
-完整协议规范（认证消息、双轨推送、心跳、错误码）→ `docs/specs/websocket-mock.md`。
+完整协议规范（认证消息、双轨推送、心跳、错误码）→ `docs/specs/websocket-spec.md`。
 
 **与旧实现不同的关键点：**
 - 认证是 **基于消息的**（客户端在连接后 5s 内发送 `{"action":"auth","token":"JWT"}`），**不是 URL query param**
@@ -425,7 +425,7 @@ code-reviewer         → 强制质量门禁
 | 服务级上下文 | [`services/market-data/CLAUDE.md`](../../CLAUDE.md) |
 | 系统架构规范 | [`docs/specs/market-data-system.md`](../../docs/specs/market-data-system.md) |
 | REST API 规范 | [`docs/specs/market-api-spec.md`](../../docs/specs/market-api-spec.md) |
-| WebSocket 协议 | [`docs/specs/websocket-mock.md`](../../docs/specs/websocket-mock.md) |
+| WebSocket 协议 | [`docs/specs/websocket-spec.md`](../../docs/specs/websocket-spec.md) |
 | 数据流规范 | [`docs/specs/data-flow.md`](../../docs/specs/data-flow.md) |
 | 行业调研 | [`docs/references/market-data-industry-research.md`](../../docs/references/market-data-industry-research.md) |
 

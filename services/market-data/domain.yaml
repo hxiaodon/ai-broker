@@ -1,0 +1,31 @@
+domain: market-data
+namespace: brokerage
+repo: ai-broker
+version: "1.0"
+layout: subdomain-first-ddd
+subdomains:
+  - quote       # real-time quotes, feed ingestion, stale detection, delayed buffer
+  - kline       # K-line aggregation, corporate action adjustment
+  - watchlist   # user watchlist CRUD
+  - search      # stock search, hot search ranking
+
+kafka:
+  produces:
+    - topic: brokerage.market-data.quote.updated
+      schema: api/events/v1/market_events.proto
+  consumes: []
+
+dependencies:
+  upstream:
+    - polygon-api
+    - hkex-feed
+  downstream:
+    - trading-engine
+    - mobile
+    - admin-panel
+
+compliance:
+  handles_pii: false
+  handles_funds: false
+  audit_required: true
+  retention_years: 7

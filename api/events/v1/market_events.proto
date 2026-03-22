@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package brokerage.events.v1;
+
+option go_package = "github.com/hxiaodon/ai-broker/api/events/v1;eventsv1";
+
+import "google/protobuf/timestamp.proto";
+import "market_data/v1/market_data.proto";
+
+// ──────────────────────────────────────────────────────────────────────────
+// Market Data Kafka 事件体
+//
+// Topic：brokerage.market-data.quote.updated
+// 来源：services/market-data/docs/specs/market-data-system.md + kafka-topology.md
+// ──────────────────────────────────────────────────────────────────────────
+
+// QuoteUpdatedEvent 是 Kafka topic brokerage.market-data.quote.updated 的消息体。
+// 每次 feed handler 收到新 tick 时由 Outbox Worker 发布。
+//
+// 消费方：
+//   Trading Engine — 维护内部报价缓存，用于批量风控计算
+//
+// 幂等保证：
+//   消费方使用 event_id（UUID v4）做幂等去重，处理前先检查是否已处理过。
+message QuoteUpdatedEvent {
+  string                               event_id    = 1; // UUID v4，消费方幂等去重键
+  google.protobuf.Timestamp            occurred_at = 2; // 事件发生时间（UTC）；JSON encoding → RFC 3339
+  brokerage.market_data.v1.Quote       quote       = 3; // 完整行情快照
+}

@@ -1,0 +1,62 @@
+# Market Data Domain - Patch Registry
+# Patch 注册表（活跃补丁 + 技术债）
+
+patches:
+  - id: PATCH-MD-001
+    title: DECIMAL precision mismatch (20,8 vs 20,4)
+    type: technical_debt
+    severity: medium
+    status: active
+    created: 2026-03-22
+    affected_files:
+      - src/migrations/001_init_market_data.sql
+    description: |
+      Migration 使用 DECIMAL(20,8) 用于价格字段，但平台规范要求 DECIMAL(20,4)。
+      Tracker 和文档索引约定不一致。
+    impact: |
+      - 违反平台 DB 规则
+      - 文档、tracker、DDL 三方口径不一致
+    resolution_plan: |
+      1. 确认 market-data 是否获准使用 8 位小数（豁免）
+      2. 若无豁免，创建新 migration 修改为 DECIMAL(20,4)
+      3. 更新文档索引和 tracker 验收记录
+    owner: market-data-engineer
+    references:
+      - docs/README-INDEX.md:97
+      - src/migrations/001_init_market_data.sql:3,12,43
+      - docs/claude-code-workflow-review.md (MD-REV-011)
+
+  - id: PATCH-MD-002
+    title: Market status enum naming inconsistency
+    type: technical_debt
+    severity: low
+    status: active
+    created: 2026-03-22
+    affected_files:
+      - src/migrations/001_init_market_data.sql
+      - src/internal/quote/domain/entity.go
+      - docs/specs/market-api-spec.md
+      - api/market_data/v1/market_data.proto
+    description: |
+      市场状态枚举在不同层使用不同词汇：
+      - Migration: OPEN, POST_MARKET, LUNCH_BREAK
+      - Domain: OPEN, POST_MARKET, LUNCH_BREAK
+      - API/Proto: REGULAR, AFTER_HOURS, HALTED
+    impact: |
+      - 领域模型、持久化、对外契约对同一概念使用不同枚举
+      - 映射逻辑容易出错
+    resolution_plan: |
+      1. 统一使用 API/Proto 词汇（REGULAR, PRE_MARKET, AFTER_HOURS, HALTED, CLOSED）
+      2. 更新 domain enum 和 migration 注释
+      3. 在 Tech Spec 中明确映射规则
+    owner: market-data-engineer
+    references:
+      - docs/claude-code-workflow-review.md (MD-REV-012, MD-REV-014)
+
+technical_debt_summary:
+  total_patches: 2
+  active: 2
+  resolved: 0
+  high_severity: 0
+  medium_severity: 1
+  low_severity: 1

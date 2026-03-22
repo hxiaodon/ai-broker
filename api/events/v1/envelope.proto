@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package brokerage.events.v1;
+
+option go_package = "github.com/hxiaodon/ai-broker/api/events/v1;eventsv1";
+
+import "google/protobuf/timestamp.proto";
+
+// EventEnvelope 是所有 Kafka 消息的统一外层包装。
+// 消费方可通过 event_type 做路由，payload 内嵌具体事件 proto 的序列化字节。
+//
+// 使用场景：需要跨服务统一元数据时使用；单服务内部 topic 可直接使用具体事件消息体。
+message EventEnvelope {
+  string                    event_id     = 1; // UUID v4，全局唯一事件 ID
+  string                    event_type   = 2; // 完整 topic 名，如 "brokerage.market-data.quote.updated"
+  string                    source       = 3; // 发布服务名，如 "market-data"
+  google.protobuf.Timestamp published_at = 4; // 发布时间（UTC）
+  bytes                     payload      = 5; // 具体事件消息体的 proto 序列化字节
+  string                    trace_id     = 6; // OTel Trace ID，用于分布式追踪关联
+}

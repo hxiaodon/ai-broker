@@ -1,0 +1,548 @@
+definitions:
+  github_com_hxiaodon_ai-broker_services_market-data_internal_quote_domain.Market:
+    enum:
+    - US
+    - HK
+    type: string
+    x-enum-comments:
+      MarketHK: HKEX
+      MarketUS: NYSE/NASDAQ
+    x-enum-descriptions:
+    - NYSE/NASDAQ
+    - HKEX
+    x-enum-varnames:
+    - MarketUS
+    - MarketHK
+  github_com_hxiaodon_ai-broker_services_market-data_internal_quote_domain.MarketStatus:
+    properties:
+      market:
+        $ref: '#/definitions/github_com_hxiaodon_ai-broker_services_market-data_internal_quote_domain.Market'
+      phase:
+        $ref: '#/definitions/github_com_hxiaodon_ai-broker_services_market-data_internal_quote_domain.TradingPhase'
+      updatedAt:
+        description: Always UTC
+        type: string
+    type: object
+  github_com_hxiaodon_ai-broker_services_market-data_internal_quote_domain.Quote:
+    properties:
+      ask:
+        description: shopspring/decimal — never float64
+        type: number
+      askSize:
+        format: int64
+        type: integer
+      bid:
+        description: shopspring/decimal — never float64
+        type: number
+      bidSize:
+        format: int64
+        type: integer
+      change:
+        description: shopspring/decimal — never float64 — Price - PrevClose (unadjusted)
+        type: number
+      changePct:
+        description: shopspring/decimal — never float64 — Change / PrevClose * 100
+        type: number
+      high:
+        description: shopspring/decimal — never float64
+        type: number
+      isStale:
+        description: true if quote exceeds stale threshold
+        type: boolean
+      lastUpdatedAt:
+        description: Always UTC
+        type: string
+      low:
+        description: shopspring/decimal — never float64
+        type: number
+      market:
+        $ref: '#/definitions/github_com_hxiaodon_ai-broker_services_market-data_internal_quote_domain.Market'
+      open:
+        description: shopspring/decimal — never float64
+        type: number
+      prevClose:
+        description: shopspring/decimal — never float64 — previous Regular Session
+          close
+        type: number
+      price:
+        description: shopspring/decimal — never float64
+        type: number
+      symbol:
+        type: string
+      volume:
+        format: int64
+        type: integer
+    type: object
+  github_com_hxiaodon_ai-broker_services_market-data_internal_quote_domain.TradingPhase:
+    enum:
+    - PRE_MARKET
+    - OPEN
+    - LUNCH_BREAK
+    - POST_MARKET
+    - CLOSED
+    type: string
+    x-enum-comments:
+      PhaseLunchBreak: HK only
+    x-enum-descriptions:
+    - ""
+    - ""
+    - HK only
+    - ""
+    - ""
+    x-enum-varnames:
+    - PhasePreMarket
+    - PhaseOpen
+    - PhaseLunchBreak
+    - PhasePostMarket
+    - PhaseClosed
+  internal_kline.Interval:
+    enum:
+    - 1min
+    - 5min
+    - 15min
+    - 30min
+    - 1h
+    - 1D
+    - 1W
+    - 1M
+    type: string
+    x-enum-varnames:
+    - Interval1Min
+    - Interval5Min
+    - Interval15Min
+    - Interval30Min
+    - Interval1H
+    - Interval1D
+    - Interval1W
+    - Interval1M
+  internal_kline.KLine:
+    properties:
+      adjusted:
+        description: true if prices are adjusted for corporate actions
+        type: boolean
+      close:
+        description: shopspring/decimal — never float64
+        type: number
+      endTime:
+        description: Always UTC — end of the candle period
+        type: string
+      high:
+        description: shopspring/decimal — never float64
+        type: number
+      id:
+        format: int64
+        type: integer
+      interval:
+        $ref: '#/definitions/internal_kline.Interval'
+      low:
+        description: shopspring/decimal — never float64
+        type: number
+      open:
+        description: shopspring/decimal — never float64
+        type: number
+      startTime:
+        description: Always UTC — start of the candle period
+        type: string
+      symbol:
+        type: string
+      volume:
+        format: int64
+        type: integer
+    type: object
+  internal_search.HotSearchItem:
+    properties:
+      name:
+        type: string
+      score:
+        description: Redis sorted set score — display ranking only, not financial
+        format: float64
+        type: number
+      symbol:
+        type: string
+    type: object
+  internal_search.Stock:
+    properties:
+      exchange:
+        description: '"NYSE", "NASDAQ", "HKEX"'
+        type: string
+      industry:
+        type: string
+      market:
+        description: '"US" or "HK"'
+        type: string
+      name:
+        description: Company name
+        type: string
+      nameCN:
+        description: Chinese company name
+        type: string
+      sector:
+        type: string
+      symbol:
+        type: string
+    type: object
+  internal_watchlist.WatchlistItem:
+    properties:
+      createdAt:
+        description: Always UTC
+        type: string
+      id:
+        format: int64
+        type: integer
+      market:
+        description: '"US" or "HK"'
+        type: string
+      sortOrder:
+        type: integer
+      symbol:
+        type: string
+      userID:
+        format: int64
+        type: integer
+    type: object
+  internal_watchlist.addWatchlistRequest:
+    properties:
+      market:
+        type: string
+      symbol:
+        type: string
+      user_id:
+        type: integer
+    type: object
+info:
+  contact: {}
+paths:
+  /kline:
+    get:
+      consumes:
+      - application/json
+      description: Returns OHLCV candlestick bars for a symbol and interval. Historical
+        prices use split+dividend backward adjustment.
+      parameters:
+      - description: Stock symbol (e.g. AAPL, 00700)
+        in: query
+        name: symbol
+        required: true
+        type: string
+      - default: 1D
+        description: Bar interval
+        enum:
+        - 1min
+        - 5min
+        - 15min
+        - 30min
+        - 1h
+        - 1D
+        - 1W
+        - 1M
+        in: query
+        name: interval
+        type: string
+      - default: 200
+        description: Maximum number of bars to return
+        in: query
+        name: limit
+        type: integer
+      - description: Start time in RFC 3339 format (e.g. 2024-01-01T00:00:00Z)
+        in: query
+        name: start
+        type: string
+      - description: End time in RFC 3339 format (e.g. 2024-12-31T23:59:59Z)
+        in: query
+        name: end
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_kline.KLine'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get K-line (candlestick) data
+      tags:
+      - kline
+  /market/status:
+    get:
+      consumes:
+      - application/json
+      description: Returns the current trading phase and session times for a given
+        market (US or HK).
+      parameters:
+      - default: US
+        description: Market identifier (US or HK)
+        enum:
+        - US
+        - HK
+        in: query
+        name: market
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_hxiaodon_ai-broker_services_market-data_internal_quote_domain.MarketStatus'
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get market trading status
+      tags:
+      - quote
+  /quote:
+    get:
+      consumes:
+      - application/json
+      description: Returns the latest quote snapshot for a given symbol. For guest
+        users the price is delayed 15 minutes and labeled accordingly.
+      parameters:
+      - description: Stock symbol (e.g. AAPL, 00700)
+        in: query
+        name: symbol
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_hxiaodon_ai-broker_services_market-data_internal_quote_domain.Quote'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get real-time quote
+      tags:
+      - quote
+  /search:
+    get:
+      consumes:
+      - application/json
+      description: Full-text search across stock symbols and company names. Supports
+        US (NYSE/NASDAQ) and HK (HKEX) markets.
+      parameters:
+      - description: Search query (symbol prefix or company name keyword)
+        in: query
+        name: q
+        required: true
+        type: string
+      - description: Filter by market
+        enum:
+        - US
+        - HK
+        in: query
+        name: market
+        type: string
+      - default: 20
+        description: Maximum number of results
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_search.Stock'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Search stocks
+      tags:
+      - search
+  /search/hot:
+    get:
+      consumes:
+      - application/json
+      description: Returns the top-N most searched symbols in the last 24 hours, ranked
+        by search frequency.
+      parameters:
+      - default: 10
+        description: Number of top symbols to return
+        in: query
+        name: "n"
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_search.HotSearchItem'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Get hot search rankings
+      tags:
+      - search
+  /watchlist:
+    delete:
+      consumes:
+      - application/json
+      description: Removes a stock symbol from the user's watchlist. No-op if symbol
+        is not present.
+      parameters:
+      - description: User ID (temporary; production uses JWT claims)
+        in: query
+        name: user_id
+        required: true
+        type: integer
+      - description: Stock symbol to remove
+        in: query
+        name: symbol
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Remove symbol from watchlist
+      tags:
+      - watchlist
+    get:
+      consumes:
+      - application/json
+      description: Returns all symbols in the user's watchlist with latest quotes.
+      parameters:
+      - description: User ID (temporary; production uses JWT claims)
+        in: query
+        name: user_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/internal_watchlist.WatchlistItem'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get user watchlist
+      tags:
+      - watchlist
+    post:
+      consumes:
+      - application/json
+      description: Adds a stock symbol to the user's watchlist. Duplicate symbols
+        are ignored.
+      parameters:
+      - description: Symbol to add
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_watchlist.addWatchlistRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Add symbol to watchlist
+      tags:
+      - watchlist
+swagger: "2.0"

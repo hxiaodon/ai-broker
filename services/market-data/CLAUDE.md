@@ -58,10 +58,12 @@ Responsibilities:
 | `docs/README-INDEX.md` | **Start here** — scenario-based loading guide, key conventions, todo list |
 | `docs/specs/market-data-system.md` | System architecture v2.1: §0 compliance prerequisites, feed handler, processing engine, corporate actions (Appendix C), stale handling (Appendix D), MySQL DDL, Redis/Kafka design, historical backfill (§14) |
 | `docs/specs/market-api-spec.md` | REST API v2.1: all 10 endpoints, `is_stale` field, change/change_pct basis definition, adjusted price notes |
-| `docs/specs/websocket-mock.md` | WebSocket protocol v2.1: full auth flow (message-based, not URL param), dual-track push (registered/guest), `is_stale` field |
+| `docs/specs/websocket-spec.md` | WebSocket protocol v2.1: full auth flow (message-based, not URL param), dual-track push (registered/guest), `is_stale` field |
 | `docs/specs/data-flow.md` | Data flow v2.1: feed→engine→Redis→WS dual-track, Kafka topics, cold-start backfill procedure |
 | `docs/specs/*.tracker.md` | 实现跟踪文件（动态进度 + 验收记录） |
 | `docs/specs/api/grpc/market_data.proto` | Protobuf message definitions |
+| `docs/specs/service-overview.md` | L3 system design spec skeleton (scaffold-generated, FILL markers) |
+| `docs/specs/business-rules.md` | L4 domain rules spec skeleton (scaffold-generated, FILL markers) |
 
 ### 平台级规范 (Global)
 
@@ -81,6 +83,7 @@ Responsibilities:
 | `docs/active-features.yaml` | 域级功能实现进度仪表盘 |
 | `docs/patches.yaml` | Patch 注册表（活跃补丁 + 技术债） |
 | `docs/threads/` | Collaboration threads |
+| `domain.yaml` | Machine-readable service metadata (subdomains, Kafka topology, dependencies) |
 
 ### 参考资料 (Cold Layer)
 
@@ -90,21 +93,95 @@ Responsibilities:
 | `src/scripts/init_db.sql` | MySQL schema and seed data (needs update to v2.1 DDL) |
 | `src/config/config.yaml` | Service configuration |
 
+## Architecture Layout
+
+**Layout**: subdomain-first-ddd (4 subdomains)
+
+```
+server → [quote.Handler, kline.Handler, watchlist.Handler, search.Handler]
+         → each handler imports its own app layer
+         → each app layer imports its own domain layer
+         → each infra layer implements domain interfaces
+```
+
+Dependency direction within each subdomain:
+```
+handler → app → domain ← infra
+```
+
 ## Code Layout
 
 ```
 src/
-├── cmd/server/main.go         -- Entry point
-├── internal/api/              -- HTTP handlers
-├── internal/service/          -- Business logic
-├── internal/repository/       -- MySQL data access (quote, kline, stock, watchlist, news, financial, hot_search)
-├── internal/websocket/        -- WebSocket hub, handler, mock pusher
-├── internal/config/           -- Config loading
-├── pkg/cache/                 -- Redis wrapper
-├── pkg/database/              -- MySQL connection
-├── pkg/kafka/                 -- Kafka consumer
-├── pkg/polygon/               -- Polygon API client
-└── api/grpc/market_data.pb.go -- Generated protobuf code
+├── cmd/
+│   ├── server/                       -- Entry point + Wire DI
+│   │   ├── main.go                   -- Application bootstrap
+│   │   ├── app.go                    -- App lifecycle container
+│   │   ├── wire.go                   -- Wire build tags (wireinject)
+│   │   └── wire_gen.go               -- Generated Wire output
+│   └── migrate/main.go               -- Goose migration runner
+├── configs/
+│   ├── config.yaml                   -- Local dev config (no secrets)
+│   └── config.yaml.example           -- Fake placeholder values
+├── migrations/
+│   └── 001_init_market_data.sql      -- Initial schema (goose Up/Down)
+├── internal/
+│   ├── conf/conf.go                  -- Config struct + loader
+│   ├── quote/                        -- COMPLEX subdomain (full DDD sub-packages)
+│   │   ├── domain/
+│   │   │   ├── entity.go             -- Quote, MarketStatus aggregates + VOs
+│   │   │   ├── repo.go               -- QuoteRepo, QuoteCacheRepo, MarketStatusRepo interfaces
+│   │   │   ├── service.go            -- StaleDetector domain service
+│   │   │   └── events.go             -- QuoteUpdatedEvent
+│   │   ├── app/
+│   │   │   ├── update_quote.go       -- UpdateQuote use case
+│   │   │   ├── get_quote.go          -- GetQuote + GetMarketStatus use cases
+│   │   │   └── get_quote_test.go     -- Test skeleton with mocks
+│   │   ├── infra/
+│   │   │   ├── mysql/repo.go + model.go  -- GORM impl + OutboxRepository
+│   │   │   ├── redis/cache.go        -- QuoteCacheRepository
+│   │   │   └── kafka/publisher.go    -- Typed outbox publisher
+│   │   ├── handler.go                -- HTTP + gRPC handler
+│   │   └── wire.go                   -- ProviderSet
+│   ├── kline/                        -- DEGENERATE form (DDD layers as files)
+│   │   ├── domain.go                 -- KLine entity + KLineRepo interface
+│   │   ├── usecase.go                -- Aggregate + GetKLines use cases
+│   │   ├── repo.go                   -- MySQL implementation
+│   │   ├── handler.go                -- HTTP handler
+│   │   ├── wire.go                   -- ProviderSet
+│   │   └── usecase_test.go           -- Test skeleton
+│   ├── watchlist/                    -- DEGENERATE form
+│   │   ├── domain.go                 -- WatchlistItem + WatchlistRepo
+│   │   ├── usecase.go                -- Get/Add/Remove use cases
+│   │   ├── repo.go                   -- MySQL implementation
+│   │   ├── handler.go                -- HTTP handler
+│   │   ├── wire.go                   -- ProviderSet
+│   │   └── usecase_test.go           -- Test skeleton
+│   ├── search/                       -- DEGENERATE form
+│   │   ├── domain.go                 -- Stock, HotSearchItem + repo interfaces
+│   │   ├── usecase.go                -- SearchStocks + GetHotSearch
+│   │   ├── repo.go                   -- MySQL + Redis implementations
+│   │   ├── handler.go                -- HTTP handler
+│   │   ├── wire.go                   -- ProviderSet
+│   │   └── usecase_test.go           -- Test skeleton
+│   ├── kafka/                        -- Service-wide Kafka infrastructure
+│   │   ├── outbox/worker.go          -- Polls outbox_events, publishes to Kafka
+│   │   └── producer/quote.go         -- Topic constants
+│   ├── server/                       -- Transport layer
+│   │   ├── http.go                   -- REST + /health + /metrics + /ready
+│   │   ├── grpc.go                   -- gRPC server + health check
+│   │   ├── websocket.go              -- WebSocket gateway (stub)
+│   │   └── server.go                 -- ProviderSet + typed addr types
+│   └── gen/.gitkeep                  -- Proto generated code placeholder
+└── pkg/
+    ├── observability/
+    │   ├── tracer.go                 -- OTel OTLP gRPC exporter
+    │   ├── metrics.go                -- 5 standard Prometheus metrics
+    │   └── logger.go                 -- Zap JSON + PII masking
+    ├── middleware/
+    │   └── idempotency.go            -- Idempotency-Key header, 72h Redis TTL
+    ├── polygon/client.go             -- Polygon API client (stub)
+    └── hkex/client.go                -- HKEX feed client (stub)
 ```
 
 ## Dependencies

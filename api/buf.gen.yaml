@@ -1,0 +1,34 @@
+version: v1
+
+# buf generate 从 api/ 目录下运行：cd api && buf generate
+#
+# 产物说明：
+#   Go/gRPC → 生成的 .pb.go 文件与 .proto 同目录（paths=source_relative）
+#             import 路径与 go_package 完全一致
+#             e.g. api/market_data/v1/market_data.pb.go
+#                  → import "github.com/hxiaodon/ai-broker/api/market_data/v1"
+#   OpenAPI  → docs/openapi/market_data/（供 Mobile/Admin 前端消费）
+#
+# 运行前确保 ~/go/bin 在 PATH 中：
+#   export PATH=$PATH:~/go/bin
+
+plugins:
+  # Go protobuf 运行时（messages）
+  - plugin: go
+    out: .
+    opt: paths=source_relative
+
+  # Go gRPC stubs（service interfaces + client）
+  - plugin: go-grpc
+    out: .
+    opt:
+      - paths=source_relative
+      - require_unimplemented_servers=false
+
+  # OpenAPI v2（REST endpoints → 供 Mobile 和 Admin Panel 消费）
+  - plugin: openapiv2
+    out: ../docs/openapi/market_data
+    opt:
+      - logtostderr=true
+      - json_names_for_fields=false
+      - enums_as_ints=false

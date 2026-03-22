@@ -1541,7 +1541,7 @@ CREATE TABLE stocks (
     pinyin_initials     VARCHAR(20)     NOT NULL DEFAULT '', -- 拼音首字母（如 "pg" 对应苹果）
     sector              VARCHAR(100)    NOT NULL DEFAULT '', -- 行业板块
     industry            VARCHAR(100)    NOT NULL DEFAULT '', -- 细分行业
-    shares_outstanding  BIGINT UNSIGNED NOT NULL DEFAULT 0, -- 流通股本（股），用于换手率计算
+    shares_outstanding  BIGINT UNSIGNED NOT NULL DEFAULT 0, -- 流通股本（股），用于换手率计算；数据源: Polygon Fundamental API，每日收盘后批量更新
     market_cap          BIGINT UNSIGNED NOT NULL DEFAULT 0, -- 市值（USD cents）
     pe_ratio            DECIMAL(12, 4)  NULL,               -- 市盈率 TTM
     pb_ratio            DECIMAL(12, 4)  NULL,               -- 市净率
@@ -1565,6 +1565,11 @@ CREATE TABLE stocks (
 - 股票入库时一次性计算写入 `pinyin_initials`
 - 算法：对中文名每个汉字取声母（如 "苹果" → "pg"）
 - 搜索时使用 `LIKE 'pg%'` 前缀匹配
+
+**中文名/拼音覆盖范围**:
+- **Phase 1**：Top 1000 美股（按市值排序，含所有主流中概股），覆盖约 99% 用户搜索需求
+- **Phase 2**：扩展至全部美股（约 6000+ 只）
+- 数据采集：服务首次部署时通过 Polygon Tickers API 批量拉取，此后随股票元数据每日更新
 
 ### 7.2 quotes — 实时行情快照
 
@@ -2260,6 +2265,18 @@ GET /health/ready   → Readiness Probe（连接已建立、Redis 可达）
 | 历史数据范围 | 日线：免费计划 2 年；付费计划更长 |
 | Tick 数据 | 需付费计划；Phase 1 暂不回填全量 Tick |
 | 无交易时段 | Polygon **不生成**无交易的 K 线，Holiday/Halt 期间为空白 |
+
+### 14.1.1 Fundamental 数据同步
+
+股票基本面数据（`shares_outstanding`、`market_cap`、`pe_ratio`、`pb_ratio`、`eps`、`dividend_yield`）通过 **Polygon Fundamental API** 获取：
+
+| 项目 | 说明 |
+|------|------|
+| **API** | `GET https://api.polygon.io/vX/reference/financials` |
+| **字段** | `shares_outstanding`（优先取 `float_shares`；不可用时取 `weighted_shares_outstanding`）|
+| **更新频率** | 每日收盘后（US 市场 16:30 ET 后）批量更新所有 `is_active=1` 股票 |
+| **触发方式** | 定时任务（Cron Job），与 K 线 EOD 数据更新流水线合并 |
+| **降级策略** | Polygon Fundamental API 不可用时，保留上一次已知值；监控告警触发 `FundamentalSyncFailed` |
 
 ### 14.2 分级回填策略
 

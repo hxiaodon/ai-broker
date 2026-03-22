@@ -1,0 +1,56 @@
+# Market Data Domain - Active Features Dashboard
+# 域级功能实现进度仪表盘
+
+features:
+  - id: market-data-core
+    name: Market Data Core Implementation
+    spec: docs/specs/market-data-system.md
+    status: in_progress
+    current_phase: 4
+    total_phases: 6
+    assignee: market-data-engineer
+    started: 2026-03-22T09:00+08:00
+    updated: 2026-03-22T18:30+08:00
+    tracker: docs/specs/market-data-implementation.tracker.md
+    progress:
+      total: 35
+      completed: 28
+      in_progress: 0
+      blocked: 0
+      pending: 7
+    phases:
+      - phase: 1
+        name: DB Schema
+        status: completed
+        completed_at: 2026-03-22T09:30+08:00
+      - phase: 2
+        name: Domain Layer
+        status: completed
+        completed_at: 2026-03-22T10:00+08:00
+      - phase: 3
+        name: Infrastructure Layer
+        status: completed
+        completed_at: 2026-03-22T14:00+08:00
+      - phase: 4
+        name: Application Layer
+        status: completed
+        completed_at: 2026-03-22T17:45+08:00
+      - phase: 5
+        name: Transport Layer
+        status: pending
+        tasks:
+          - HTTP handlers (路由对齐、DTO 层、批量接口)
+          - gRPC service implementation
+          - WebSocket gateway (认证、订阅、双轨推送)
+          - /ready endpoint health checks
+      - phase: 6
+        name: Integration Verification
+        status: pending
+        tasks:
+          - End-to-end flow validation
+          - Integration tests with docker-compose
+          - Compliance checks
+    blockers: []
+    notes: |
+      Phase 4 完成，Phase 5 待开始。
+      文档合规问题已修复（Tracker、Contracts、business-rules、service-overview）。
