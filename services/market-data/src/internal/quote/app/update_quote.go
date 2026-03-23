@@ -65,7 +65,7 @@ func (uc *UpdateQuoteUsecase) Execute(ctx context.Context, q *domain.Quote) erro
 	// The usecase must NOT overwrite it with time.Now() — doing so would break
 	// stale detection by making stale quotes appear fresh (market-data-system.md Appendix D.3).
 	// Spec: market-data-system.md §3.3.5 — evaluate stale thresholds on every update
-	uc.stale.Evaluate(q)
+	q.ApplyStaleCheck(uc.stale.Evaluate(q))
 
 	// Serialize domain event payload (JSON; proto wire format added in Phase 5).
 	// Spec: market-data-system.md §5 — QuoteUpdatedEvent is the canonical outbox payload.
@@ -77,11 +77,13 @@ func (uc *UpdateQuoteUsecase) Execute(ctx context.Context, q *domain.Quote) erro
 
 	// 1. Atomic: DB write + outbox insert in one transaction.
 	// Spec: Outbox pattern — event and entity are written together so no event is lost.
+	// Spec: data-flow.md — use market-specific topic (market-data.quotes.us or .hk)
+	topic := producer.QuoteTopicForMarket(string(q.Market))
 	if err := uc.txFunc(ctx, func(txCtx context.Context) error {
 		if err := uc.quoteRepo.Save(txCtx, q); err != nil {
 			return fmt.Errorf("save quote: %w", err)
 		}
-		if err := uc.outboxRepo.InsertEvent(txCtx, producer.QuoteTopic, payload); err != nil {
+		if err := uc.outboxRepo.InsertEvent(txCtx, topic, payload); err != nil {
 			return fmt.Errorf("insert outbox event: %w", err)
 		}
 		return nil
@@ -92,9 +94,11 @@ func (uc *UpdateQuoteUsecase) Execute(ctx context.Context, q *domain.Quote) erro
 	// 2. Cache update is best-effort after the transaction commits.
 	// A cache miss is tolerable — the next read will fall through to DB.
 	if err := uc.cacheRepo.Set(ctx, q); err != nil {
-		// Non-fatal: log in production, do not fail the use case.
-		// The outbox event is already durable; cache is a performance optimisation.
-		_ = fmt.Errorf("update quote %s: cache set (non-fatal): %w", q.Symbol, err)
+		// Non-fatal: log and continue. The outbox event is already durable.
+		uc.logger.Warn("cache set failed (non-fatal)",
+			zap.String("symbol", q.Symbol),
+			zap.String("market", string(q.Market)),
+			zap.Error(err))
 	}
 
 	return nil

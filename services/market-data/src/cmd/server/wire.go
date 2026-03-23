@@ -12,6 +12,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/conf"
+	"github.com/hxiaodon/ai-broker/services/market-data/internal/feed"
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/kline"
 	kafkaOutbox "github.com/hxiaodon/ai-broker/services/market-data/internal/kafka/outbox"
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/quote"
@@ -32,6 +33,9 @@ func initApp(cfg *conf.Config, logger *zap.Logger) (*App, func(), error) {
 		kline.ProviderSet,
 		watchlist.ProviderSet,
 		search.ProviderSet,
+
+		// Feed handler
+		feed.ProviderSet,
 
 		// Kafka outbox
 		kafkaOutbox.NewWorker,

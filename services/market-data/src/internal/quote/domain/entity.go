@@ -74,3 +74,11 @@ func DefaultStaleThreshold() StaleThreshold {
 		DisplayWarn: 5 * time.Second,
 	}
 }
+
+// ApplyStaleCheck applies the result of StaleDetector.Evaluate() to the Quote.
+// Separating computation (StaleDetector) from mutation (Quote) keeps the domain
+// service free of side effects and the aggregate in control of its own state.
+func (q *Quote) ApplyStaleCheck(r StaleResult) {
+	q.IsStale = r.IsStale
+	q.StaleSinceMs = r.StaleSinceMs
+}

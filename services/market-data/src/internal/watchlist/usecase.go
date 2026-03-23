@@ -17,10 +17,10 @@ func NewGetWatchlistUsecase(repo WatchlistRepo) *GetWatchlistUsecase {
 }
 
 // Execute retrieves all watchlist items for the given user.
-func (uc *GetWatchlistUsecase) Execute(ctx context.Context, userID int64) ([]*WatchlistItem, error) {
+func (uc *GetWatchlistUsecase) Execute(ctx context.Context, userID string) ([]*WatchlistItem, error) {
 	items, err := uc.repo.FindByUserID(ctx, userID)
 	if err != nil {
-		return nil, fmt.Errorf("get watchlist user %d: %w", userID, err)
+		return nil, fmt.Errorf("get watchlist user %s: %w", userID, err)
 	}
 	return items, nil
 }
@@ -41,7 +41,7 @@ func NewAddToWatchlistUsecase(repo WatchlistRepo, validator StockValidator) *Add
 //  1. Watchlist limit: maximum 100 symbols per user.
 //  2. Idempotency: if the symbol is already in the watchlist, return nil (no error).
 //  3. Symbol existence: the symbol must exist in the tradeable stocks universe.
-func (uc *AddToWatchlistUsecase) Execute(ctx context.Context, userID int64, symbol, market string) error {
+func (uc *AddToWatchlistUsecase) Execute(ctx context.Context, userID string, symbol, market string) error {
 	if symbol == "" {
 		return fmt.Errorf("add to watchlist: symbol must not be empty")
 	}
@@ -49,16 +49,16 @@ func (uc *AddToWatchlistUsecase) Execute(ctx context.Context, userID int64, symb
 	// Rule 3: symbol must exist in stocks universe.
 	exists, err := uc.validator.ExistsBySymbol(ctx, symbol)
 	if err != nil {
-		return fmt.Errorf("add to watchlist user %d symbol %s: validate symbol: %w", userID, symbol, err)
+		return fmt.Errorf("add to watchlist user %s symbol %s: validate symbol: %w", userID, symbol, err)
 	}
 	if !exists {
-		return fmt.Errorf("add to watchlist user %d symbol %s: %w", userID, symbol, ErrSymbolNotFound)
+		return fmt.Errorf("add to watchlist user %s symbol %s: %w", userID, symbol, ErrSymbolNotFound)
 	}
 
 	// Rule 2: idempotency — already in watchlist is a no-op.
 	alreadyExists, err := uc.repo.ExistsByUserAndSymbol(ctx, userID, symbol)
 	if err != nil {
-		return fmt.Errorf("add to watchlist user %d symbol %s: check exists: %w", userID, symbol, err)
+		return fmt.Errorf("add to watchlist user %s symbol %s: check exists: %w", userID, symbol, err)
 	}
 	if alreadyExists {
 		return nil
@@ -67,10 +67,10 @@ func (uc *AddToWatchlistUsecase) Execute(ctx context.Context, userID int64, symb
 	// Rule 1: enforce 100-symbol cap.
 	count, err := uc.repo.CountByUserID(ctx, userID)
 	if err != nil {
-		return fmt.Errorf("add to watchlist user %d: count: %w", userID, err)
+		return fmt.Errorf("add to watchlist user %s: count: %w", userID, err)
 	}
 	if count >= MaxWatchlistSize {
-		return fmt.Errorf("add to watchlist user %d: %w", userID, ErrWatchlistFull)
+		return fmt.Errorf("add to watchlist user %s: %w", userID, ErrWatchlistFull)
 	}
 
 	item := &WatchlistItem{
@@ -80,7 +80,7 @@ func (uc *AddToWatchlistUsecase) Execute(ctx context.Context, userID int64, symb
 		CreatedAt: time.Now().UTC(),
 	}
 	if err := uc.repo.Add(ctx, item); err != nil {
-		return fmt.Errorf("add to watchlist user %d symbol %s: %w", userID, symbol, err)
+		return fmt.Errorf("add to watchlist user %s symbol %s: %w", userID, symbol, err)
 	}
 	return nil
 }
@@ -96,12 +96,12 @@ func NewRemoveFromWatchlistUsecase(repo WatchlistRepo) *RemoveFromWatchlistUseca
 }
 
 // Execute removes a symbol from the user's watchlist.
-func (uc *RemoveFromWatchlistUsecase) Execute(ctx context.Context, userID int64, symbol string) error {
+func (uc *RemoveFromWatchlistUsecase) Execute(ctx context.Context, userID string, symbol string) error {
 	if symbol == "" {
 		return fmt.Errorf("remove from watchlist: symbol must not be empty")
 	}
 	if err := uc.repo.Remove(ctx, userID, symbol); err != nil {
-		return fmt.Errorf("remove from watchlist user %d symbol %s: %w", userID, symbol, err)
+		return fmt.Errorf("remove from watchlist user %s symbol %s: %w", userID, symbol, err)
 	}
 	return nil
 }

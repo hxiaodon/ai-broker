@@ -5,7 +5,6 @@ import (
 
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/quote/app"
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/quote/domain"
-	infraKafka "github.com/hxiaodon/ai-broker/services/market-data/internal/quote/infra/kafka"
 	infraMySQL "github.com/hxiaodon/ai-broker/services/market-data/internal/quote/infra/mysql"
 	infraRedis "github.com/hxiaodon/ai-broker/services/market-data/internal/quote/infra/redis"
 )
@@ -21,7 +20,8 @@ var ProviderSet = wire.NewSet(
 	infraMySQL.NewOutboxRepository,
 	infraMySQL.NewTxFunc,
 	infraRedis.NewQuoteCacheRepository,
-	infraKafka.NewQuoteEventPublisher,
+	// NOTE: infraKafka.NewQuoteEventPublisher removed — unused dead code.
+	// UpdateQuoteUsecase calls OutboxRepo.InsertEvent directly with producer.QuoteTopicForMarket().
 
 	// Bind infra implementations to domain interfaces
 	wire.Bind(new(domain.QuoteRepo), new(*infraMySQL.QuoteRepository)),

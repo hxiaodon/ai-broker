@@ -5,6 +5,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/hxiaodon/ai-broker/services/market-data/internal/feed"
 	kafkaOutbox "github.com/hxiaodon/ai-broker/services/market-data/internal/kafka/outbox"
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/server"
 )
@@ -13,6 +14,7 @@ import (
 type App struct {
 	httpSrv      *server.HTTPServer
 	grpcSrv      *server.GRPCServer
+	feedWorker   *feed.Worker
 	outboxWorker *kafkaOutbox.Worker
 	logger       *zap.Logger
 	cancel       context.CancelFunc
@@ -22,12 +24,14 @@ type App struct {
 func NewApp(
 	httpSrv *server.HTTPServer,
 	grpcSrv *server.GRPCServer,
+	feedWorker *feed.Worker,
 	outboxWorker *kafkaOutbox.Worker,
 	logger *zap.Logger,
 ) *App {
 	return &App{
 		httpSrv:      httpSrv,
 		grpcSrv:      grpcSrv,
+		feedWorker:   feedWorker,
 		outboxWorker: outboxWorker,
 		logger:       logger,
 	}
@@ -37,6 +41,13 @@ func NewApp(
 func (a *App) Start() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	a.cancel = cancel
+
+	// Start feed worker in background.
+	go func() {
+		if err := a.feedWorker.Run(ctx); err != nil && ctx.Err() == nil {
+			a.logger.Error("feed worker error", zap.Error(err))
+		}
+	}()
 
 	// Start outbox worker in background.
 	go func() {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/hxiaodon/ai-broker/services/market-data/internal/quote/app"
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/quote/domain"
 	"gorm.io/gorm"
 )
@@ -139,7 +140,7 @@ func (r *OutboxRepository) InsertEvent(ctx context.Context, topic string, payloa
 // NewTxFunc returns an app.TxFunc backed by gorm.DB.Transaction.
 // The returned function executes fn within a single DB transaction; if fn returns
 // an error the transaction is rolled back, otherwise it is committed.
-func NewTxFunc(db *gorm.DB) func(ctx context.Context, fn func(ctx context.Context) error) error {
+func NewTxFunc(db *gorm.DB) app.TxFunc {
 	return func(ctx context.Context, fn func(ctx context.Context) error) error {
 		return db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 			// Store tx in context so repos can detect and use it.

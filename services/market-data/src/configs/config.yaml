@@ -19,8 +19,14 @@ kafka:
     - "127.0.0.1:9092"
 
 polygon:
-  api_key: "fake-polygon-api-key-not-real"
+  api_key: "27LTRfW88f5Kp_ylbPIf59njTZQaPXAh"
   base_url: "https://api.polygon.io"
+  symbols:
+    - "AAPL"
+    - "MSFT"
+    - "GOOGL"
+    - "TSLA"
+    - "NVDA"
 
 hkex:
   endpoint: "https://fake-hkex-feed.example.com"

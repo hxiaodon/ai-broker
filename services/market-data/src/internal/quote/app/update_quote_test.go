@@ -48,8 +48,10 @@ func (m *mockCacheRepo) Set(_ context.Context, _ *domain.Quote) error {
 	m.setCalled++
 	return m.setErr
 }
-func (m *mockCacheRepo) Get(_ context.Context, _ string) (*domain.Quote, error) { return nil, nil }
-func (m *mockCacheRepo) MGet(_ context.Context, _ []string) ([]*domain.Quote, error) {
+func (m *mockCacheRepo) Get(_ context.Context, _ domain.Market, _ string) (*domain.Quote, error) {
+	return nil, nil
+}
+func (m *mockCacheRepo) MGet(_ context.Context, _ domain.Market, _ []string) ([]*domain.Quote, error) {
 	return nil, nil
 }
 
@@ -115,7 +117,7 @@ func TestUpdateQuoteUsecase_Execute_HappyPath(t *testing.T) {
 
 	// Outbox event inserted with correct topic
 	assert.Len(t, outboxRepo.events, 1)
-	assert.Equal(t, "brokerage.market-data.quote.updated", outboxRepo.events[0].topic)
+	assert.Equal(t, "market-data.quotes.us", outboxRepo.events[0].topic)
 
 	// Cache updated
 	assert.Equal(t, 1, cacheRepo.setCalled)

@@ -1,9 +1,10 @@
 package search
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
+
+	"github.com/hxiaodon/ai-broker/services/market-data/pkg/httputil"
 )
 
 // Handler provides HTTP endpoints for the search subdomain.
@@ -22,80 +23,103 @@ func NewHandler(searchStocks *SearchStocksUsecase, getHotSearch *GetHotSearchUse
 
 // RegisterRoutes registers HTTP routes on the provided mux.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/v1/search", h.handleSearch)
-	mux.HandleFunc("GET /api/v1/search/hot", h.handleHotSearch)
+	mux.HandleFunc("GET /v1/market/search", h.handleSearch)
+	mux.HandleFunc("GET /v1/market/search/hot", h.handleHotSearch)
 }
 
-// handleSearch godoc
-//
-//	@Summary     Search stocks
-//	@Description Full-text search across stock symbols and company names. Supports US (NYSE/NASDAQ) and HK (HKEX) markets.
-//	@Tags        search
-//	@Accept      json
-//	@Produce     json
-//	@Param       q       query     string  true   "Search query (symbol prefix or company name keyword)"
-//	@Param       market  query     string  false  "Filter by market" Enums(US, HK)
-//	@Param       limit   query     int     false  "Maximum number of results" default(20)
-//	@Success     200     {array}   Stock
-//	@Failure     400     {object}  map[string]string
-//	@Failure     500     {object}  map[string]string
-//	@Router      /search [get]
+// searchResponse is the top-level response for GET /v1/market/search (spec §5.3).
+type searchResponse struct {
+	Results []searchResultItem `json:"results"`
+	Total   int                `json:"total"`
+}
+
+type searchResultItem struct {
+	Symbol    string `json:"symbol"`
+	Name      string `json:"name"`
+	NameZh    string `json:"name_zh"`
+	Market    string `json:"market"`
+	Price     string `json:"price"`
+	ChangePct string `json:"change_pct"`
+	Delayed   bool   `json:"delayed"`
+}
+
+// handleSearch handles GET /v1/market/search (spec §5).
 func (h *Handler) handleSearch(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query().Get("q")
 	if query == "" {
-		http.Error(w, `{"error":"q query parameter required"}`, http.StatusBadRequest)
+		httputil.WriteError(w, http.StatusBadRequest, "INVALID_SYMBOL", "搜索关键词 q 不能为空", nil)
 		return
 	}
-	market := r.URL.Query().Get("market")
 
-	limitStr := r.URL.Query().Get("limit")
-	limit := 20
-	if limitStr != "" {
-		if l, err := strconv.Atoi(limitStr); err == nil {
+	market := r.URL.Query().Get("market")
+	limit := 10
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
 			limit = l
 		}
+	}
+	if limit > 50 {
+		limit = 50
 	}
 
 	stocks, err := h.searchStocks.Execute(r.Context(), query, market, limit)
 	if err != nil {
-		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+		httputil.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "搜索失败", nil)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(stocks); err != nil {
-		http.Error(w, `{"error":"encode response"}`, http.StatusInternalServerError)
+	delayed := !httputil.IsValidJWT(r)
+	results := make([]searchResultItem, len(stocks))
+	for i, s := range stocks {
+		results[i] = searchResultItem{
+			Symbol:    s.Symbol,
+			Name:      s.Name,
+			NameZh:    s.NameCN,
+			Market:    s.Market,
+			Price:     "0.0000", // Stub: quote lookup deferred to Phase 6.
+			ChangePct: "0.00",
+			Delayed:   delayed,
+		}
 	}
+
+	httputil.WriteJSON(w, &searchResponse{
+		Results: results,
+		Total:   len(results),
+	})
 }
 
-// handleHotSearch godoc
-//
-//	@Summary     Get hot search rankings
-//	@Description Returns the top-N most searched symbols in the last 24 hours, ranked by search frequency.
-//	@Tags        search
-//	@Accept      json
-//	@Produce     json
-//	@Param       n   query     int  false  "Number of top symbols to return" default(10)
-//	@Success     200 {array}   HotSearchItem
-//	@Failure     500 {object}  map[string]string
-//	@Router      /search/hot [get]
+// hotSearchResponse is the top-level response for GET /v1/market/search/hot.
+type hotSearchResponse struct {
+	Items []hotSearchItem `json:"items"`
+}
+
+type hotSearchItem struct {
+	Symbol string `json:"symbol"`
+	Name   string `json:"name"`
+}
+
+// handleHotSearch handles GET /v1/market/search/hot.
 func (h *Handler) handleHotSearch(w http.ResponseWriter, r *http.Request) {
-	nStr := r.URL.Query().Get("n")
 	n := 10
-	if nStr != "" {
-		if parsed, err := strconv.Atoi(nStr); err == nil {
+	if nStr := r.URL.Query().Get("n"); nStr != "" {
+		if parsed, err := strconv.Atoi(nStr); err == nil && parsed > 0 {
 			n = parsed
 		}
 	}
 
 	items, err := h.getHotSearch.Execute(r.Context(), n)
 	if err != nil {
-		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+		httputil.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "获取热搜失败", nil)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(items); err != nil {
-		http.Error(w, `{"error":"encode response"}`, http.StatusInternalServerError)
+	results := make([]hotSearchItem, len(items))
+	for i, item := range items {
+		results[i] = hotSearchItem{
+			Symbol: item.Symbol,
+			Name:   item.Name,
+		}
 	}
+
+	httputil.WriteJSON(w, &hotSearchResponse{Items: results})
 }

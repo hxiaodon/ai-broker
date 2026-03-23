@@ -14,6 +14,8 @@ type stockModel struct {
 	Symbol   string `gorm:"type:varchar(20);uniqueIndex;not null"`
 	Name     string `gorm:"type:varchar(255);not null"`
 	NameCN   string `gorm:"type:varchar(255)"`
+	Pinyin   string `gorm:"type:varchar(255)"`
+	Initials string `gorm:"type:varchar(50)"`
 	Market   string `gorm:"type:varchar(5);not null;index"`
 	Exchange string `gorm:"type:varchar(20);not null"`
 	Sector   string `gorm:"type:varchar(100)"`
@@ -33,8 +35,9 @@ func NewMySQLStockSearchRepo(db *gorm.DB) *MySQLStockSearchRepo {
 }
 
 // Search performs a FULLTEXT search on stocks using the idx_stocks_search index.
-// Spec: market-api-spec.md §GET /search — MATCH(name, name_cn) AGAINST IN BOOLEAN MODE
+// Spec: market-api-spec.md §GET /search — MATCH(name, name_cn, pinyin) AGAINST IN BOOLEAN MODE
 // Symbol prefix match is ORed in so exact ticker lookups always surface first.
+// Pinyin support: queries like "pingguo" will match stocks with pinyin="pingguo" (e.g., 苹果/Apple).
 func (r *MySQLStockSearchRepo) Search(ctx context.Context, query string, market string, limit int) ([]*Stock, error) {
 	if query == "" {
 		return nil, fmt.Errorf("stock search: query must not be empty")
@@ -45,9 +48,9 @@ func (r *MySQLStockSearchRepo) Search(ctx context.Context, query string, market 
 
 	rawSQL := `
 SELECT id, symbol, name, name_cn, market, exchange, sector, industry,
-       MATCH(name, name_cn) AGAINST(? IN BOOLEAN MODE) AS relevance
+       MATCH(name, name_cn, pinyin) AGAINST(? IN BOOLEAN MODE) AS relevance
 FROM stocks
-WHERE (symbol LIKE ? OR MATCH(name, name_cn) AGAINST(? IN BOOLEAN MODE))`
+WHERE (symbol LIKE ? OR MATCH(name, name_cn, pinyin) AGAINST(? IN BOOLEAN MODE))`
 
 	args := []interface{}{fulltextTerm, query + "%", fulltextTerm}
 

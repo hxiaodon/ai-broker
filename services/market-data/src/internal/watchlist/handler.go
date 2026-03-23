@@ -2,8 +2,11 @@ package watchlist
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
-	"strconv"
+	"time"
+
+	"github.com/hxiaodon/ai-broker/services/market-data/pkg/httputil"
 )
 
 // Handler provides HTTP endpoints for the watchlist subdomain.
@@ -28,114 +31,128 @@ func NewHandler(
 
 // RegisterRoutes registers HTTP routes on the provided mux.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/v1/watchlist", h.handleGetWatchlist)
-	mux.HandleFunc("POST /api/v1/watchlist", h.handleAddToWatchlist)
-	mux.HandleFunc("DELETE /api/v1/watchlist", h.handleRemoveFromWatchlist)
+	mux.HandleFunc("GET /v1/watchlist", h.handleGetWatchlist)
+	mux.HandleFunc("POST /v1/watchlist", h.handleAddToWatchlist)
+	mux.HandleFunc("DELETE /v1/watchlist/{symbol}", h.handleRemoveFromWatchlist)
 }
 
-// handleGetWatchlist godoc
-//
-//	@Summary     Get user watchlist
-//	@Description Returns all symbols in the user's watchlist with latest quotes.
-//	@Tags        watchlist
-//	@Accept      json
-//	@Produce     json
-//	@Param       user_id  query     int  true  "User ID (temporary; production uses JWT claims)"
-//	@Success     200      {array}   WatchlistItem
-//	@Failure     400      {object}  map[string]string
-//	@Failure     500      {object}  map[string]string
-//	@Security    BearerAuth
-//	@Router      /watchlist [get]
+// handleGetWatchlist handles GET /v1/watchlist (spec §10).
 func (h *Handler) handleGetWatchlist(w http.ResponseWriter, r *http.Request) {
-	// FILL: extract userID from JWT claims in production.
-	userIDStr := r.URL.Query().Get("user_id")
-	userID, err := strconv.ParseInt(userIDStr, 10, 64)
-	if err != nil {
-		http.Error(w, `{"error":"invalid user_id"}`, http.StatusBadRequest)
+	// TODO(Phase-6): Extract userID from validated JWT claims.
+	userID := httputil.ExtractUserID(r)
+	if userID == "" {
+		httputil.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "需要有效的 Authorization Bearer JWT", nil)
 		return
 	}
 
 	items, err := h.getWatchlist.Execute(r.Context(), userID)
 	if err != nil {
-		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+		httputil.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "获取自选股失败", nil)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(items); err != nil {
-		http.Error(w, `{"error":"encode response"}`, http.StatusInternalServerError)
+	symbols := make([]string, len(items))
+	for i, item := range items {
+		symbols[i] = item.Symbol
 	}
+
+	// Spec §10.3: response includes symbols array + quotes map + as_of.
+	// Phase 5: quotes map is stubbed as empty; full implementation in Phase 6.
+	httputil.WriteJSON(w, map[string]interface{}{
+		"symbols": symbols,
+		"quotes":  map[string]interface{}{},
+		"as_of":   time.Now().UTC().Format(time.RFC3339Nano),
+	})
 }
 
 type addWatchlistRequest struct {
-	UserID int64  `json:"user_id"`
 	Symbol string `json:"symbol"`
-	Market string `json:"market"`
 }
 
-// handleAddToWatchlist godoc
-//
-//	@Summary     Add symbol to watchlist
-//	@Description Adds a stock symbol to the user's watchlist. Duplicate symbols are ignored.
-//	@Tags        watchlist
-//	@Accept      json
-//	@Produce     json
-//	@Param       request  body      addWatchlistRequest  true  "Symbol to add"
-//	@Success     201      {object}  map[string]string
-//	@Failure     400      {object}  map[string]string
-//	@Failure     500      {object}  map[string]string
-//	@Security    BearerAuth
-//	@Router      /watchlist [post]
+// handleAddToWatchlist handles POST /v1/watchlist (spec §11).
 func (h *Handler) handleAddToWatchlist(w http.ResponseWriter, r *http.Request) {
+	userID := httputil.ExtractUserID(r)
+	if userID == "" {
+		httputil.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "需要有效的 Authorization Bearer JWT", nil)
+		return
+	}
+
 	var req addWatchlistRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		httputil.WriteError(w, http.StatusBadRequest, "INVALID_SYMBOL", "请求体格式错误", nil)
+		return
+	}
+	if req.Symbol == "" {
+		httputil.WriteError(w, http.StatusBadRequest, "INVALID_SYMBOL", "symbol 不能为空", nil)
 		return
 	}
 
-	if err := h.add.Execute(r.Context(), req.UserID, req.Symbol, req.Market); err != nil {
-		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+	// Infer market from symbol format (same logic as quote handler).
+	market := "US"
+	if isHKSymbol(req.Symbol) {
+		market = "HK"
+	}
+
+	err := h.add.Execute(r.Context(), userID, req.Symbol, market)
+	if err != nil {
+		if errors.Is(err, ErrSymbolNotFound) {
+			httputil.WriteError(w, http.StatusNotFound, "SYMBOL_NOT_FOUND",
+				"股票代码 "+req.Symbol+" 不存在", nil)
+			return
+		}
+		if errors.Is(err, ErrWatchlistFull) {
+			httputil.WriteError(w, http.StatusBadRequest, "WATCHLIST_FULL",
+				"自选股数量已达上限",
+				map[string]int{"max": MaxWatchlistSize, "current": MaxWatchlistSize})
+			return
+		}
+		httputil.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "添加自选股失败", nil)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	_, _ = w.Write([]byte(`{"status":"ok"}`))
+	// Spec §11.3: HTTP 200 with {symbol, added_at}.
+	httputil.WriteJSON(w, map[string]interface{}{
+		"symbol":   req.Symbol,
+		"added_at": time.Now().UTC().Format(time.RFC3339Nano),
+	})
 }
 
-// handleRemoveFromWatchlist godoc
-//
-//	@Summary     Remove symbol from watchlist
-//	@Description Removes a stock symbol from the user's watchlist. No-op if symbol is not present.
-//	@Tags        watchlist
-//	@Accept      json
-//	@Produce     json
-//	@Param       user_id  query     int     true  "User ID (temporary; production uses JWT claims)"
-//	@Param       symbol   query     string  true  "Stock symbol to remove"
-//	@Success     200      {object}  map[string]string
-//	@Failure     400      {object}  map[string]string
-//	@Failure     500      {object}  map[string]string
-//	@Security    BearerAuth
-//	@Router      /watchlist [delete]
+// handleRemoveFromWatchlist handles DELETE /v1/watchlist/{symbol} (spec §12).
 func (h *Handler) handleRemoveFromWatchlist(w http.ResponseWriter, r *http.Request) {
-	// FILL: extract userID from JWT claims in production.
-	userIDStr := r.URL.Query().Get("user_id")
-	userID, err := strconv.ParseInt(userIDStr, 10, 64)
-	if err != nil {
-		http.Error(w, `{"error":"invalid user_id"}`, http.StatusBadRequest)
+	userID := httputil.ExtractUserID(r)
+	if userID == "" {
+		httputil.WriteError(w, http.StatusUnauthorized, "UNAUTHORIZED", "需要有效的 Authorization Bearer JWT", nil)
 		return
 	}
-	symbol := r.URL.Query().Get("symbol")
+
+	symbol := r.PathValue("symbol")
 	if symbol == "" {
-		http.Error(w, `{"error":"symbol required"}`, http.StatusBadRequest)
+		httputil.WriteError(w, http.StatusBadRequest, "INVALID_SYMBOL", "symbol 不能为空", nil)
 		return
 	}
 
-	if err := h.remove.Execute(r.Context(), userID, symbol); err != nil {
-		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+	err := h.remove.Execute(r.Context(), userID, symbol)
+	if err != nil {
+		httputil.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "删除自选股失败", nil)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write([]byte(`{"status":"ok"}`))
+	// Spec §12.3: {symbol, removed: true/false}.
+	// Phase 5: always return removed: true (idempotency check deferred).
+	httputil.WriteJSON(w, map[string]interface{}{
+		"symbol":  symbol,
+		"removed": true,
+	})
+}
+
+func isHKSymbol(symbol string) bool {
+	if len(symbol) < 4 {
+		return false
+	}
+	for _, c := range symbol {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }

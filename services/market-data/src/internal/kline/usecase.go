@@ -3,6 +3,7 @@ package kline
 import (
 	"context"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -45,6 +46,14 @@ func (uc *AggregateKLineUsecase) Execute(ctx context.Context, ticks []Tick, inte
 		return nil
 	}
 
+	// Spec: OHLCV rules require ticks ordered by timestamp so that Open = first tick,
+	// Close = last tick within each candle bucket.
+	// Sort ascending by timestamp before bucketing to guarantee correctness
+	// regardless of the order ticks arrive from the feed handler.
+	sort.Slice(ticks, func(i, j int) bool {
+		return ticks[i].Timestamp.Before(ticks[j].Timestamp)
+	})
+
 	// Group ticks into candle buckets by interval boundary.
 	dur, err := intervalDuration(interval)
 	if err != nil {
@@ -71,8 +80,24 @@ func (uc *AggregateKLineUsecase) Execute(ctx context.Context, ticks []Tick, inte
 		if dur > 0 {
 			start = ts.Truncate(dur)
 		} else {
-			// Daily/Weekly/Monthly: truncate to day boundary; weekly/monthly handled upstream
-			start = time.Date(ts.Year(), ts.Month(), ts.Day(), 0, 0, 0, 0, time.UTC)
+			switch interval {
+			case Interval1W:
+				// Truncate to the Monday of the ISO week containing ts.
+				// weekday: Sunday=0, Monday=1, ..., Saturday=6
+				weekday := int(ts.Weekday())
+				if weekday == 0 {
+					weekday = 7 // treat Sunday as day 7
+				}
+				daysFromMonday := weekday - 1
+				monday := ts.AddDate(0, 0, -daysFromMonday)
+				start = time.Date(monday.Year(), monday.Month(), monday.Day(), 0, 0, 0, 0, time.UTC)
+			case Interval1M:
+				// Truncate to first day of the month.
+				start = time.Date(ts.Year(), ts.Month(), 1, 0, 0, 0, 0, time.UTC)
+			default:
+				// Interval1D and any future daily-scale interval.
+				start = time.Date(ts.Year(), ts.Month(), ts.Day(), 0, 0, 0, 0, time.UTC)
+			}
 		}
 
 		b, ok := buckets[start]
@@ -130,7 +155,7 @@ func (uc *AggregateKLineUsecase) Execute(ctx context.Context, ticks []Tick, inte
 }
 
 // intervalDuration returns the time.Duration for intra-day intervals.
-// Returns 0 for daily/weekly/monthly (handled separately).
+// Returns 0 for daily/weekly/monthly (handled by calendar-aware bucket assignment).
 func intervalDuration(iv Interval) (time.Duration, error) {
 	switch iv {
 	case Interval1Min:

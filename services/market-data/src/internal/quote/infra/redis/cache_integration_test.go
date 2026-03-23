@@ -70,7 +70,7 @@ func TestQuoteCacheRepository_SetAndGet(t *testing.T) {
 
 	require.NoError(t, repo.Set(ctx, q))
 
-	got, err := repo.Get(ctx, "AAPL")
+	got, err := repo.Get(ctx, domain.MarketUS, "AAPL")
 	require.NoError(t, err)
 	require.NotNil(t, got)
 
@@ -93,7 +93,7 @@ func TestQuoteCacheRepository_Get_Miss(t *testing.T) {
 
 	_ = rdb.Del(ctx, "quote:NONEXISTENT")
 
-	got, err := repo.Get(ctx, "NONEXISTENT")
+	got, err := repo.Get(ctx, domain.MarketUS, "NONEXISTENT")
 	require.NoError(t, err)
 	assert.Nil(t, got, "cache miss should return nil quote")
 }
@@ -116,7 +116,7 @@ func TestQuoteCacheRepository_Set_OverwritesExisting(t *testing.T) {
 	q2.Price = decimal.NewFromFloat(405.50)
 	require.NoError(t, repo.Set(ctx, q2))
 
-	got, err := repo.Get(ctx, "MSFT")
+	got, err := repo.Get(ctx, domain.MarketUS, "MSFT")
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.True(t, decimal.NewFromFloat(405.50).Equal(got.Price), "should return latest price")
@@ -136,7 +136,7 @@ func TestQuoteCacheRepository_Set_DecimalPrecisionPreserved(t *testing.T) {
 	q.Price = decimal.RequireFromString("123.4567") // 4 decimal places (US stock price precision)
 	require.NoError(t, repo.Set(ctx, q))
 
-	got, err := repo.Get(ctx, "PREC")
+	got, err := repo.Get(ctx, domain.MarketUS, "PREC")
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	assert.True(t, q.Price.Equal(got.Price),
@@ -164,7 +164,7 @@ func TestQuoteCacheRepository_MGet_AllPresent(t *testing.T) {
 		}
 	})
 
-	results, err := repo.MGet(ctx, symbols)
+	results, err := repo.MGet(ctx, domain.MarketUS, symbols)
 	require.NoError(t, err)
 	assert.Len(t, results, 3)
 
@@ -190,7 +190,7 @@ func TestQuoteCacheRepository_MGet_PartialHit(t *testing.T) {
 	_ = rdb.Del(ctx, "quote:MISSING")
 	t.Cleanup(func() { _ = rdb.Del(ctx, "quote:PARTIAL1").Err() })
 
-	results, err := repo.MGet(ctx, []string{"PARTIAL1", "MISSING"})
+	results, err := repo.MGet(ctx, domain.MarketUS, []string{"PARTIAL1", "MISSING"})
 	require.NoError(t, err)
 	assert.Len(t, results, 1)
 	assert.Equal(t, "PARTIAL1", results[0].Symbol)
@@ -204,7 +204,7 @@ func TestQuoteCacheRepository_MGet_Empty(t *testing.T) {
 	rdb := setupRedis(t)
 	repo := quoteredis.NewQuoteCacheRepository(rdb)
 
-	results, err := repo.MGet(context.Background(), []string{})
+	results, err := repo.MGet(context.Background(), domain.MarketUS, []string{})
 	require.NoError(t, err)
 	assert.Empty(t, results)
 }
@@ -222,7 +222,7 @@ func TestQuoteCacheRepository_UTCTimestampPreserved(t *testing.T) {
 	q := newTestQuote("UTCTEST")
 	require.NoError(t, repo.Set(ctx, q))
 
-	got, err := repo.Get(ctx, "UTCTEST")
+	got, err := repo.Get(ctx, domain.MarketUS, "UTCTEST")
 	require.NoError(t, err)
 	require.NotNil(t, got)
 

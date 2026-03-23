@@ -11,7 +11,7 @@ import (
 // watchlistModel is the GORM DB struct for the watchlist_items table.
 type watchlistModel struct {
 	ID        int64     `gorm:"primaryKey;autoIncrement"`
-	UserID    int64     `gorm:"not null;index:idx_user_symbol,unique"`
+	UserID    string    `gorm:"type:char(36);not null;index:idx_user_symbol,unique"`
 	Symbol    string    `gorm:"type:varchar(20);not null;index:idx_user_symbol,unique"`
 	Market    string    `gorm:"type:varchar(5);not null"`
 	SortOrder int       `gorm:"not null;default:0"`
@@ -31,11 +31,11 @@ func NewMySQLWatchlistRepo(db *gorm.DB) *MySQLWatchlistRepo {
 }
 
 // FindByUserID retrieves all watchlist items for a user.
-func (r *MySQLWatchlistRepo) FindByUserID(ctx context.Context, userID int64) ([]*WatchlistItem, error) {
+func (r *MySQLWatchlistRepo) FindByUserID(ctx context.Context, userID string) ([]*WatchlistItem, error) {
 	var models []watchlistModel
 	result := r.db.WithContext(ctx).Where("user_id = ?", userID).Order("sort_order ASC").Find(&models)
 	if result.Error != nil {
-		return nil, fmt.Errorf("watchlist repo find user %d: %w", userID, result.Error)
+		return nil, fmt.Errorf("watchlist repo find user %s: %w", userID, result.Error)
 	}
 	items := make([]*WatchlistItem, 0, len(models))
 	for _, m := range models {
@@ -52,22 +52,22 @@ func (r *MySQLWatchlistRepo) FindByUserID(ctx context.Context, userID int64) ([]
 }
 
 // CountByUserID returns the number of watchlist items for a user.
-func (r *MySQLWatchlistRepo) CountByUserID(ctx context.Context, userID int64) (int, error) {
+func (r *MySQLWatchlistRepo) CountByUserID(ctx context.Context, userID string) (int, error) {
 	var count int64
 	result := r.db.WithContext(ctx).Model(&watchlistModel{}).Where("user_id = ?", userID).Count(&count)
 	if result.Error != nil {
-		return 0, fmt.Errorf("watchlist repo count user %d: %w", userID, result.Error)
+		return 0, fmt.Errorf("watchlist repo count user %s: %w", userID, result.Error)
 	}
 	return int(count), nil
 }
 
 // ExistsByUserAndSymbol returns true if the user already has the symbol in their watchlist.
-func (r *MySQLWatchlistRepo) ExistsByUserAndSymbol(ctx context.Context, userID int64, symbol string) (bool, error) {
+func (r *MySQLWatchlistRepo) ExistsByUserAndSymbol(ctx context.Context, userID string, symbol string) (bool, error) {
 	var count int64
 	result := r.db.WithContext(ctx).Model(&watchlistModel{}).
 		Where("user_id = ? AND symbol = ?", userID, symbol).Count(&count)
 	if result.Error != nil {
-		return false, fmt.Errorf("watchlist repo exists user %d symbol %s: %w", userID, symbol, result.Error)
+		return false, fmt.Errorf("watchlist repo exists user %s symbol %s: %w", userID, symbol, result.Error)
 	}
 	return count > 0, nil
 }
@@ -90,7 +90,7 @@ func (r *MySQLWatchlistRepo) Add(ctx context.Context, item *WatchlistItem) error
 }
 
 // Remove removes a symbol from the user's watchlist.
-func (r *MySQLWatchlistRepo) Remove(ctx context.Context, userID int64, symbol string) error {
+func (r *MySQLWatchlistRepo) Remove(ctx context.Context, userID string, symbol string) error {
 	result := r.db.WithContext(ctx).Where("user_id = ? AND symbol = ?", userID, symbol).Delete(&watchlistModel{})
 	if result.Error != nil {
 		return fmt.Errorf("watchlist repo remove: %w", result.Error)
@@ -99,7 +99,7 @@ func (r *MySQLWatchlistRepo) Remove(ctx context.Context, userID int64, symbol st
 }
 
 // Reorder updates the sort order for a user's watchlist items.
-func (r *MySQLWatchlistRepo) Reorder(ctx context.Context, userID int64, symbolOrder []string) error {
+func (r *MySQLWatchlistRepo) Reorder(ctx context.Context, userID string, symbolOrder []string) error {
 	for i, symbol := range symbolOrder {
 		result := r.db.WithContext(ctx).
 			Model(&watchlistModel{}).

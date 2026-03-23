@@ -8,6 +8,7 @@ package main
 
 import (
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/conf"
+	"github.com/hxiaodon/ai-broker/services/market-data/internal/feed"
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/kafka/outbox"
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/kline"
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/quote"
@@ -40,7 +41,7 @@ func initApp(cfg *conf.Config, logger *zap.Logger) (*App, func(), error) {
 	}
 	quoteRepository := mysql.NewQuoteRepository(db)
 	staleDetector := quote.ProvideStaleDetector()
-	getQuoteUsecase := app.NewGetQuoteUsecase(quoteCacheRepository, quoteRepository, staleDetector)
+	getQuoteUsecase := app.NewGetQuoteUsecase(quoteCacheRepository, quoteRepository, staleDetector, logger)
 	marketStatusRepository := mysql.NewMarketStatusRepository(db)
 	getMarketStatusUsecase := app.NewGetMarketStatusUsecase(marketStatusRepository)
 	handler := quote.NewHandler(getQuoteUsecase, getMarketStatusUsecase)
@@ -65,9 +66,14 @@ func initApp(cfg *conf.Config, logger *zap.Logger) (*App, func(), error) {
 		cleanup()
 		return nil, nil, err
 	}
+	massiveClient := feed.ProvideMassiveClient(cfg)
+	outboxRepository := mysql.NewOutboxRepository(db)
+	txFunc := mysql.NewTxFunc(db)
+	updateQuoteUsecase := app.NewUpdateQuoteUsecase(quoteRepository, quoteCacheRepository, outboxRepository, txFunc, staleDetector, logger)
+	worker := feed.ProvideWorker(massiveClient, updateQuoteUsecase, logger)
 	writer := ProvideKafkaWriter(cfg)
-	worker := outbox.NewWorker(db, writer, logger)
-	mainApp := NewApp(httpServer, grpcServer, worker, logger)
+	outboxWorker := outbox.NewWorker(db, writer, logger)
+	mainApp := NewApp(httpServer, grpcServer, worker, outboxWorker, logger)
 	return mainApp, func() {
 		cleanup2()
 		cleanup()

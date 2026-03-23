@@ -2,9 +2,11 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
@@ -13,13 +15,20 @@ import (
 )
 
 // WSServer provides the WebSocket gateway for real-time quote push.
-// Transport layer only — aggregates quote data from the quote subdomain.
-// Protocol: control frames use JSON text, quote data uses Protobuf binary.
+// Spec: websocket-spec.md v2.1
 type WSServer struct {
 	upgrader websocket.Upgrader
 	logger   *zap.Logger
-	clients  map[*websocket.Conn]bool
+	clients  map[*wsClient]bool
 	mu       sync.RWMutex
+}
+
+type wsClient struct {
+	conn          *websocket.Conn
+	authenticated bool
+	userType      string // "registered" or "guest"
+	subscriptions map[string]bool
+	mu            sync.RWMutex
 }
 
 // NewWSServer creates a new WebSocket server.
@@ -29,75 +38,234 @@ func NewWSServer(logger *zap.Logger) *WSServer {
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
 			CheckOrigin: func(r *http.Request) bool {
-				// FILL: domain engineer restricts origins for production.
+				// TODO(Phase-6): restrict origins for production.
 				return true
 			},
 		},
 		logger:  logger,
-		clients: make(map[*websocket.Conn]bool),
+		clients: make(map[*wsClient]bool),
 	}
 }
 
+// controlMessage represents JSON text frame messages (spec §2).
+type controlMessage struct {
+	Action string   `json:"action,omitempty"` // client → server
+	Type   string   `json:"type,omitempty"`   // server → client
+	Token  string   `json:"token,omitempty"`
+	Symbols []string `json:"symbols,omitempty"`
+}
+
 // HandleWebSocket upgrades HTTP connections to WebSocket.
-// FILL: domain engineer implements the full auth flow (message-based, not URL param),
-// dual-track push (registered/guest), and Protobuf binary framing.
+// Spec: websocket-spec.md — message-based auth, subscribe/unsubscribe, ping/pong.
 func (ws *WSServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := ws.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		ws.logger.Error("websocket upgrade", zap.Error(err))
 		return
 	}
+
+	client := &wsClient{
+		conn:          conn,
+		authenticated: false,
+		subscriptions: make(map[string]bool),
+	}
+
+	ws.addClient(client)
 	defer func() {
-		ws.removeClient(conn)
-		if closeErr := conn.Close(); closeErr != nil {
-			ws.logger.Debug("websocket close", zap.Error(closeErr))
-		}
+		ws.removeClient(client)
+		_ = conn.Close()
 	}()
 
-	ws.addClient(conn)
+	// Set 5-second auth deadline (spec: must auth within 5s).
+	authDeadline := time.NewTimer(5 * time.Second)
+	defer authDeadline.Stop()
 
-	// Read loop — handles control messages (auth, subscribe, unsubscribe).
+	authChan := make(chan bool, 1)
+	go ws.readLoop(client, authChan)
+
+	select {
+	case <-authDeadline.C:
+		if !client.authenticated {
+			ws.logger.Warn("client failed to authenticate within 5s")
+			_ = conn.WriteControl(websocket.CloseMessage,
+				websocket.FormatCloseMessage(4001, "auth timeout"), time.Now().Add(time.Second))
+			return
+		}
+	case authed := <-authChan:
+		if !authed {
+			_ = conn.WriteControl(websocket.CloseMessage,
+				websocket.FormatCloseMessage(4002, "auth failed"), time.Now().Add(time.Second))
+			return
+		}
+	}
+
+	// Keep connection alive until client disconnects.
+	<-make(chan struct{})
+}
+
+func (ws *WSServer) readLoop(client *wsClient, authChan chan bool) {
 	for {
-		_, _, err := conn.ReadMessage()
+		_, message, err := client.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
 				ws.logger.Error("websocket read", zap.Error(err))
 			}
-			break
+			return
 		}
-		// FILL: parse control messages and handle subscriptions.
+
+		var msg controlMessage
+		if err := json.Unmarshal(message, &msg); err != nil {
+			ws.sendError(client, "INVALID_MESSAGE", "消息格式错误")
+			continue
+		}
+
+		ws.handleControlMessage(client, &msg, authChan)
 	}
 }
 
-func (ws *WSServer) addClient(conn *websocket.Conn) {
+func (ws *WSServer) handleControlMessage(client *wsClient, msg *controlMessage, authChan chan bool) {
+	switch msg.Action {
+	case "auth":
+		ws.handleAuth(client, msg, authChan)
+	case "subscribe":
+		ws.handleSubscribe(client, msg)
+	case "unsubscribe":
+		ws.handleUnsubscribe(client, msg)
+	case "ping":
+		ws.handlePing(client)
+	case "reauth":
+		ws.handleReauth(client, msg)
+	default:
+		ws.sendError(client, "UNKNOWN_ACTION", "未知的 action: "+msg.Action)
+	}
+}
+
+func (ws *WSServer) handleAuth(client *wsClient, msg *controlMessage, authChan chan bool) {
+	userType := "guest"
+	success := true
+	expiresIn := 0
+
+	if msg.Token != "" {
+		// TODO(Phase-6): validate JWT signature.
+		// Current stub: accept any non-empty token as registered user.
+		userType = "registered"
+		expiresIn = 900
+	}
+
+	client.mu.Lock()
+	client.authenticated = success
+	client.userType = userType
+	client.mu.Unlock()
+
+	resp := map[string]interface{}{
+		"type":             "auth_result",
+		"success":          success,
+		"user_type":        userType,
+		"token_expires_in": expiresIn,
+		"client_id":        fmt.Sprintf("client-%d", time.Now().UnixNano()),
+	}
+	if userType == "guest" {
+		resp["token_expires_in"] = nil
+	}
+
+	ws.sendJSON(client, resp)
+	authChan <- success
+}
+
+func (ws *WSServer) handleSubscribe(client *wsClient, msg *controlMessage) {
+	if !client.authenticated {
+		ws.sendError(client, "AUTH_REQUIRED", "请先完成认证后再订阅")
+		return
+	}
+	if len(msg.Symbols) > 50 {
+		ws.sendError(client, "SYMBOL_LIMIT_EXCEEDED", "每次订阅最多50个symbols")
+		return
+	}
+
+	client.mu.Lock()
+	for _, sym := range msg.Symbols {
+		client.subscriptions[sym] = true
+	}
+	client.mu.Unlock()
+
+	ws.sendJSON(client, map[string]interface{}{
+		"type":    "subscribe_ack",
+		"symbols": msg.Symbols,
+	})
+
+	// TODO(Phase-6): send initial SNAPSHOT frames (Protobuf binary).
+}
+
+func (ws *WSServer) handleUnsubscribe(client *wsClient, msg *controlMessage) {
+	client.mu.Lock()
+	for _, sym := range msg.Symbols {
+		delete(client.subscriptions, sym)
+	}
+	client.mu.Unlock()
+}
+
+func (ws *WSServer) handlePing(client *wsClient) {
+	ws.sendJSON(client, map[string]interface{}{
+		"type":      "pong",
+		"timestamp": time.Now().UTC().Format(time.RFC3339),
+	})
+}
+
+func (ws *WSServer) handleReauth(client *wsClient, msg *controlMessage) {
+	// TODO(Phase-6): validate new token and switch user type.
+	ws.sendJSON(client, map[string]interface{}{
+		"type":             "reauth_result",
+		"success":          true,
+		"user_type":        "registered",
+		"token_expires_in": 900,
+	})
+}
+
+func (ws *WSServer) sendJSON(client *wsClient, v interface{}) {
+	data, _ := json.Marshal(v)
+	_ = client.conn.WriteMessage(websocket.TextMessage, data)
+}
+
+func (ws *WSServer) sendError(client *wsClient, code, message string) {
+	ws.sendJSON(client, map[string]interface{}{
+		"type":    "error",
+		"code":    code,
+		"message": message,
+	})
+}
+
+func (ws *WSServer) addClient(client *wsClient) {
 	ws.mu.Lock()
 	defer ws.mu.Unlock()
-	ws.clients[conn] = true
+	ws.clients[client] = true
 	observability.ActiveConns.Inc()
 }
 
-func (ws *WSServer) removeClient(conn *websocket.Conn) {
+func (ws *WSServer) removeClient(client *wsClient) {
 	ws.mu.Lock()
 	defer ws.mu.Unlock()
-	delete(ws.clients, conn)
+	delete(ws.clients, client)
 	observability.ActiveConns.Dec()
 }
 
-// BroadcastQuote sends a quote update to all connected clients.
-// FILL: domain engineer implements topic-based subscription filtering.
-func (ws *WSServer) BroadcastQuote(data []byte) {
+// BroadcastQuote sends a quote update to subscribed clients.
+// TODO(Phase-6): implement subscription filtering and Protobuf binary frames.
+func (ws *WSServer) BroadcastQuote(symbol string, data []byte) {
 	ws.mu.RLock()
 	defer ws.mu.RUnlock()
-	for conn := range ws.clients {
-		if err := conn.WriteMessage(websocket.BinaryMessage, data); err != nil {
-			ws.logger.Debug("websocket broadcast", zap.Error(err))
+	for client := range ws.clients {
+		client.mu.RLock()
+		subscribed := client.subscriptions[symbol]
+		client.mu.RUnlock()
+		if subscribed {
+			_ = client.conn.WriteMessage(websocket.BinaryMessage, data)
 		}
 	}
 }
 
 // RegisterRoutes registers the WebSocket endpoint on the HTTP mux.
 func (ws *WSServer) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/ws", ws.HandleWebSocket)
+	mux.HandleFunc("/ws/market", ws.HandleWebSocket)
 }
 
 // StartWSServer starts a dedicated HTTP server for WebSocket connections.
@@ -112,9 +280,7 @@ func StartWSServer(ctx context.Context, addr string, ws *WSServer) error {
 
 	go func() {
 		<-ctx.Done()
-		if err := srv.Shutdown(context.Background()); err != nil {
-			ws.logger.Error("ws server shutdown", zap.Error(err))
-		}
+		_ = srv.Shutdown(context.Background())
 	}()
 
 	ws.logger.Info(fmt.Sprintf("websocket server listening on %s", addr))

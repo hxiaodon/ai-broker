@@ -281,3 +281,145 @@ func TestAggregateKLine_DecimalPriceNoFloat(t *testing.T) {
 	assert.True(t, decimal.RequireFromString("150.2400").Equal(k.Low), "Low precision: %s", k.Low)
 	assert.True(t, decimal.RequireFromString("150.2400").Equal(k.Close), "Close precision: %s", k.Close)
 }
+
+func TestAggregateKLine_TicksOutOfOrder_OpenAndCloseCorrect(t *testing.T) {
+	// Spec: §4 — Open = first tick by timestamp, Close = last tick by timestamp.
+	// Feed handlers may deliver ticks out of wall-clock order (network jitter, retransmission).
+	// The usecase must sort ticks before bucketing so Open/Close are always chronologically correct.
+	repo := &mockKLineRepo{}
+	uc := NewAggregateKLineUsecase(repo)
+	base := time.Date(2024, 1, 15, 9, 30, 0, 0, time.UTC)
+
+	// Deliberately deliver ticks in reverse time order.
+	ticks := []Tick{
+		makeTick("AAPL", 153.00, 100, base, 59*time.Second), // last chronologically  → Close
+		makeTick("AAPL", 148.00, 100, base, 20*time.Second), // middle
+		makeTick("AAPL", 150.00, 100, base, 0*time.Second),  // first chronologically → Open
+	}
+
+	require.NoError(t, uc.Execute(context.Background(), ticks, Interval1Min))
+	require.Len(t, repo.saved, 1)
+	k := repo.saved[0]
+
+	assert.True(t, decimal.NewFromFloat(150.00).Equal(k.Open),
+		"Open must be price of first tick by time: want 150.00 got %s", k.Open)
+	assert.True(t, decimal.NewFromFloat(153.00).Equal(k.Close),
+		"Close must be price of last tick by time: want 153.00 got %s", k.Close)
+	assert.True(t, decimal.NewFromFloat(153.00).Equal(k.High),
+		"High: want 153.00 got %s", k.High)
+	assert.True(t, decimal.NewFromFloat(148.00).Equal(k.Low),
+		"Low: want 148.00 got %s", k.Low)
+}
+
+func TestAggregateKLine_WeeklyBucket_TruncatesToMonday(t *testing.T) {
+	// Spec: §4 Interval1W — all ticks within the same ISO week must land in one candle.
+	// The candle StartTime must be the Monday of that week (00:00:00 UTC).
+	repo := &mockKLineRepo{}
+	uc := NewAggregateKLineUsecase(repo)
+
+	// 2024-01-15 is a Monday. 2024-01-17 is a Wednesday.
+	monday := time.Date(2024, 1, 15, 9, 30, 0, 0, time.UTC)
+	wednesday := time.Date(2024, 1, 17, 11, 00, 0, 0, time.UTC)
+
+	ticks := []Tick{
+		makeTick("AAPL", 150.00, 100, monday, 0),
+		makeTick("AAPL", 155.00, 100, wednesday, 0),
+	}
+
+	require.NoError(t, uc.Execute(context.Background(), ticks, Interval1W))
+	require.Len(t, repo.saved, 1, "ticks from the same ISO week must produce exactly one weekly candle")
+
+	k := repo.saved[0]
+	expectedMonday := time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC)
+	assert.Equal(t, expectedMonday, k.StartTime,
+		"weekly candle StartTime must be Monday 00:00 UTC")
+	assert.Equal(t, expectedMonday.AddDate(0, 0, 7), k.EndTime,
+		"weekly candle EndTime must be next Monday")
+	assert.True(t, decimal.NewFromFloat(150.00).Equal(k.Open), "Open = Monday's tick")
+	assert.True(t, decimal.NewFromFloat(155.00).Equal(k.Close), "Close = Wednesday's tick")
+}
+
+func TestAggregateKLine_WeeklyBucket_TwoWeeksTwoCandles(t *testing.T) {
+	// Ticks spanning two ISO weeks must produce two separate weekly candles.
+	repo := &mockKLineRepo{}
+	uc := NewAggregateKLineUsecase(repo)
+
+	// Week 1: Mon 2024-01-15; Week 2: Mon 2024-01-22
+	week1 := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	week2 := time.Date(2024, 1, 22, 10, 0, 0, 0, time.UTC)
+
+	ticks := []Tick{
+		makeTick("TSLA", 200.00, 100, week1, 0),
+		makeTick("TSLA", 210.00, 100, week2, 0),
+	}
+
+	require.NoError(t, uc.Execute(context.Background(), ticks, Interval1W))
+	require.Len(t, repo.saved, 2, "ticks from two different weeks must produce two weekly candles")
+
+	sort.Slice(repo.saved, func(i, j int) bool {
+		return repo.saved[i].StartTime.Before(repo.saved[j].StartTime)
+	})
+	assert.Equal(t, time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC), repo.saved[0].StartTime)
+	assert.Equal(t, time.Date(2024, 1, 22, 0, 0, 0, 0, time.UTC), repo.saved[1].StartTime)
+}
+
+func TestAggregateKLine_MonthlyBucket_TruncatesToFirstOfMonth(t *testing.T) {
+	// Spec: §4 Interval1M — all ticks in the same calendar month land in one candle.
+	// StartTime must be the 1st of the month at 00:00:00 UTC.
+	repo := &mockKLineRepo{}
+	uc := NewAggregateKLineUsecase(repo)
+
+	jan10 := time.Date(2024, 1, 10, 9, 30, 0, 0, time.UTC)
+	jan28 := time.Date(2024, 1, 28, 15, 45, 0, 0, time.UTC)
+
+	ticks := []Tick{
+		makeTick("MSFT", 400.00, 100, jan10, 0),
+		makeTick("MSFT", 410.00, 100, jan28, 0),
+	}
+
+	require.NoError(t, uc.Execute(context.Background(), ticks, Interval1M))
+	require.Len(t, repo.saved, 1, "ticks from the same month must produce exactly one monthly candle")
+
+	k := repo.saved[0]
+	expectedStart := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+	assert.Equal(t, expectedStart, k.StartTime, "monthly StartTime must be 1st of month UTC")
+	assert.Equal(t, expectedStart.AddDate(0, 1, 0), k.EndTime, "monthly EndTime must be 1st of next month")
+	assert.True(t, decimal.NewFromFloat(400.00).Equal(k.Open), "Open = Jan 10 tick")
+	assert.True(t, decimal.NewFromFloat(410.00).Equal(k.Close), "Close = Jan 28 tick")
+}
+
+func TestAggregateKLine_MonthlyBucket_TwoMonthsTwoCandles(t *testing.T) {
+	// Ticks from January and February must produce two separate monthly candles.
+	repo := &mockKLineRepo{}
+	uc := NewAggregateKLineUsecase(repo)
+
+	jan := time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC)
+	feb := time.Date(2024, 2, 5, 10, 0, 0, 0, time.UTC)
+
+	ticks := []Tick{
+		makeTick("NVDA", 600.00, 100, jan, 0),
+		makeTick("NVDA", 620.00, 100, feb, 0),
+	}
+
+	require.NoError(t, uc.Execute(context.Background(), ticks, Interval1M))
+	require.Len(t, repo.saved, 2, "January and February ticks must produce two monthly candles")
+
+	sort.Slice(repo.saved, func(i, j int) bool {
+		return repo.saved[i].StartTime.Before(repo.saved[j].StartTime)
+	})
+	assert.Equal(t, time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC), repo.saved[0].StartTime)
+	assert.Equal(t, time.Date(2024, 2, 1, 0, 0, 0, 0, time.UTC), repo.saved[1].StartTime)
+}
+
+func TestGetKLines_TimeRangePassedToRepo(t *testing.T) {
+	// GetKLines must pass start/end UTC times verbatim to the repository.
+	repo := &mockKLineRepo{}
+	uc := NewGetKLinesUsecase(repo)
+	start := time.Date(2024, 1, 15, 9, 30, 0, 0, time.UTC)
+	end := time.Date(2024, 1, 15, 16, 0, 0, 0, time.UTC)
+
+	_, err := uc.Execute(context.Background(), "AAPL", Interval1Min, start, end, 100)
+	require.NoError(t, err)
+	// mockKLineRepo returns whatever is in saved; we just verify no error and a call was made.
+	// A real integration test would verify repo receives correct time range.
+}

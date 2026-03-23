@@ -1,10 +1,11 @@
 package kline
 
 import (
-	"encoding/json"
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/hxiaodon/ai-broker/services/market-data/pkg/httputil"
 )
 
 // Handler provides HTTP endpoints for the kline subdomain.
@@ -19,57 +20,75 @@ func NewHandler(getKLines *GetKLinesUsecase) *Handler {
 
 // RegisterRoutes registers HTTP routes on the provided mux.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/v1/kline", h.handleGetKLines)
+	mux.HandleFunc("GET /v1/market/kline", h.handleGetKLines)
 }
 
-// handleGetKLines godoc
-//
-//	@Summary     Get K-line (candlestick) data
-//	@Description Returns OHLCV candlestick bars for a symbol and interval. Historical prices use split+dividend backward adjustment.
-//	@Tags        kline
-//	@Accept      json
-//	@Produce     json
-//	@Param       symbol    query     string  true   "Stock symbol (e.g. AAPL, 00700)"
-//	@Param       interval  query     string  false  "Bar interval" Enums(1min,5min,15min,30min,1h,1D,1W,1M) default(1D)
-//	@Param       limit     query     int     false  "Maximum number of bars to return" default(200)
-//	@Param       start     query     string  false  "Start time in RFC 3339 format (e.g. 2024-01-01T00:00:00Z)"
-//	@Param       end       query     string  false  "End time in RFC 3339 format (e.g. 2024-12-31T23:59:59Z)"
-//	@Success     200       {array}   KLine
-//	@Failure     400       {object}  map[string]string
-//	@Failure     500       {object}  map[string]string
-//	@Security    BearerAuth
-//	@Router      /kline [get]
+// klineResponse is the top-level response for GET /v1/market/kline (spec §4.3).
+type klineResponse struct {
+	Symbol     string          `json:"symbol"`
+	Period     string          `json:"period"`
+	Candles    []candleItem    `json:"candles"`
+	NextCursor *string         `json:"next_cursor"`
+	Total      int             `json:"total"`
+}
+
+type candleItem struct {
+	T string `json:"t"` // ISO 8601 timestamp
+	O string `json:"o"` // open (4dp string)
+	H string `json:"h"` // high
+	L string `json:"l"` // low
+	C string `json:"c"` // close
+	V int64  `json:"v"` // volume
+	N int    `json:"n"` // trade count (stub: always 0 in Phase 5)
+}
+
+var allowedPeriods = map[string]bool{
+	"1min": true, "5min": true, "15min": true, "30min": true,
+	"60min": true, "1d": true, "1w": true, "1mo": true,
+}
+
+// handleGetKLines handles GET /v1/market/kline (spec §4).
 func (h *Handler) handleGetKLines(w http.ResponseWriter, r *http.Request) {
 	symbol := r.URL.Query().Get("symbol")
 	if symbol == "" {
-		http.Error(w, `{"error":"symbol query parameter required"}`, http.StatusBadRequest)
+		httputil.WriteError(w, http.StatusBadRequest, "INVALID_SYMBOL", "symbol 参数不能为空", nil)
 		return
 	}
 
-	intervalStr := r.URL.Query().Get("interval")
-	if intervalStr == "" {
-		intervalStr = "1D"
+	period := r.URL.Query().Get("period")
+	if period == "" {
+		httputil.WriteError(w, http.StatusBadRequest, "INVALID_PERIOD", "period 参数不能为空", nil)
+		return
 	}
-	interval := Interval(intervalStr)
+	if !allowedPeriods[period] {
+		httputil.WriteError(w, http.StatusBadRequest, "INVALID_PERIOD",
+			"period 参数不合法，合法值为：1min, 5min, 15min, 30min, 60min, 1d, 1w, 1mo",
+			map[string]string{"provided": period})
+		return
+	}
 
-	limitStr := r.URL.Query().Get("limit")
-	limit := 200
-	if limitStr != "" {
-		if l, err := strconv.Atoi(limitStr); err == nil {
+	// Map spec period names to internal Interval constants.
+	interval := mapPeriodToInterval(period)
+
+	limit := 100
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
 			limit = l
 		}
 	}
+	if limit > 500 {
+		limit = 500
+	}
 
-	// Default time range: last 30 days.
+	// Parse time range.
 	end := time.Now().UTC()
 	start := end.AddDate(0, 0, -30)
-
-	if s := r.URL.Query().Get("start"); s != "" {
+	if s := r.URL.Query().Get("from"); s != "" {
 		if t, err := time.Parse(time.RFC3339, s); err == nil {
 			start = t.UTC()
 		}
 	}
-	if e := r.URL.Query().Get("end"); e != "" {
+	if e := r.URL.Query().Get("to"); e != "" {
 		if t, err := time.Parse(time.RFC3339, e); err == nil {
 			end = t.UTC()
 		}
@@ -77,12 +96,51 @@ func (h *Handler) handleGetKLines(w http.ResponseWriter, r *http.Request) {
 
 	klines, err := h.getKLines.Execute(r.Context(), symbol, interval, start, end, limit)
 	if err != nil {
-		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+		httputil.WriteError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "查询 K 线失败", nil)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	if err := json.NewEncoder(w).Encode(klines); err != nil {
-		http.Error(w, `{"error":"encode response"}`, http.StatusInternalServerError)
+	candles := make([]candleItem, len(klines))
+	for i, k := range klines {
+		candles[i] = candleItem{
+			T: k.StartTime.UTC().Format(time.RFC3339Nano),
+			O: k.Open.StringFixed(4),
+			H: k.High.StringFixed(4),
+			L: k.Low.StringFixed(4),
+			C: k.Close.StringFixed(4),
+			V: k.Volume,
+			N: 0, // Trade count not implemented in Phase 5.
+		}
+	}
+
+	httputil.WriteJSON(w, &klineResponse{
+		Symbol:     symbol,
+		Period:     period,
+		Candles:    candles,
+		NextCursor: nil, // Cursor pagination not implemented in Phase 5.
+		Total:      len(candles),
+	})
+}
+
+func mapPeriodToInterval(period string) Interval {
+	switch period {
+	case "1min":
+		return Interval1Min
+	case "5min":
+		return Interval5Min
+	case "15min":
+		return Interval15Min
+	case "30min":
+		return Interval30Min
+	case "60min":
+		return Interval1H
+	case "1d":
+		return Interval1D
+	case "1w":
+		return Interval1W
+	case "1mo":
+		return Interval1M
+	default:
+		return Interval1D
 	}
 }

@@ -26,8 +26,8 @@ func NewQuoteCacheRepository(rdb *redis.Client) *QuoteCacheRepository {
 	}
 }
 
-func quoteKey(symbol string) string {
-	return "quote:" + symbol
+func quoteKey(market, symbol string) string {
+	return fmt.Sprintf("quote:%s:%s", market, symbol)
 }
 
 // Set stores a quote in Redis.
@@ -36,15 +36,15 @@ func (r *QuoteCacheRepository) Set(ctx context.Context, q *domain.Quote) error {
 	if err != nil {
 		return fmt.Errorf("quote cache set %s: marshal: %w", q.Symbol, err)
 	}
-	if err := r.rdb.Set(ctx, quoteKey(q.Symbol), data, r.ttl).Err(); err != nil {
+	if err := r.rdb.Set(ctx, quoteKey(string(q.Market), q.Symbol), data, r.ttl).Err(); err != nil {
 		return fmt.Errorf("quote cache set %s: redis: %w", q.Symbol, err)
 	}
 	return nil
 }
 
-// Get retrieves a quote from Redis by symbol.
-func (r *QuoteCacheRepository) Get(ctx context.Context, symbol string) (*domain.Quote, error) {
-	data, err := r.rdb.Get(ctx, quoteKey(symbol)).Bytes()
+// Get retrieves a quote from Redis by market and symbol.
+func (r *QuoteCacheRepository) Get(ctx context.Context, market domain.Market, symbol string) (*domain.Quote, error) {
+	data, err := r.rdb.Get(ctx, quoteKey(string(market), symbol)).Bytes()
 	if err != nil {
 		if err == redis.Nil {
 			return nil, nil
@@ -58,14 +58,14 @@ func (r *QuoteCacheRepository) Get(ctx context.Context, symbol string) (*domain.
 	return &q, nil
 }
 
-// MGet retrieves quotes for multiple symbols from Redis.
-func (r *QuoteCacheRepository) MGet(ctx context.Context, symbols []string) ([]*domain.Quote, error) {
+// MGet retrieves quotes for multiple symbols from Redis (all from same market).
+func (r *QuoteCacheRepository) MGet(ctx context.Context, market domain.Market, symbols []string) ([]*domain.Quote, error) {
 	if len(symbols) == 0 {
 		return nil, nil
 	}
 	keys := make([]string, len(symbols))
 	for i, s := range symbols {
-		keys[i] = quoteKey(s)
+		keys[i] = quoteKey(string(market), s)
 	}
 
 	vals, err := r.rdb.MGet(ctx, keys...).Result()
@@ -84,8 +84,6 @@ func (r *QuoteCacheRepository) MGet(ctx context.Context, symbols []string) ([]*d
 		}
 		var q domain.Quote
 		if err := json.Unmarshal([]byte(str), &q); err != nil {
-			// Log at WARN level so schema drift or corruption is observable.
-			// symbols[i] is safe to log — it is a stock ticker, not PII.
 			_ = fmt.Errorf("quote cache mget: unmarshal failed symbol=%s: %w", symbols[i], err)
 			continue
 		}

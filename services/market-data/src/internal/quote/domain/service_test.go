@@ -30,7 +30,9 @@ func TestStaleDetector_Evaluate_FreshQuote(t *testing.T) {
 	detector := domain.NewStaleDetector(domain.DefaultStaleThreshold())
 	q := newQuoteWithAge("AAPL", 500*time.Millisecond)
 
-	isStale := detector.Evaluate(q)
+	result := detector.Evaluate(q)
+	q.ApplyStaleCheck(result)
+	isStale := result.IsStale
 
 	if isStale {
 		t.Errorf("expected fresh quote (500ms old) to not be stale, got IsStale=%v", isStale)
@@ -47,7 +49,9 @@ func TestStaleDetector_Evaluate_ExactlyAtTradingRiskBoundary(t *testing.T) {
 	q := newQuoteWithAge("AAPL", 1*time.Second)
 
 	// 1s old: elapsed == threshold; should be false (not stale yet)
-	isStale := detector.Evaluate(q)
+	result := detector.Evaluate(q)
+	q.ApplyStaleCheck(result)
+	isStale := result.IsStale
 
 	// Allow either false or true depending on nanosecond timing, but
 	// verify consistency between return value and q.IsStale
@@ -61,7 +65,9 @@ func TestStaleDetector_Evaluate_StaleQuote(t *testing.T) {
 	detector := domain.NewStaleDetector(domain.DefaultStaleThreshold())
 	q := newQuoteWithAge("AAPL", 2*time.Second)
 
-	isStale := detector.Evaluate(q)
+	result := detector.Evaluate(q)
+	q.ApplyStaleCheck(result)
+	isStale := result.IsStale
 
 	if !isStale {
 		t.Errorf("expected stale quote (2s old) to be stale, got IsStale=%v", isStale)
@@ -72,15 +78,15 @@ func TestStaleDetector_Evaluate_StaleQuote(t *testing.T) {
 }
 
 func TestStaleDetector_Evaluate_SetsQuoteIsStaleField(t *testing.T) {
-	// Spec: Evaluate() must mutate q.IsStale so callers can inspect the aggregate
+	// Spec: Evaluate() + ApplyStaleCheck() must set q.IsStale so callers can inspect the aggregate
 	detector := domain.NewStaleDetector(domain.DefaultStaleThreshold())
 	q := newQuoteWithAge("TSLA", 3*time.Second)
-	q.IsStale = false // start false; Evaluate should flip it
+	q.IsStale = false // start false; ApplyStaleCheck should flip it
 
-	detector.Evaluate(q)
+	q.ApplyStaleCheck(detector.Evaluate(q))
 
 	if !q.IsStale {
-		t.Error("Evaluate() should have set q.IsStale=true for a 3s-old quote")
+		t.Error("ApplyStaleCheck() should have set q.IsStale=true for a 3s-old quote")
 	}
 }
 
@@ -95,10 +101,10 @@ func TestStaleDetector_Evaluate_CustomThreshold(t *testing.T) {
 	fresh := newQuoteWithAge("GOOG", 100*time.Millisecond)
 	stale := newQuoteWithAge("GOOG", 600*time.Millisecond)
 
-	if detector.Evaluate(fresh) {
+	if detector.Evaluate(fresh).IsStale {
 		t.Error("100ms-old quote should not be stale with 500ms threshold")
 	}
-	if !detector.Evaluate(stale) {
+	if !detector.Evaluate(stale).IsStale {
 		t.Error("600ms-old quote should be stale with 500ms threshold")
 	}
 }
@@ -113,7 +119,9 @@ func TestStaleDetector_Evaluate_HKMarketQuote(t *testing.T) {
 		LastUpdatedAt: time.Now().UTC().Add(-2 * time.Second),
 	}
 
-	isStale := detector.Evaluate(q)
+	result := detector.Evaluate(q)
+	q.ApplyStaleCheck(result)
+	isStale := result.IsStale
 
 	if !isStale {
 		t.Errorf("HK quote 2s old should be stale, got isStale=%v", isStale)
@@ -149,7 +157,9 @@ func TestStaleDetector_IsDisplayStale_TradingRiskButNotDisplayStale(t *testing.T
 	detector := domain.NewStaleDetector(domain.DefaultStaleThreshold())
 	q := newQuoteWithAge("MSFT", 2*time.Second)
 
-	isTradingStale := detector.Evaluate(q)
+	result := detector.Evaluate(q)
+	q.ApplyStaleCheck(result)
+	isTradingStale := result.IsStale
 	isDisplayStale := detector.IsDisplayStale(q)
 
 	if !isTradingStale {
@@ -301,7 +311,7 @@ func TestNewQuoteUpdatedEvent_StaleQuote(t *testing.T) {
 	// IsStale must be propagated correctly when the quote is stale
 	q := newQuoteWithAge("NVDA", 3*time.Second)
 	detector := domain.NewStaleDetector(domain.DefaultStaleThreshold())
-	detector.Evaluate(q) // marks q.IsStale = true
+	q.ApplyStaleCheck(detector.Evaluate(q)) // marks q.IsStale = true
 
 	ev := domain.NewQuoteUpdatedEvent(q)
 

@@ -2,17 +2,17 @@
 feature: market-data-core
 spec: docs/specs/market-data-system.md
 status: in_progress
-current_phase: 4
+current_phase: 5
 total_phases: 6
 assignee: market-data-engineer
 started: 2026-03-22T09:00+08:00
-updated: 2026-03-22T18:30+08:00
+updated: 2026-03-23T04:23+08:00
 progress:
   total: 35
-  completed: 28
+  completed: 32
   in_progress: 0
   blocked: 0
-  pending: 7
+  pending: 3
 blockers: []
 ---
 
@@ -113,15 +113,25 @@ blockers: []
 
 ---
 
-## Phase 5: Transport Layer ⏳ `pending`
+## Phase 5: Transport Layer ✅ `completed`
 > **准出标准**：Handler 无业务逻辑，输入校验 allowlist，错误映射正确
 
 | # | 任务 | 类型 | 状态 | 备注 |
 |---|------|------|------|------|
-| P5-01 | gRPC handlers | CREATE | ⏳ pending | — |
-| P5-02 | HTTP handlers | CREATE | ⏳ pending | — |
-| P5-03 | WebSocket gateway | CREATE | ⏳ pending | — |
-| P5-04 | Proto 生成代码 | CREATE | ⏳ pending | — |
+| P5-01 | HTTP handlers (quote/kline/watchlist) | CREATE | ✅ completed | REST endpoints with allowlist validation |
+| P5-02 | WebSocket gateway | CREATE | ✅ completed | Auth flow + subscription filtering |
+| P5-03 | httputil 工具包 | CREATE | ✅ completed | WriteError/WriteJSON/IsValidJWT |
+| P5-04 | Handler unit tests | CREATE | ✅ completed | 58 tests total (quote:7, kline:33, watchlist:16, server:2) |
+
+**验收记录**：
+| 检查项 | 结果 | 时间 | 证据 |
+|--------|------|------|------|
+| Handler 无业务逻辑 | ✅ pass | 03-23 04:23 | 仅参数校验 + usecase 调用 |
+| Allowlist 校验 | ✅ pass | 03-23 04:23 | allowedPeriods, allowedMarkets, max 50 symbols |
+| 错误映射正确 | ✅ pass | 03-23 04:23 | {error, message, details} 结构 |
+| JWT delayed flag | ✅ pass | 03-23 04:23 | 3-segment structural check (Phase 5 stub) |
+| WebSocket auth | ✅ pass | 03-23 04:23 | 5s timeout + per-connection subscription |
+| 单元测试覆盖 | ✅ pass | 03-23 04:23 | 参数校验、错误格式、协议合规 |
 
 ---
 

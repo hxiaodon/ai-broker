@@ -64,8 +64,9 @@ type KafkaConfig struct {
 
 // PolygonConfig holds Polygon API settings.
 type PolygonConfig struct {
-	APIKey  string `yaml:"api_key"`
-	BaseURL string `yaml:"base_url"`
+	APIKey  string   `yaml:"api_key"`
+	BaseURL string   `yaml:"base_url"`
+	Symbols []string `yaml:"symbols"` // Symbols to subscribe for real-time feed
 }
 
 // HKEXConfig holds HKEX feed settings.
