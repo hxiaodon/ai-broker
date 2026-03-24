@@ -11,6 +11,8 @@ type QuoteRepo interface {
 	FindBySymbol(ctx context.Context, symbol string) (*Quote, error)
 	// FindBySymbols retrieves quotes for multiple symbols.
 	FindBySymbols(ctx context.Context, symbols []string) ([]*Quote, error)
+	// GetBySymbolMarketTimestamp checks if a quote already exists for deduplication.
+	GetBySymbolMarketTimestamp(ctx context.Context, symbol string, market Market, timestamp int64) (*Quote, error)
 }
 
 // QuoteCacheRepo defines the cache interface for real-time quote access.

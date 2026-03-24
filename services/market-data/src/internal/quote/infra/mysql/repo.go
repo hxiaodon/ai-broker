@@ -9,6 +9,7 @@ import (
 
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/quote/app"
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/quote/domain"
+	"github.com/hxiaodon/ai-broker/services/market-data/pkg/correlation"
 	"gorm.io/gorm"
 )
 
@@ -59,6 +60,19 @@ func (r *QuoteRepository) FindBySymbols(ctx context.Context, symbols []string) (
 		quotes = append(quotes, toDomain(&models[i]))
 	}
 	return quotes, nil
+}
+
+// GetBySymbolMarketTimestamp checks if a quote already exists for deduplication.
+func (r *QuoteRepository) GetBySymbolMarketTimestamp(ctx context.Context, symbol string, market domain.Market, timestamp int64) (*domain.Quote, error) {
+	var m QuoteModel
+	result := r.db.WithContext(ctx).Where("symbol = ? AND market = ? AND last_updated_at = ?", symbol, string(market), timestamp).First(&m)
+	if result.Error != nil {
+		if result.Error == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("quote repo get by timestamp: %w", result.Error)
+	}
+	return toDomain(&m), nil
 }
 
 // MarketStatusRepository implements domain.MarketStatusRepo using GORM.
@@ -171,9 +185,11 @@ func generateUUID() string {
 	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
 }
 
-// extractCorrelationID extracts correlation_id from context (OTel trace ID).
+// extractCorrelationID extracts correlation_id from context.
 func extractCorrelationID(ctx context.Context, fallback string) string {
-	// TODO: Extract from OTel when observability integrated
+	if id := correlation.FromContext(ctx); id != "" {
+		return id
+	}
 	return fallback
 }
 

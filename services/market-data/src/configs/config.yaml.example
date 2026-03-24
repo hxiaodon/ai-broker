@@ -1,3 +1,13 @@
+# Local development example — export these env vars before starting the service:
+#
+#   export MYSQL_USER=root MYSQL_PASSWORD=root MYSQL_HOST=127.0.0.1
+#   export MYSQL_PORT=3306 MYSQL_DB=market_data_db
+#   export REDIS_ADDR=127.0.0.1:6379 REDIS_PASSWORD=
+#   export KAFKA_BROKER=127.0.0.1:9092
+#   export POLYGON_API_KEY=your-polygon-key-here
+#   export HKEX_ENDPOINT=https://fake-hkex-feed.example.com
+#   export OTLP_ENDPOINT=127.0.0.1:4317
+
 server:
   http:
     addr: "0.0.0.0:8080"
@@ -8,22 +18,29 @@ server:
 
 data:
   mysql:
-    dsn: "root:root@tcp(127.0.0.1:3306)/market_data_db?parseTime=true&loc=UTC&time_zone=%27%2B00%3A00%27&charset=utf8mb4"
+    dsn: "${MYSQL_USER}:${MYSQL_PASSWORD}@tcp(${MYSQL_HOST}:${MYSQL_PORT})/${MYSQL_DB}?parseTime=true&loc=UTC&time_zone=%27%2B00%3A00%27&charset=utf8mb4"
   redis:
-    addr: "127.0.0.1:6379"
-    password: ""
+    addr: "${REDIS_ADDR}"
+    password: "${REDIS_PASSWORD}"
     db: 0
 
 kafka:
   brokers:
-    - "127.0.0.1:9092"
+    - "${KAFKA_BROKER}"
+  dlq_topic: "market-data.dlq"
 
 polygon:
-  api_key: "fake-polygon-api-key-not-real"
+  api_key: "${POLYGON_API_KEY}"
   base_url: "https://api.polygon.io"
+  symbols:
+    - "AAPL"
+    - "MSFT"
+    - "GOOGL"
+    - "TSLA"
+    - "NVDA"
 
 hkex:
-  endpoint: "https://fake-hkex-feed.example.com"
+  endpoint: "${HKEX_ENDPOINT}"
 
 observability:
-  otlp_endpoint: "127.0.0.1:4317"
+  otlp_endpoint: "${OTLP_ENDPOINT}"

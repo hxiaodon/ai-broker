@@ -3,6 +3,7 @@ package conf
 
 import (
 	"os"
+	"regexp"
 
 	"gopkg.in/yaml.v3"
 )
@@ -59,7 +60,8 @@ type RedisConfig struct {
 
 // KafkaConfig holds Kafka broker settings.
 type KafkaConfig struct {
-	Brokers []string `yaml:"brokers"`
+	Brokers  []string `yaml:"brokers"`
+	DLQTopic string   `yaml:"dlq_topic"`
 }
 
 // PolygonConfig holds Polygon API settings.
@@ -79,15 +81,27 @@ type ObsConfig struct {
 	OTLPEndpoint string `yaml:"otlp_endpoint"`
 }
 
-// Load reads config from the given YAML file path.
+// envVarPattern matches ${VAR_NAME} placeholders in config values.
+var envVarPattern = regexp.MustCompile(`\$\{([A-Z0-9_]+)\}`)
+
+// Load reads config from the given YAML file path and expands ${ENV_VAR} placeholders.
 func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
+	// Expand ${VAR} → os.Getenv("VAR") before YAML parsing.
+	expanded := envVarPattern.ReplaceAllFunc(data, func(match []byte) []byte {
+		varName := envVarPattern.FindSubmatch(match)[1]
+		if val := os.Getenv(string(varName)); val != "" {
+			return []byte(val)
+		}
+		return match // keep placeholder if env var not set
+	})
 	var cfg Config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
+	if err := yaml.Unmarshal(expanded, &cfg); err != nil {
 		return nil, err
 	}
 	return &cfg, nil
 }
+

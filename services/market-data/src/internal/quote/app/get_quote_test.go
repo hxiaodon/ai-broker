@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/shopspring/decimal"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -37,6 +38,14 @@ func (m *MockQuoteRepo) FindBySymbols(ctx context.Context, symbols []string) ([]
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]*domain.Quote), args.Error(1)
+}
+
+func (m *MockQuoteRepo) GetBySymbolMarketTimestamp(ctx context.Context, symbol string, market domain.Market, timestamp int64) (*domain.Quote, error) {
+	args := m.Called(ctx, symbol, market, timestamp)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*domain.Quote), args.Error(1)
 }
 
 // MockQuoteCacheRepo satisfies domain.QuoteCacheRepo interface.
@@ -179,6 +188,7 @@ func TestGetQuote_KafkaTopicIsMarketSpecific(t *testing.T) {
 	cacheRepo := new(MockQuoteCacheRepo)
 	stale := domain.NewStaleDetector(domain.DefaultStaleThreshold())
 
+	quoteRepo.On("GetBySymbolMarketTimestamp", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 	quoteRepo.On("Save", mock.Anything, mock.Anything).Return(nil)
 	cacheRepo.On("Set", mock.Anything, mock.Anything).Return(nil)
 	outboxRepo.On("InsertEvent", mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -193,6 +203,7 @@ func TestGetQuote_KafkaTopicIsMarketSpecific(t *testing.T) {
 	usQuote := &domain.Quote{
 		Symbol:        "AAPL",
 		Market:        domain.MarketUS,
+		Price:         decimal.NewFromFloat(150.25),
 		LastUpdatedAt: time.Now().UTC(),
 	}
 	require.NoError(t, uc.Execute(context.Background(), usQuote))
@@ -207,6 +218,7 @@ func TestUpdateQuote_HKGoesToHKTopic(t *testing.T) {
 	cacheRepo := new(MockQuoteCacheRepo)
 	stale := domain.NewStaleDetector(domain.DefaultStaleThreshold())
 
+	quoteRepo.On("GetBySymbolMarketTimestamp", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
 	quoteRepo.On("Save", mock.Anything, mock.Anything).Return(nil)
 	cacheRepo.On("Set", mock.Anything, mock.Anything).Return(nil)
 	outboxRepo.On("InsertEvent", mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -220,6 +232,7 @@ func TestUpdateQuote_HKGoesToHKTopic(t *testing.T) {
 	hkQuote := &domain.Quote{
 		Symbol:        "00700",
 		Market:        domain.MarketHK,
+		Price:         decimal.NewFromFloat(320.50),
 		LastUpdatedAt: time.Now().UTC(),
 	}
 	require.NoError(t, uc.Execute(context.Background(), hkQuote))

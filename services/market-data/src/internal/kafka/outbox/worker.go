@@ -30,21 +30,27 @@ type OutboxDB interface {
 
 // Worker polls the outbox_events table and publishes pending events to Kafka.
 type Worker struct {
-	db       OutboxDB
-	writer   KafkaWriter
-	logger   *zap.Logger
-	interval time.Duration
+	db         OutboxDB
+	writer     KafkaWriter
+	dlqWriter  KafkaWriter
+	dlqTopic   string
+	maxRetries int
+	logger     *zap.Logger
+	interval   time.Duration
+	batchSize  int
+	backoff    time.Duration
 }
 
 // outboxEvent maps to the outbox_events table row.
 type outboxEvent struct {
-	ID          int64     `gorm:"primaryKey"`
-	Topic       string    `gorm:"type:varchar(255)"`
-	Payload     []byte    `gorm:"type:blob"`
-	Status      string    `gorm:"type:varchar(20)"`
-	CreatedAt   time.Time
-	PublishedAt *time.Time
-	RetryCount  int `gorm:"type:tinyint unsigned"`
+	ID            int64     `gorm:"primaryKey"`
+	Topic         string    `gorm:"type:varchar(255)"`
+	Payload       []byte    `gorm:"type:blob"`
+	CorrelationID string    `gorm:"type:varchar(64)"`
+	Status        string    `gorm:"type:varchar(20)"`
+	CreatedAt     time.Time
+	PublishedAt   *time.Time
+	RetryCount    int `gorm:"type:tinyint unsigned"`
 }
 
 // OutboxEvent is the exported version for tests.
@@ -90,22 +96,31 @@ func (g *gormOutboxDB) MarkRetry(ctx context.Context, id int64, retryCount int) 
 }
 
 // NewWorker creates a new outbox Worker backed by a real *gorm.DB and *kafka.Writer.
-func NewWorker(db *gorm.DB, writer *kafka.Writer, logger *zap.Logger) *Worker {
+func NewWorker(db *gorm.DB, writer *kafka.Writer, dlqTopic string, logger *zap.Logger) *Worker {
 	return &Worker{
-		db:       &gormOutboxDB{db: db},
-		writer:   writer,
-		logger:   logger,
-		interval: 500 * time.Millisecond,
+		db:         &gormOutboxDB{db: db},
+		writer:     writer,
+		dlqWriter:  writer, // Reuse same writer for DLQ
+		dlqTopic:   dlqTopic,
+		maxRetries: 3,
+		logger:     logger,
+		interval:   500 * time.Millisecond,
+		batchSize:  100,
+		backoff:    0,
 	}
 }
 
 // newWorkerWithDeps is used in tests to inject mock implementations.
 func newWorkerWithDeps(db OutboxDB, writer KafkaWriter, logger *zap.Logger) *Worker {
 	return &Worker{
-		db:       db,
-		writer:   writer,
-		logger:   logger,
-		interval: 500 * time.Millisecond,
+		db:         db,
+		writer:     writer,
+		dlqWriter:  writer, // reuse writer for DLQ in tests
+		dlqTopic:   "market-data.dlq",
+		maxRetries: 3,
+		logger:     logger,
+		interval:   500 * time.Millisecond,
+		batchSize:  100,
 	}
 }
 
@@ -139,11 +154,18 @@ func (w *Worker) Run(ctx context.Context) error {
 }
 
 func (w *Worker) processBatch(ctx context.Context) error {
-	events, err := w.db.QueryPending(ctx, 100)
+	// Apply backoff if Kafka was slow
+	if w.backoff > 0 {
+		time.Sleep(w.backoff)
+	}
+
+	start := time.Now()
+	events, err := w.db.QueryPending(ctx, w.batchSize)
 	if err != nil {
 		return err
 	}
 
+	successCount := 0
 	for i := range events {
 		if err := w.publishEvent(ctx, &events[i]); err != nil {
 			w.logger.Error("outbox publish event",
@@ -152,11 +174,31 @@ func (w *Worker) processBatch(ctx context.Context) error {
 				zap.Error(err),
 			)
 			events[i].RetryCount++
-			_ = w.db.MarkRetry(ctx, events[i].ID, events[i].RetryCount)
+
+			// Route to DLQ if max retries reached
+			if events[i].RetryCount >= w.maxRetries {
+				if dlqErr := w.publishToDLQ(ctx, &events[i], err); dlqErr != nil {
+					w.logger.Error("failed to publish to DLQ",
+						zap.Int64("event_id", events[i].ID),
+						zap.Error(dlqErr))
+				}
+			}
+
+			if markErr := w.db.MarkRetry(ctx, events[i].ID, events[i].RetryCount); markErr != nil {
+				w.logger.Error("failed to mark retry", zap.Error(markErr))
+			}
 			continue
 		}
-		_ = w.db.MarkPublished(ctx, events[i].ID)
+		successCount++
+		if markErr := w.db.MarkPublished(ctx, events[i].ID); markErr != nil {
+			w.logger.Error("failed to mark published", zap.Error(markErr))
+		}
 	}
+
+	// Adjust batch size and backoff based on latency
+	latency := time.Since(start)
+	w.adjustBackpressure(latency, successCount, len(events))
+
 	return nil
 }
 
@@ -165,9 +207,90 @@ func (w *Worker) publishEvent(ctx context.Context, event *outboxEvent) error {
 		Topic: event.Topic,
 		Value: event.Payload,
 		Time:  time.Now().UTC(),
+		Headers: []kafka.Header{
+			{Key: "correlation_id", Value: []byte(event.CorrelationID)},
+		},
 	}
 	if err := w.writer.WriteMessages(ctx, msg); err != nil {
 		return fmt.Errorf("outbox publish to %s: %w", event.Topic, err)
 	}
 	return nil
+}
+
+// publishToDLQ publishes a failed event to the Dead Letter Queue with error metadata.
+func (w *Worker) publishToDLQ(ctx context.Context, event *outboxEvent, originalErr error) error {
+	dlqMsg := kafka.Message{
+		Topic: w.dlqTopic,
+		Key:   []byte(fmt.Sprintf("%d", event.ID)),
+		Value: event.Payload,
+		Time:  time.Now().UTC(),
+		Headers: []kafka.Header{
+			{Key: "original_topic", Value: []byte(event.Topic)},
+			{Key: "event_id", Value: []byte(fmt.Sprintf("%d", event.ID))},
+			{Key: "retry_count", Value: []byte(fmt.Sprintf("%d", event.RetryCount))},
+			{Key: "error", Value: []byte(originalErr.Error())},
+			{Key: "failed_at", Value: []byte(time.Now().UTC().Format(time.RFC3339))},
+		},
+	}
+	if err := w.dlqWriter.WriteMessages(ctx, dlqMsg); err != nil {
+		return fmt.Errorf("publish to DLQ: %w", err)
+	}
+	w.logger.Warn("event routed to DLQ",
+		zap.Int64("event_id", event.ID),
+		zap.String("original_topic", event.Topic),
+		zap.Int("retry_count", event.RetryCount))
+	return nil
+}
+
+// adjustBackpressure adjusts batch size and backoff based on Kafka latency.
+func (w *Worker) adjustBackpressure(latency time.Duration, successCount, totalCount int) {
+	avgLatency := latency
+	if totalCount > 0 {
+		avgLatency = latency / time.Duration(totalCount)
+	}
+
+	// If Kafka is slow (>100ms per message), reduce batch size and add backoff
+	if avgLatency > 100*time.Millisecond {
+		w.batchSize = maxInt(25, w.batchSize/2)
+		w.backoff = minDuration(4*time.Second, w.backoff*2)
+		if w.backoff == 0 {
+			w.backoff = 500 * time.Millisecond
+		}
+		w.logger.Warn("kafka slow, reducing batch size",
+			zap.Duration("latency", avgLatency),
+			zap.Int("new_batch_size", w.batchSize),
+			zap.Duration("backoff", w.backoff))
+	} else if avgLatency < 50*time.Millisecond && w.batchSize < 100 {
+		// Kafka is fast, increase batch size and reduce backoff
+		w.batchSize = minInt(100, w.batchSize*2)
+		w.backoff = maxDuration(0, w.backoff/2)
+	}
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func minDuration(a, b time.Duration) time.Duration {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func maxDuration(a, b time.Duration) time.Duration {
+	if a > b {
+		return a
+	}
+	return b
 }

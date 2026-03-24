@@ -99,7 +99,7 @@ func TestWorkerIntegration_OutboxToKafka_EndToEnd(t *testing.T) {
 
 	// Run worker for one batch
 	logger := zap.NewExample()
-	w := outbox.NewWorker(db, writer, logger)
+	w := outbox.NewWorker(db, writer, "market-data.dlq", logger)
 	err = w.ProcessBatchForTest(ctx)
 	require.NoError(t, err, "processBatch must succeed")
 
@@ -119,7 +119,7 @@ func TestWorkerIntegration_Run_ContextCancellation(t *testing.T) {
 
 	db := setupDB(t)
 	writer := setupKafkaWriter(t)
-	w := outbox.NewWorker(db, writer, zap.NewNop())
+	w := outbox.NewWorker(db, writer, "market-data.dlq", zap.NewNop())
 
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()

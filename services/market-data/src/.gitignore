@@ -1,0 +1,12 @@
+# Secret / local config — never commit real credentials
+configs/config.yaml
+
+# Build output
+/server
+/migrate
+
+# Generated files
+docs/swagger/
+
+# macOS
+.DS_Store

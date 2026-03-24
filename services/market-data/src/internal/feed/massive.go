@@ -33,7 +33,7 @@ func NewMassiveClient(apiKey string, symbols []string) *MassiveClient {
 func (m *MassiveClient) Connect(ctx context.Context) error {
 	client, err := massivews.New(massivews.Config{
 		APIKey: m.apiKey,
-		Feed:   massivews.RealTime,
+		Feed:   massivews.Delayed,
 		Market: massivews.Stocks,
 	})
 	if err != nil {

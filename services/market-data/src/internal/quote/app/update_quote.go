@@ -61,6 +61,26 @@ func (uc *UpdateQuoteUsecase) Execute(ctx context.Context, q *domain.Quote) erro
 		return fmt.Errorf("update quote: quote must not be nil")
 	}
 
+	// Enforce domain invariants before persisting.
+	if err := q.Validate(); err != nil {
+		return fmt.Errorf("update quote: %w", err)
+	}
+
+	// Idempotency check: prevent duplicate processing of same (symbol, market, timestamp).
+	// If feed handler retries or sends duplicate ticks, return early without creating duplicate outbox events.
+	existing, err := uc.quoteRepo.GetBySymbolMarketTimestamp(ctx, q.Symbol, q.Market, q.LastUpdatedAt.UnixMicro())
+	if err != nil {
+		return fmt.Errorf("update quote %s: dedup check: %w", q.Symbol, err)
+	}
+	if existing != nil {
+		// Quote already processed — idempotent success
+		uc.logger.Debug("duplicate quote ignored",
+			zap.String("symbol", q.Symbol),
+			zap.String("market", string(q.Market)),
+			zap.Time("timestamp", q.LastUpdatedAt))
+		return nil
+	}
+
 	// LastUpdatedAt must be set by the feed handler (exchange timestamp).
 	// The usecase must NOT overwrite it with time.Now() — doing so would break
 	// stale detection by making stale quotes appear fresh (market-data-system.md Appendix D.3).

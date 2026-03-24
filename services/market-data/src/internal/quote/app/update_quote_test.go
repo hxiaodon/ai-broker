@@ -38,6 +38,9 @@ func (m *mockQuoteRepo) FindBySymbol(_ context.Context, symbol string) (*domain.
 func (m *mockQuoteRepo) FindBySymbols(_ context.Context, _ []string) ([]*domain.Quote, error) {
 	return nil, nil
 }
+func (m *mockQuoteRepo) GetBySymbolMarketTimestamp(_ context.Context, _ string, _ domain.Market, _ int64) (*domain.Quote, error) {
+	return nil, nil
+}
 
 type mockCacheRepo struct {
 	setErr error
@@ -86,13 +89,14 @@ func errorTxFunc(_ context.Context, _ func(ctx context.Context) error) error {
 
 func newTestQuote() *domain.Quote {
 	return &domain.Quote{
-		Symbol:    "AAPL",
-		Market:    domain.MarketUS,
-		Price:     decimal.NewFromFloat(150.25),
-		PrevClose: decimal.NewFromFloat(149.00),
-		Volume:    1000000,
-		Bid:       decimal.NewFromFloat(150.24),
-		Ask:       decimal.NewFromFloat(150.26),
+		Symbol:        "AAPL",
+		Market:        domain.MarketUS,
+		Price:         decimal.NewFromFloat(150.25),
+		PrevClose:     decimal.NewFromFloat(149.00),
+		Volume:        1000000,
+		Bid:           decimal.NewFromFloat(150.24),
+		Ask:           decimal.NewFromFloat(150.26),
+		LastUpdatedAt: time.Now().UTC(),
 	}
 }
 

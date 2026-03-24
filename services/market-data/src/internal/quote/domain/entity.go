@@ -2,6 +2,7 @@
 package domain
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/shopspring/decimal"
@@ -81,4 +82,29 @@ func DefaultStaleThreshold() StaleThreshold {
 func (q *Quote) ApplyStaleCheck(r StaleResult) {
 	q.IsStale = r.IsStale
 	q.StaleSinceMs = r.StaleSinceMs
+}
+
+// Validate enforces domain invariants on a Quote.
+// Called by the application layer before persisting.
+func (q *Quote) Validate() error {
+	if q.Symbol == "" {
+		return fmt.Errorf("quote: symbol must not be empty")
+	}
+	if q.Market != MarketUS && q.Market != MarketHK {
+		return fmt.Errorf("quote: unsupported market %q", q.Market)
+	}
+	if q.Price.LessThanOrEqual(decimal.Zero) {
+		return fmt.Errorf("quote: price must be > 0, got %s", q.Price)
+	}
+	if q.Volume < 0 {
+		return fmt.Errorf("quote: volume must be >= 0, got %d", q.Volume)
+	}
+	// Bid/Ask spread check (only when both are set)
+	if !q.Bid.IsZero() && !q.Ask.IsZero() && q.Bid.GreaterThan(q.Ask) {
+		return fmt.Errorf("quote: bid %s must be <= ask %s", q.Bid, q.Ask)
+	}
+	if q.LastUpdatedAt.IsZero() {
+		return fmt.Errorf("quote: last_updated_at must not be zero")
+	}
+	return nil
 }

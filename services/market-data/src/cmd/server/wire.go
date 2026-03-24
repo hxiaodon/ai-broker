@@ -27,6 +27,7 @@ func initApp(cfg *conf.Config, logger *zap.Logger) (*App, func(), error) {
 		ProvideDB,
 		ProvideRedis,
 		ProvideKafkaWriter,
+		ProvideDLQTopic,
 
 		// Subdomain provider sets
 		quote.ProviderSet,
@@ -85,6 +86,14 @@ func ProvideKafkaWriter(cfg *conf.Config) *kafka.Writer {
 		Addr:     kafka.TCP(cfg.Kafka.Brokers...),
 		Balancer: &kafka.LeastBytes{},
 	}
+}
+
+// ProvideDLQTopic extracts DLQ topic from config.
+func ProvideDLQTopic(cfg *conf.Config) string {
+	if cfg.Kafka.DLQTopic == "" {
+		return "market-data.dlq"
+	}
+	return cfg.Kafka.DLQTopic
 }
 
 // ProvideHTTPAddr extracts the HTTP address from config.

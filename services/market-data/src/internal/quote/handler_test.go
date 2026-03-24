@@ -54,6 +54,10 @@ func (s *stubQuoteRepo) FindBySymbols(ctx context.Context, symbols []string) ([]
 	return nil, nil
 }
 
+func (s *stubQuoteRepo) GetBySymbolMarketTimestamp(ctx context.Context, symbol string, market domain.Market, timestamp int64) (*domain.Quote, error) {
+	return nil, nil
+}
+
 type stubStatusRepo struct{}
 
 func (s *stubStatusRepo) GetStatus(ctx context.Context, market domain.Market) (*domain.MarketStatus, error) {
