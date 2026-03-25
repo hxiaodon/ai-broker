@@ -36,9 +36,10 @@ Responsibilities:
 | `docs/specs/*.tracker.md` | 实现跟踪文件（动态进度 + 验收记录） |
 | `docs/active-features.yaml` | 域级功能实现进度仪表盘 |
 | `docs/patches.yaml` | Patch 注册表（活跃补丁 + 技术债） |
-| `docs/references/bank-channel-docs.md` | 银行渠道对接文档索引（JP Morgan、恒生、HKICL、Nacha 等公开文档链接及价值说明） |
-| `docs/references/payment-networks-primer.md` | **必读**：ACH/Wire/FPS 运营主体、技术本质、接入方式、Bank Adapter 设计含义 |
+| `docs/references/bank-channel-docs.md` | 银行渠道对接文档索引（JP Morgan、恒生、HKICL、Nacha、FedNow、moov-io 开源库、AML SaaS 等） |
+| `docs/references/payment-networks-primer.md` | **必读**：ACH/Wire/FPS/SWIFT 运营主体、技术本质、Wire IMAD/OMAD、HK→US 跨境流程、FedNow/RTP |
 | `docs/references/clearing-settlement-primer.md` | **必读**：出入金清结算 vs 证券清结算的区别、两套体系的唯一交汇点、fund-engineer 职责边界 |
+| `docs/references/aml-screening-vendors.md` | AML 制裁筛查方案选型：moov-io/watchman（开源）vs 商业 SaaS、名字模糊匹配、AMLO HK 接入 |
 | `docs/threads/` | Collaboration threads |
 | `docs/specs/api/grpc/fund_transfer.proto` | gRPC proto definitions |
 | `docs/specs/api/rest/` | REST OpenAPI specs (TBD) |

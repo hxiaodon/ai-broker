@@ -12,7 +12,7 @@ import (
 )
 
 func TestWebSocket_AuthTimeout(t *testing.T) {
-	ws := NewWSServer(zap.NewNop())
+	ws := NewWSServer(zap.NewNop(), nil)
 
 	server := httptest.NewServer(http.HandlerFunc(ws.HandleWebSocket))
 	defer server.Close()
@@ -33,7 +33,7 @@ func TestWebSocket_AuthTimeout(t *testing.T) {
 }
 
 func TestWebSocket_SubscribeFiltering(t *testing.T) {
-	ws := NewWSServer(zap.NewNop())
+	ws := NewWSServer(zap.NewNop(), nil)
 
 	server := httptest.NewServer(http.HandlerFunc(ws.HandleWebSocket))
 	defer server.Close()

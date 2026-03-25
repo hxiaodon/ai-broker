@@ -11,16 +11,18 @@ import (
 	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
 
+	"github.com/hxiaodon/ai-broker/services/market-data/internal/quote/domain"
 	"github.com/hxiaodon/ai-broker/services/market-data/pkg/observability"
 )
 
 // WSServer provides the WebSocket gateway for real-time quote push.
 // Spec: websocket-spec.md v2.1
 type WSServer struct {
-	upgrader websocket.Upgrader
-	logger   *zap.Logger
-	clients  map[*wsClient]bool
-	mu       sync.RWMutex
+	upgrader  websocket.Upgrader
+	logger    *zap.Logger
+	clients   map[*wsClient]bool
+	mu        sync.RWMutex
+	cacheRepo domain.QuoteCacheRepo // used to send initial snapshot on subscribe
 }
 
 type wsClient struct {
@@ -28,11 +30,13 @@ type wsClient struct {
 	authenticated bool
 	userType      string // "registered" or "guest"
 	subscriptions map[string]bool
-	mu            sync.RWMutex
+	mu            sync.RWMutex // protects authenticated, userType, subscriptions
+	writeMu       sync.Mutex   // serialises all conn.WriteMessage calls (gorilla requirement)
 }
 
 // NewWSServer creates a new WebSocket server.
-func NewWSServer(logger *zap.Logger) *WSServer {
+// cacheRepo is used to push initial snapshots on subscribe; may be nil (disables snapshot push).
+func NewWSServer(logger *zap.Logger, cacheRepo domain.QuoteCacheRepo) *WSServer {
 	return &WSServer{
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
@@ -42,8 +46,9 @@ func NewWSServer(logger *zap.Logger) *WSServer {
 				return true
 			},
 		},
-		logger:  logger,
-		clients: make(map[*wsClient]bool),
+		logger:    logger,
+		clients:   make(map[*wsClient]bool),
+		cacheRepo: cacheRepo,
 	}
 }
 
@@ -80,8 +85,13 @@ func (ws *WSServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	authDeadline := time.NewTimer(5 * time.Second)
 	defer authDeadline.Stop()
 
+	// readLoop signals auth result then continues processing messages until disconnect.
 	authChan := make(chan bool, 1)
-	go ws.readLoop(client, authChan)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		ws.readLoop(client, authChan)
+	}()
 
 	select {
 	case <-authDeadline.C:
@@ -89,18 +99,21 @@ func (ws *WSServer) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			ws.logger.Warn("client failed to authenticate within 5s")
 			_ = conn.WriteControl(websocket.CloseMessage,
 				websocket.FormatCloseMessage(4001, "auth timeout"), time.Now().Add(time.Second))
+			// Wait for readLoop to exit before returning (ensures clean defer).
+			<-done
 			return
 		}
 	case authed := <-authChan:
 		if !authed {
 			_ = conn.WriteControl(websocket.CloseMessage,
 				websocket.FormatCloseMessage(4002, "auth failed"), time.Now().Add(time.Second))
+			<-done
 			return
 		}
 	}
 
-	// Keep connection alive until client disconnects.
-	<-make(chan struct{})
+	// Keep connection alive until readLoop exits (client disconnects or read error).
+	<-done
 }
 
 func (ws *WSServer) readLoop(client *wsClient, authChan chan bool) {
@@ -146,8 +159,8 @@ func (ws *WSServer) handleAuth(client *wsClient, msg *controlMessage, authChan c
 	expiresIn := 0
 
 	if msg.Token != "" {
-		// TODO(Phase-6): validate JWT signature.
-		// Current stub: accept any non-empty token as registered user.
+		// WARNING: stub — accepts any non-empty token as registered user.
+		// TODO(Phase-6): validate RS256 JWT signature using AMS public key — MUST NOT deploy to production with stub.
 		userType = "registered"
 		expiresIn = 900
 	}
@@ -193,7 +206,12 @@ func (ws *WSServer) handleSubscribe(client *wsClient, msg *controlMessage) {
 		"symbols": msg.Symbols,
 	})
 
-	// TODO(Phase-6): send initial SNAPSHOT frames (Protobuf binary).
+	// Push initial snapshot for each subscribed symbol so the client gets
+	// the current price immediately without waiting for the next feed update.
+	// Spec: websocket-spec.md — server MUST send SNAPSHOT frames after subscribe_ack.
+	if ws.cacheRepo != nil && len(msg.Symbols) > 0 {
+		go ws.pushInitialSnapshots(client, msg.Symbols)
+	}
 }
 
 func (ws *WSServer) handleUnsubscribe(client *wsClient, msg *controlMessage) {
@@ -223,7 +241,9 @@ func (ws *WSServer) handleReauth(client *wsClient, msg *controlMessage) {
 
 func (ws *WSServer) sendJSON(client *wsClient, v interface{}) {
 	data, _ := json.Marshal(v)
+	client.writeMu.Lock()
 	_ = client.conn.WriteMessage(websocket.TextMessage, data)
+	client.writeMu.Unlock()
 }
 
 func (ws *WSServer) sendError(client *wsClient, code, message string) {
@@ -249,7 +269,7 @@ func (ws *WSServer) removeClient(client *wsClient) {
 }
 
 // BroadcastQuote sends a quote update to subscribed clients.
-// TODO(Phase-6): implement subscription filtering and Protobuf binary frames.
+// Each client's writeMu serialises concurrent writes from this goroutine and sendJSON.
 func (ws *WSServer) BroadcastQuote(symbol string, data []byte) {
 	ws.mu.RLock()
 	defer ws.mu.RUnlock()
@@ -258,7 +278,9 @@ func (ws *WSServer) BroadcastQuote(symbol string, data []byte) {
 		subscribed := client.subscriptions[symbol]
 		client.mu.RUnlock()
 		if subscribed {
+			client.writeMu.Lock()
 			_ = client.conn.WriteMessage(websocket.BinaryMessage, data)
+			client.writeMu.Unlock()
 		}
 	}
 }
@@ -288,4 +310,63 @@ func StartWSServer(ctx context.Context, addr string, ws *WSServer) error {
 		return fmt.Errorf("ws server: %w", err)
 	}
 	return nil
+}
+
+// WSAddr is the typed address for the WebSocket server (avoids collision with HTTPAddr).
+type WSAddr string
+
+// pushInitialSnapshots fetches cached quotes for the given symbols and sends
+// each as a SNAPSHOT binary frame to the client.
+// Runs in a goroutine to avoid blocking the readLoop.
+func (ws *WSServer) pushInitialSnapshots(client *wsClient, symbols []string) {
+	// Group symbols by market (infer from symbol format).
+	usSymbols := make([]string, 0)
+	hkSymbols := make([]string, 0)
+	for _, s := range symbols {
+		if isHKSymbol(s) {
+			hkSymbols = append(hkSymbols, s)
+		} else {
+			usSymbols = append(usSymbols, s)
+		}
+	}
+
+	ctx := context.Background()
+	for _, batch := range []struct {
+		market  domain.Market
+		symbols []string
+	}{
+		{domain.MarketUS, usSymbols},
+		{domain.MarketHK, hkSymbols},
+	} {
+		if len(batch.symbols) == 0 {
+			continue
+		}
+		quotes, err := ws.cacheRepo.MGet(ctx, batch.market, batch.symbols)
+		if err != nil {
+			ws.logger.Warn("snapshot fetch failed", zap.Error(err))
+			continue
+		}
+		for _, q := range quotes {
+			payload, err := json.Marshal(q)
+			if err != nil {
+				continue
+			}
+			client.writeMu.Lock()
+			_ = client.conn.WriteMessage(websocket.BinaryMessage, payload)
+			client.writeMu.Unlock()
+		}
+	}
+}
+
+// isHKSymbol returns true when the symbol looks like a HK stock code (4–5 digits).
+func isHKSymbol(symbol string) bool {
+	if len(symbol) < 4 {
+		return false
+	}
+	for _, c := range symbol {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }

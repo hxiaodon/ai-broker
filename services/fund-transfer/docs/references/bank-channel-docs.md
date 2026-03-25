@@ -215,12 +215,56 @@
 - Wire 不可撤销性的法律依据
 - IMAD/OMAD 是 Wire 状态追踪的唯一标识，需在 fund_transfers 表记录
 
+### 9. FedNow（美联储实时支付，2023 年上线）
+
+| 项目 | 内容 |
+|------|------|
+| 服务页面 | https://www.frbservices.org/financial-services/fednow |
+| 开发者资源 | https://www.frbservices.org/financial-services/fednow/resources/developer-exchange |
+| 参与行名单 | https://www.frbservices.org/financial-services/fednow/participants |
+| 文档质量 | ⭐⭐⭐⭐ |
+
+**覆盖内容**：
+- 7×24×365 实时结算，到账秒级
+- 单笔上限 $500,000（可与银行协商提高）
+- 基于 ISO 20022 消息格式（pacs.008）
+- **立即最终结算，不可撤销**（无 ACH Return 风险）
+- 接入需通过已加入 FedNow 的持牌参与行
+
+**对我们的价值**：
+- 若用户银行支持 FedNow，可**完全替代 ACH 垫资逻辑**——到账即可交易，无需分层即时额度策略
+- 解决 ACH T+2 Return 窗口期垫资风险（目前参与行覆盖率约 70%+，持续增长）
+- 通过 JP Morgan 或 Modern Treasury API 接入，无需单独对接
+
 ---
 
-## 四、三方聚合层（可作为银行适配器的替代方案）
+### 10. RTP — The Clearing House 实时支付（2017 年上线）
+
+| 项目 | 内容 |
+|------|------|
+| 服务页面 | https://www.theclearinghouse.org/payment-systems/rtp |
+| 参与行列表 | https://www.theclearinghouse.org/payment-systems/rtp/rtp-participating-financial-institutions |
+| 开发者文档（通过会员银行获取） | 需联系 The Clearing House |
+| 文档质量 | ⭐⭐⭐ |
+
+**覆盖内容**：
+- 与 FedNow 定位相同，私营版本，由大型银行联盟运营
+- 7×24 实时清算，覆盖约 65% 美国银行账户
+- 实时消息确认（RTP 的 "Request for Payment" 支持收款方发起）
+- JP Morgan、Citibank、Bank of America 均已接入
+
+**与 FedNow 的选择**：
+- 两者并行存在，同一银行可能同时支持两者
+- 通过 Modern Treasury 或银行 API 接入时，可统一以 `payment_type: rtp` 或 `fednow` 切换
+- 建议优先检查用户银行的支持情况，按优先级：FedNow/RTP → ACH → Wire
+
+---
+
+## 四、开源工具与三方聚合层
 
 > 如果前期没有足够的银行商务资源，可考虑通过三方聚合商接入，
-> 后期规模扩大后再直连银行。
+> 后期规模扩大后再直连银行。开源工具可直接集成到 Go 服务中，
+> 无需商务关系，推荐优先用于开发和早期阶段。
 
 ### 9. Modern Treasury
 
@@ -294,29 +338,158 @@
 
 ---
 
+### 12. moov-io/wire（开源 Go 库 — Fedwire 报文处理）
+
+| 项目 | 内容 |
+|------|------|
+| GitHub | https://github.com/moov-io/wire |
+| 文档站 | https://moov-io.github.io/wire/ |
+| Go pkg | https://pkg.go.dev/github.com/moov-io/wire |
+| 沙盒 | 有（Docker 镜像，本地运行 HTTP server） |
+| 文档质量 | ⭐⭐⭐⭐ |
+
+**覆盖内容**：
+- Fedwire FIMA 和 GEN 报文格式的 Go 读写/验证
+- ISO 20022 pacs.008（客户信贷转账）和 pacs.009（金融机构信贷转账）报文结构
+- IMAD/OMAD 字段解析（Wire 的唯一追踪标识）
+- 提供 REST HTTP server，Docker 本地可直接运行
+
+**对我们的价值**：
+- 与 moov-io/ach 配套，构成完整的 US 资金转移报文处理层
+- Wire 到账时银行 Webhook 携带的 IMAD 字段解析，存入 `fund_transfers.wire_metadata` 用于对账
+- 出金 Wire 报文生成的参考实现
+
+---
+
+### 13. moov-io/watchman（开源 Go 服务 — OFAC 制裁筛查）
+
+| 项目 | 内容 |
+|------|------|
+| GitHub | https://github.com/moov-io/watchman |
+| 文档站 | https://moov-io.github.io/watchman/ |
+| API 文档 | https://moov-io.github.io/watchman/api/ |
+| Docker Hub | `moov/watchman` |
+| 沙盒 | 有（Docker 本地运行，内置测试数据） |
+| 文档质量 | ⭐⭐⭐⭐ |
+
+**覆盖内容**：
+- OFAC SDN、Consolidated Sanctions、Sectoral Sanctions 名单本地化检索
+- EU、UN、UK HMT、OFAC Non-SDN 等多名单合并筛查
+- 名字模糊匹配（Jaro-Winkler + phonetic 算法）
+- gRPC + REST 双协议，Docker 部署 10 分钟起服务
+- 名单自动每日更新（拉取 OFAC 官方 CSV）
+- Webhook 推送：名单变更时触发存量用户自动复查
+
+**对我们的价值**：
+- **可完全替代商业 AML SaaS 的制裁筛查部分**（ComplyAdvantage 月费 $1,000+ 起）
+- Go 语言原生，Fund Transfer Service 通过 REST/gRPC 调用，延迟 <50ms
+- 生产案例：被 Moov Financial 用于自身支付合规基础设施
+- 不足：不含 PEP（政治公众人物）数据库和不良媒体监控（规模化后需补充商业 SaaS）
+- 详细选型对比见 [`aml-screening-vendors.md`](./aml-screening-vendors.md)
+
+---
+
+### 14. Dwolla — ACH 专注支付运营平台
+
+| 项目 | 内容 |
+|------|------|
+| 开发者文档 | https://developers.dwolla.com/ |
+| API Reference | https://docs.dwolla.com/ |
+| Go SDK | https://github.com/dwolla/dwolla-v2-go |
+| 沙盒 | 有（注册即开通，免费） |
+| 文档质量 | ⭐⭐⭐⭐ |
+
+**覆盖内容**：
+- ACH Credit/Debit（Standard ACH + Same-Day ACH）
+- 支付状态 Webhook 事件模型（`transfer:created` / `transfer:completed` / `transfer:failed`）
+- Return Code 完整处理（R01-R85，附原因说明）
+- 幂等键设计（`Idempotency-Key` header）
+- 银行账户验证（Micro-deposits + Instant Account Verification）
+
+**与 Modern Treasury 的区别**：
+- Dwolla 专注 ACH，不支持 Wire 和国际汇款
+- Modern Treasury 是 ACH + Wire + 国际汇款统一平台，价格更高
+- Dwolla 适合纯 ACH 场景，价格更低；若需要 Wire 则选 Modern Treasury
+
+**对我们的价值**：
+- Return Code Webhook 事件模型是 `ach-risk-and-instant-deposit.md` 补偿事务的实现参考
+- 幂等键设计方案可直接借鉴（72 小时缓存、网络超时重试规范）
+- 沙盒可模拟各类 Return Code（R01/R02/R10），适合开发阶段测试
+
+---
+
+### 15. Wise Business API — 跨境 FX 设计参考
+
+| 项目 | 内容 |
+|------|------|
+| 开发者文档 | https://docs.wise.com/api-docs/api-reference |
+| OpenAPI Spec | https://github.com/transferwise/openapi |
+| 沙盒 | https://sandbox.transferwise.tech |
+| 文档质量 | ⭐⭐⭐⭐⭐ |
+
+**覆盖内容**：
+- 跨境汇款：80+ 货币，支持 HKD → USD
+- 汇率锁价（Quote → Lock Rate → Create Transfer 三步模型）
+- 透明的费用结构（spread + 固定手续费，API 返回完整明细）
+- Webhook 通知（transfer state 变更：`processing` → `outgoing_payment_sent` → `funds_converted`）
+- 批量支付（Batch Transfers）
+
+**对我们的价值**：
+- `fx-conversion-flow.md` 中锁价机制的对标参考：Quote → Lock → Execute 三步与我们的设计高度吻合
+- 费用透明化模型参考：如何在用户入金前展示预估手续费和汇率
+- **注意**：不建议直接接入作为 C 端出金渠道（监管合规要求不同），仅作设计参考
+
+---
+
+### 16. ComplyAdvantage — 商业 AML 筛查 SaaS
+
+| 项目 | 内容 |
+|------|------|
+| 开发者文档 | https://docs.complyadvantage.com/ |
+| AML 数据库说明 | https://complyadvantage.com/insights/aml-database/ |
+| 沙盒 | 有（注册申请） |
+| 定价 | 企业协商，月费 $1,000+ 起 |
+| 文档质量 | ⭐⭐⭐⭐ |
+
+**覆盖内容**：
+- 全球制裁名单（OFAC、UN、EU、HMT、DFAT）实时搜索（分钟级更新）
+- PEP（政治公众人物）数据库 — moov-io/watchman 不具备
+- 不良媒体监控（Adverse Media）— 新闻舆情筛查
+- 批量搜索 API，响应 <200ms
+- Webhook 推送（监控对象状态变化）
+
+**与 moov-io/watchman 的选择建议**：
+- 早期/MVP 阶段：moov-io/watchman 自托管（零成本，覆盖 OFAC/UN/EU/UK）
+- 规模化/合规升级：ComplyAdvantage（补充 PEP + 媒体监控，满足 Enhanced Due Diligence）
+- 详细选型矩阵见 [`aml-screening-vendors.md`](./aml-screening-vendors.md)
+
+---
+
 ## 五、访问优先级建议
 
-### 阶段一：系统设计阶段（现在）
-
-无需注册即可阅读，直接用于对照系统设计：
+### 阶段一：系统设计阶段（无需注册，直接阅读）
 
 ```
-1. JP Morgan ACH/Wire 文档    → 验证 Bank Adapter 字段设计
+1. JP Morgan ACH/Wire 文档    → 验证 Bank Adapter 字段设计（含 Wire IMAD 字段）
 2. 恒生银行 FPS 文档          → 验证香港 FPS 集成方案
 3. Modern Treasury 文档       → 参考 Ledger + 对账接口设计
-4. Nacha ACH 开发者指南       → 理解 ACH Return Code 处理
+4. Nacha ACH 开发者指南       → 理解 ACH Return Code 处理规范
 5. HKICL FPS Rules PDF        → 理解 FPS 合规要求
+6. moov-io/wire GitHub        → 了解 Fedwire 报文结构（IMAD/OMAD）
+7. moov-io/watchman GitHub    → 了解 OFAC 制裁名单筛查方案
+8. FedNow 参与行名单          → 评估即时支付覆盖率
 ```
 
-### 阶段二：开发阶段
-
-需注册沙盒账号：
+### 阶段二：开发阶段（本地沙盒，无需商务关系）
 
 ```
-1. Dwolla 沙盒               → 模拟 ACH Return Code 失败场景
-2. Plaid 沙盒                → 模拟银行账户验证流程
-3. moov-io/ach Docker        → 本地 ACH 文件处理测试
-4. Modern Treasury test 环境 → 对账流程端到端测试
+1. moov-io/ach Docker         → 本地 ACH 文件处理测试（无需真实账户）
+2. moov-io/wire Docker        → 本地 Wire 报文解析测试
+3. moov-io/watchman Docker    → 本地 OFAC 筛查服务（直接用于开发环境）
+4. Dwolla 沙盒                → 模拟 ACH Return Code 全场景（R01/R02/R10）
+5. Plaid 沙盒                 → 模拟银行账户验证流程（Instant + Micro-deposit）
+6. Modern Treasury test 环境  → 对账流程端到端测试
+7. Wise 沙盒                  → 验证 FX 锁价流程设计
 ```
 
 ### 阶段三：上线前（需商务关系）
@@ -327,6 +500,7 @@
 3. 签署 API License Agreement
 4. 获取生产环境 API 凭证
 5. 通过银行合规审查
+6. 评估是否升级 moov-io/watchman → ComplyAdvantage（PEP 数据库需求）
 ```
 
 ---

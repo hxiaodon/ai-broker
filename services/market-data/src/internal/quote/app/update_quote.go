@@ -14,12 +14,13 @@ import (
 
 // UpdateQuoteUsecase handles updating a quote from feed data.
 type UpdateQuoteUsecase struct {
-	quoteRepo  domain.QuoteRepo
-	cacheRepo  domain.QuoteCacheRepo
-	outboxRepo OutboxRepo
-	txFunc     TxFunc
-	stale      *domain.StaleDetector
-	logger     *zap.Logger
+	quoteRepo   domain.QuoteRepo
+	cacheRepo   domain.QuoteCacheRepo
+	outboxRepo  OutboxRepo
+	txFunc      TxFunc
+	stale       *domain.StaleDetector
+	delayedRepo domain.QuoteDelayedRepo // optional; nil disables delayed ring-buffer push
+	logger      *zap.Logger
 }
 
 // OutboxRepo defines the interface for writing outbox events.
@@ -35,21 +36,24 @@ type OutboxRepo interface {
 type TxFunc func(ctx context.Context, fn func(ctx context.Context) error) error
 
 // NewUpdateQuoteUsecase creates a new UpdateQuoteUsecase.
+// delayedRepo is optional — pass nil to disable the delayed ring-buffer push.
 func NewUpdateQuoteUsecase(
 	quoteRepo domain.QuoteRepo,
 	cacheRepo domain.QuoteCacheRepo,
 	outboxRepo OutboxRepo,
 	txFunc TxFunc,
 	stale *domain.StaleDetector,
+	delayedRepo domain.QuoteDelayedRepo,
 	logger *zap.Logger,
 ) *UpdateQuoteUsecase {
 	return &UpdateQuoteUsecase{
-		quoteRepo:  quoteRepo,
-		cacheRepo:  cacheRepo,
-		outboxRepo: outboxRepo,
-		txFunc:     txFunc,
-		stale:      stale,
-		logger:     logger,
+		quoteRepo:   quoteRepo,
+		cacheRepo:   cacheRepo,
+		outboxRepo:  outboxRepo,
+		txFunc:      txFunc,
+		stale:       stale,
+		delayedRepo: delayedRepo,
+		logger:      logger,
 	}
 }
 
@@ -67,18 +71,38 @@ func (uc *UpdateQuoteUsecase) Execute(ctx context.Context, q *domain.Quote) erro
 	}
 
 	// Idempotency check: prevent duplicate processing of same (symbol, market, timestamp).
+	// Redis SET NX is used instead of a MySQL query to avoid a DB round-trip on every tick.
 	// If feed handler retries or sends duplicate ticks, return early without creating duplicate outbox events.
-	existing, err := uc.quoteRepo.GetBySymbolMarketTimestamp(ctx, q.Symbol, q.Market, q.LastUpdatedAt.UnixMicro())
+	isDup, err := uc.cacheRepo.IsDedup(ctx, q.Symbol, q.Market, q.LastUpdatedAt.UnixMicro())
 	if err != nil {
-		return fmt.Errorf("update quote %s: dedup check: %w", q.Symbol, err)
-	}
-	if existing != nil {
-		// Quote already processed — idempotent success
+		// Dedup check failure is non-fatal: fall through and risk a duplicate outbox entry,
+		// which is safer than dropping a real quote update.
+		uc.logger.Warn("dedup check failed (non-fatal), proceeding",
+			zap.String("symbol", q.Symbol),
+			zap.Error(err))
+	} else if isDup {
 		uc.logger.Debug("duplicate quote ignored",
 			zap.String("symbol", q.Symbol),
 			zap.String("market", string(q.Market)),
 			zap.Time("timestamp", q.LastUpdatedAt))
 		return nil
+	}
+
+	// Compute Change / ChangePct from PrevClose when the feed does not provide them.
+	// Spec: market-data-system.md Appendix C — change basis = previous Regular Session close (unadjusted).
+	if q.PrevClose.IsZero() {
+		prevClose, err := uc.quoteRepo.FindPrevClose(ctx, q.Symbol, q.Market)
+		if err != nil {
+			// Non-fatal: log and continue with zero Change (better than failing the whole update).
+			uc.logger.Warn("find prev close failed (non-fatal)",
+				zap.String("symbol", q.Symbol),
+				zap.Error(err))
+		} else {
+			q.ApplyChange(prevClose)
+		}
+	} else {
+		// Feed supplied PrevClose; ensure Change/ChangePct are (re)computed consistently.
+		q.ApplyChange(q.PrevClose)
 	}
 
 	// LastUpdatedAt must be set by the feed handler (exchange timestamp).
@@ -119,6 +143,15 @@ func (uc *UpdateQuoteUsecase) Execute(ctx context.Context, q *domain.Quote) erro
 			zap.String("symbol", q.Symbol),
 			zap.String("market", string(q.Market)),
 			zap.Error(err))
+	}
+
+	// 3. Push to delayed ring buffer for guest users (best-effort).
+	if uc.delayedRepo != nil {
+		if err := uc.delayedRepo.Push(ctx, q); err != nil {
+			uc.logger.Warn("delayed push failed (non-fatal)",
+				zap.String("symbol", q.Symbol),
+				zap.Error(err))
+		}
 	}
 
 	return nil

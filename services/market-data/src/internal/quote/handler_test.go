@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/shopspring/decimal"
+
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/quote/app"
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/quote/domain"
 	"github.com/hxiaodon/ai-broker/services/market-data/pkg/httputil"
@@ -17,7 +19,7 @@ import (
 
 func newTestHandler() *Handler {
 	return NewHandler(
-		app.NewGetQuoteUsecase(&stubQuoteCache{}, &stubQuoteRepo{}, nil, zap.NewNop()),
+		app.NewGetQuoteUsecase(&stubQuoteCache{}, &stubQuoteRepo{}, nil, nil, zap.NewNop()),
 		app.NewGetMarketStatusUsecase(&stubStatusRepo{}),
 	)
 }
@@ -34,6 +36,10 @@ func (s *stubQuoteCache) Set(ctx context.Context, q *domain.Quote) error {
 
 func (s *stubQuoteCache) MGet(ctx context.Context, market domain.Market, symbols []string) ([]*domain.Quote, error) {
 	return nil, nil
+}
+
+func (s *stubQuoteCache) IsDedup(_ context.Context, _ string, _ domain.Market, _ int64) (bool, error) {
+	return false, nil
 }
 
 type stubQuoteRepo struct{}
@@ -56,6 +62,10 @@ func (s *stubQuoteRepo) FindBySymbols(ctx context.Context, symbols []string) ([]
 
 func (s *stubQuoteRepo) GetBySymbolMarketTimestamp(ctx context.Context, symbol string, market domain.Market, timestamp int64) (*domain.Quote, error) {
 	return nil, nil
+}
+
+func (s *stubQuoteRepo) FindPrevClose(_ context.Context, _ string, _ domain.Market) (decimal.Decimal, error) {
+	return decimal.Zero, nil
 }
 
 type stubStatusRepo struct{}

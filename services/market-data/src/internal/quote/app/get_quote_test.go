@@ -48,6 +48,11 @@ func (m *MockQuoteRepo) GetBySymbolMarketTimestamp(ctx context.Context, symbol s
 	return args.Get(0).(*domain.Quote), args.Error(1)
 }
 
+func (m *MockQuoteRepo) FindPrevClose(ctx context.Context, symbol string, market domain.Market) (decimal.Decimal, error) {
+	args := m.Called(ctx, symbol, market)
+	return args.Get(0).(decimal.Decimal), args.Error(1)
+}
+
 // MockQuoteCacheRepo satisfies domain.QuoteCacheRepo interface.
 type MockQuoteCacheRepo struct{ mock.Mock }
 
@@ -70,6 +75,11 @@ func (m *MockQuoteCacheRepo) MGet(ctx context.Context, market domain.Market, sym
 		return nil, args.Error(1)
 	}
 	return args.Get(0).([]*domain.Quote), args.Error(1)
+}
+
+func (m *MockQuoteCacheRepo) IsDedup(ctx context.Context, symbol string, market domain.Market, tsMicro int64) (bool, error) {
+	args := m.Called(ctx, symbol, market, tsMicro)
+	return args.Bool(0), args.Error(1)
 }
 
 // MockOutboxRepo satisfies app.OutboxRepo interface.
@@ -95,8 +105,8 @@ func TestGetQuote_CacheMiss_DBHit(t *testing.T) {
 	quoteRepo.On("FindBySymbol", mock.Anything, "AAPL").Return(dbQuote, nil)
 	cacheRepo.On("Set", mock.Anything, dbQuote).Return(nil) // cache backfill
 
-	uc := app.NewGetQuoteUsecase(cacheRepo, quoteRepo, stale, zap.NewNop())
-	q, err := uc.Execute(context.Background(), domain.MarketUS, "AAPL")
+	uc := app.NewGetQuoteUsecase(cacheRepo, quoteRepo, stale, nil, zap.NewNop())
+	q, err := uc.Execute(context.Background(), domain.MarketUS, "AAPL", false)
 
 	require.NoError(t, err)
 	assert.Equal(t, "AAPL", q.Symbol)
@@ -113,8 +123,8 @@ func TestGetQuote_CacheMiss_DBMiss_ReturnsError(t *testing.T) {
 	cacheRepo.On("Get", mock.Anything, domain.MarketUS, "UNKNOWN").Return(nil, nil)
 	quoteRepo.On("FindBySymbol", mock.Anything, "UNKNOWN").Return(nil, nil)
 
-	uc := app.NewGetQuoteUsecase(cacheRepo, quoteRepo, stale, zap.NewNop())
-	_, err := uc.Execute(context.Background(), domain.MarketUS, "UNKNOWN")
+	uc := app.NewGetQuoteUsecase(cacheRepo, quoteRepo, stale, nil, zap.NewNop())
+	_, err := uc.Execute(context.Background(), domain.MarketUS, "UNKNOWN", false)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
@@ -129,8 +139,8 @@ func TestGetQuote_DBError_Propagated(t *testing.T) {
 	cacheRepo.On("Get", mock.Anything, domain.MarketUS, "AAPL").Return(nil, nil)
 	quoteRepo.On("FindBySymbol", mock.Anything, "AAPL").Return(nil, errors.New("db: connection refused"))
 
-	uc := app.NewGetQuoteUsecase(cacheRepo, quoteRepo, stale, zap.NewNop())
-	_, err := uc.Execute(context.Background(), domain.MarketUS, "AAPL")
+	uc := app.NewGetQuoteUsecase(cacheRepo, quoteRepo, stale, nil, zap.NewNop())
+	_, err := uc.Execute(context.Background(), domain.MarketUS, "AAPL", false)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "connection refused")
@@ -150,8 +160,8 @@ func TestGetQuote_StaleEvaluatedOnCacheHit(t *testing.T) {
 	}
 	cacheRepo.On("Get", mock.Anything, domain.MarketUS, "AAPL").Return(staleQuote, nil)
 
-	uc := app.NewGetQuoteUsecase(cacheRepo, quoteRepo, stale, zap.NewNop())
-	q, err := uc.Execute(context.Background(), domain.MarketUS, "AAPL")
+	uc := app.NewGetQuoteUsecase(cacheRepo, quoteRepo, stale, nil, zap.NewNop())
+	q, err := uc.Execute(context.Background(), domain.MarketUS, "AAPL", false)
 
 	require.NoError(t, err)
 	assert.True(t, q.IsStale, "cache hit with old timestamp must be flagged as stale")
@@ -172,8 +182,8 @@ func TestGetQuote_HKMarket_UsesMarketDimension(t *testing.T) {
 	}
 	cacheRepo.On("Get", mock.Anything, domain.MarketHK, "00700").Return(hkQuote, nil)
 
-	uc := app.NewGetQuoteUsecase(cacheRepo, quoteRepo, stale, zap.NewNop())
-	q, err := uc.Execute(context.Background(), domain.MarketHK, "00700")
+	uc := app.NewGetQuoteUsecase(cacheRepo, quoteRepo, stale, nil, zap.NewNop())
+	q, err := uc.Execute(context.Background(), domain.MarketHK, "00700", false)
 
 	require.NoError(t, err)
 	assert.Equal(t, domain.MarketHK, q.Market)
@@ -188,7 +198,8 @@ func TestGetQuote_KafkaTopicIsMarketSpecific(t *testing.T) {
 	cacheRepo := new(MockQuoteCacheRepo)
 	stale := domain.NewStaleDetector(domain.DefaultStaleThreshold())
 
-	quoteRepo.On("GetBySymbolMarketTimestamp", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+	quoteRepo.On("FindPrevClose", mock.Anything, mock.Anything, mock.Anything).Return(decimal.Zero, nil)
+	cacheRepo.On("IsDedup", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
 	quoteRepo.On("Save", mock.Anything, mock.Anything).Return(nil)
 	cacheRepo.On("Set", mock.Anything, mock.Anything).Return(nil)
 	outboxRepo.On("InsertEvent", mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -196,7 +207,7 @@ func TestGetQuote_KafkaTopicIsMarketSpecific(t *testing.T) {
 	uc := app.NewUpdateQuoteUsecase(
 		quoteRepo, cacheRepo, outboxRepo,
 		func(ctx context.Context, fn func(context.Context) error) error { return fn(ctx) },
-		stale, zap.NewNop(),
+		stale, nil, zap.NewNop(),
 	)
 
 	// US quote → should go to market-data.quotes.us
@@ -218,7 +229,8 @@ func TestUpdateQuote_HKGoesToHKTopic(t *testing.T) {
 	cacheRepo := new(MockQuoteCacheRepo)
 	stale := domain.NewStaleDetector(domain.DefaultStaleThreshold())
 
-	quoteRepo.On("GetBySymbolMarketTimestamp", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, nil)
+	quoteRepo.On("FindPrevClose", mock.Anything, mock.Anything, mock.Anything).Return(decimal.Zero, nil)
+	cacheRepo.On("IsDedup", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(false, nil)
 	quoteRepo.On("Save", mock.Anything, mock.Anything).Return(nil)
 	cacheRepo.On("Set", mock.Anything, mock.Anything).Return(nil)
 	outboxRepo.On("InsertEvent", mock.Anything, mock.Anything, mock.Anything).Return(nil)
@@ -226,7 +238,7 @@ func TestUpdateQuote_HKGoesToHKTopic(t *testing.T) {
 	uc := app.NewUpdateQuoteUsecase(
 		quoteRepo, cacheRepo, outboxRepo,
 		func(ctx context.Context, fn func(context.Context) error) error { return fn(ctx) },
-		stale, zap.NewNop(),
+		stale, nil, zap.NewNop(),
 	)
 
 	hkQuote := &domain.Quote{
@@ -251,8 +263,8 @@ func TestGetQuote_CacheHit(t *testing.T) {
 	}
 	cacheRepo.On("Get", mock.Anything, domain.MarketUS, "AAPL").Return(expectedQuote, nil)
 
-	uc := app.NewGetQuoteUsecase(cacheRepo, quoteRepo, stale, zap.NewNop())
-	q, err := uc.Execute(context.Background(), domain.MarketUS, "AAPL")
+	uc := app.NewGetQuoteUsecase(cacheRepo, quoteRepo, stale, nil, zap.NewNop())
+	q, err := uc.Execute(context.Background(), domain.MarketUS, "AAPL", false)
 
 	assert.NoError(t, err)
 	assert.Equal(t, "AAPL", q.Symbol)
@@ -265,8 +277,8 @@ func TestGetQuote_EmptySymbol(t *testing.T) {
 	quoteRepo := new(MockQuoteRepo)
 	stale := domain.NewStaleDetector(domain.DefaultStaleThreshold())
 
-	uc := app.NewGetQuoteUsecase(cacheRepo, quoteRepo, stale, zap.NewNop())
-	_, err := uc.Execute(context.Background(), domain.MarketUS, "")
+	uc := app.NewGetQuoteUsecase(cacheRepo, quoteRepo, stale, nil, zap.NewNop())
+	_, err := uc.Execute(context.Background(), domain.MarketUS, "", false)
 
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "symbol must not be empty")
@@ -278,7 +290,7 @@ func TestUpdateQuote_NilQuote(t *testing.T) {
 	outboxRepo := new(MockOutboxRepo)
 	stale := domain.NewStaleDetector(domain.DefaultStaleThreshold())
 
-	uc := app.NewUpdateQuoteUsecase(quoteRepo, cacheRepo, outboxRepo, func(ctx context.Context, fn func(context.Context) error) error { return fn(ctx) }, stale, zap.NewNop())
+	uc := app.NewUpdateQuoteUsecase(quoteRepo, cacheRepo, outboxRepo, func(ctx context.Context, fn func(context.Context) error) error { return fn(ctx) }, stale, nil, zap.NewNop())
 	err := uc.Execute(context.Background(), nil)
 
 	assert.Error(t, err)

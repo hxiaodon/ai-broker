@@ -95,12 +95,17 @@ func (g *gormOutboxDB) MarkRetry(ctx context.Context, id int64, retryCount int) 
 	}).Error
 }
 
-// NewWorker creates a new outbox Worker backed by a real *gorm.DB and *kafka.Writer.
-func NewWorker(db *gorm.DB, writer *kafka.Writer, dlqTopic string, logger *zap.Logger) *Worker {
+// NewWorker creates a new outbox Worker backed by a real *gorm.DB and separate Kafka writers.
+// dlqWriter may be nil — when nil, the main writer is used as fallback for DLQ (test convenience).
+func NewWorker(db *gorm.DB, writer *kafka.Writer, dlqWriter *kafka.Writer, dlqTopic string, logger *zap.Logger) *Worker {
+	var dw KafkaWriter = writer // fallback: same writer
+	if dlqWriter != nil {
+		dw = dlqWriter
+	}
 	return &Worker{
 		db:         &gormOutboxDB{db: db},
 		writer:     writer,
-		dlqWriter:  writer, // Reuse same writer for DLQ
+		dlqWriter:  dw,
 		dlqTopic:   dlqTopic,
 		maxRetries: 3,
 		logger:     logger,

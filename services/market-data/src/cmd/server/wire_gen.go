@@ -9,12 +9,13 @@ package main
 import (
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/conf"
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/feed"
+	kafkaConsumer "github.com/hxiaodon/ai-broker/services/market-data/internal/kafka/consumer"
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/kafka/outbox"
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/kline"
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/quote"
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/quote/app"
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/quote/infra/mysql"
-	"github.com/hxiaodon/ai-broker/services/market-data/internal/quote/infra/redis"
+	redisInfra "github.com/hxiaodon/ai-broker/services/market-data/internal/quote/infra/redis"
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/search"
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/server"
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/watchlist"
@@ -33,7 +34,8 @@ func initApp(cfg *conf.Config, logger *zap.Logger) (*App, func(), error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	quoteCacheRepository := redis.NewQuoteCacheRepository(client)
+	quoteCacheRepository := redisInfra.NewQuoteCacheRepository(client)
+	delayedRingBuffer := redisInfra.NewDelayedRingBuffer(client)
 	db, cleanup2, err := ProvideDB(cfg)
 	if err != nil {
 		cleanup()
@@ -41,11 +43,14 @@ func initApp(cfg *conf.Config, logger *zap.Logger) (*App, func(), error) {
 	}
 	quoteRepository := mysql.NewQuoteRepository(db)
 	staleDetector := quote.ProvideStaleDetector()
-	getQuoteUsecase := app.NewGetQuoteUsecase(quoteCacheRepository, quoteRepository, staleDetector, logger)
+	getQuoteUsecase := app.NewGetQuoteUsecase(quoteCacheRepository, quoteRepository, staleDetector, delayedRingBuffer, logger)
 	marketStatusRepository := mysql.NewMarketStatusRepository(db)
 	getMarketStatusUsecase := app.NewGetMarketStatusUsecase(marketStatusRepository)
 	handler := quote.NewHandler(getQuoteUsecase, getMarketStatusUsecase)
 	mySQLKLineRepo := kline.NewMySQLKLineRepo(db)
+	aggregateKLineUsecase := kline.NewAggregateKLineUsecase(mySQLKLineRepo)
+	tickAccumulator := kline.NewTickAccumulator(aggregateKLineUsecase)
+	klineScheduler := kline.NewKLineScheduler(tickAccumulator)
 	getKLinesUsecase := kline.NewGetKLinesUsecase(mySQLKLineRepo)
 	klineHandler := kline.NewHandler(getKLinesUsecase)
 	mySQLWatchlistRepo := watchlist.NewMySQLWatchlistRepo(db)
@@ -66,15 +71,25 @@ func initApp(cfg *conf.Config, logger *zap.Logger) (*App, func(), error) {
 		cleanup()
 		return nil, nil, err
 	}
+	wsServer := server.NewWSServer(logger, quoteCacheRepository)
+	wsAddr := ProvideWSAddr(cfg)
 	massiveClient := feed.ProvideMassiveClient(cfg)
 	outboxRepository := mysql.NewOutboxRepository(db)
 	txFunc := mysql.NewTxFunc(db)
-	updateQuoteUsecase := app.NewUpdateQuoteUsecase(quoteRepository, quoteCacheRepository, outboxRepository, txFunc, staleDetector, logger)
-	worker := feed.ProvideWorker(massiveClient, updateQuoteUsecase, logger)
-	writer := ProvideKafkaWriter(cfg)
+	updateQuoteUsecase := app.NewUpdateQuoteUsecase(quoteRepository, quoteCacheRepository, outboxRepository, txFunc, staleDetector, delayedRingBuffer, logger)
+	worker := feed.ProvideWorker(massiveClient, updateQuoteUsecase, tickAccumulator, logger)
+	mainWriter := ProvideKafkaWriter(cfg)
+	dlqWriter := ProvideDLQWriter(cfg)
 	string2 := ProvideDLQTopic(cfg)
-	outboxWorker := outbox.NewWorker(db, writer, string2, logger)
-	mainApp := NewApp(httpServer, grpcServer, worker, outboxWorker, logger)
+	outboxWorker := outbox.NewWorker(db, mainWriter, dlqWriter, string2, logger)
+	quoteConsumer := kafkaConsumer.NewQuoteConsumer(cfg.Kafka.Brokers, "market-data-ws", wsServer, logger)
+	marketScheduler, err := app.NewMarketScheduler(marketStatusRepository, logger)
+	if err != nil {
+		cleanup2()
+		cleanup()
+		return nil, nil, err
+	}
+	mainApp := NewApp(httpServer, grpcServer, wsServer, wsAddr, worker, outboxWorker, quoteConsumer, klineScheduler, marketScheduler, logger)
 	return mainApp, func() {
 		cleanup2()
 		cleanup()
@@ -120,6 +135,16 @@ func ProvideKafkaWriter(cfg *conf.Config) *kafka.Writer {
 	}
 }
 
+// ProvideDLQWriter creates a dedicated Kafka writer for the Dead Letter Queue.
+// Using a separate writer ensures DLQ writes use a distinct connection and can
+// be routed to a different broker cluster if needed.
+func ProvideDLQWriter(cfg *conf.Config) *kafka.Writer {
+	return &kafka.Writer{
+		Addr:     kafka.TCP(cfg.Kafka.Brokers...),
+		Balancer: &kafka.LeastBytes{},
+	}
+}
+
 // ProvideDLQTopic extracts DLQ topic from config.
 func ProvideDLQTopic(cfg *conf.Config) string {
 	if cfg.Kafka.DLQTopic == "" {
@@ -137,3 +162,12 @@ func ProvideHTTPAddr(cfg *conf.Config) server.HTTPAddr {
 func ProvideGRPCAddr(cfg *conf.Config) server.GRPCAddr {
 	return server.GRPCAddr(cfg.Server.GRPC.Addr)
 }
+
+// ProvideWSAddr extracts the WebSocket server address from config.
+func ProvideWSAddr(cfg *conf.Config) server.WSAddr {
+	if cfg.Server.WS.Addr == "" {
+		return server.WSAddr(":8082")
+	}
+	return server.WSAddr(cfg.Server.WS.Addr)
+}
+

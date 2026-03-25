@@ -38,7 +38,7 @@ func TestPhase6_P6_01_MainFlow(t *testing.T) {
 	staleDetector := domain.NewStaleDetector(domain.DefaultStaleThreshold())
 	logger := zap.NewNop()
 
-	updateQuoteUC := app.NewUpdateQuoteUsecase(quoteRepo, quoteCacheRepo, outboxRepo, txFunc, staleDetector, logger)
+	updateQuoteUC := app.NewUpdateQuoteUsecase(quoteRepo, quoteCacheRepo, outboxRepo, txFunc, staleDetector, nil, logger)
 
 	scenarios := &MockQuoteScenarios{}
 	ctx := context.Background()
@@ -122,7 +122,7 @@ func TestPhase6_P6_02_ExceptionFlow(t *testing.T) {
 	t.Run("Redis unavailable - graceful degradation", func(t *testing.T) {
 		rdb.Close()
 		failedCacheRepo := quoteredis.NewQuoteCacheRepository(rdb)
-		ucWithFailedCache := app.NewUpdateQuoteUsecase(quoteRepo, failedCacheRepo, outboxRepo, txFunc, staleDetector, logger)
+		ucWithFailedCache := app.NewUpdateQuoteUsecase(quoteRepo, failedCacheRepo, outboxRepo, txFunc, staleDetector, nil, logger)
 
 		quote := scenarios.FreshQuote("GOOG")
 		err := ucWithFailedCache.Execute(ctx, quote)

@@ -10,6 +10,7 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/quote/domain"
+	"github.com/hxiaodon/ai-broker/services/market-data/pkg/observability"
 )
 
 // MassiveClient wraps the Massive SDK WebSocket client.
@@ -71,7 +72,8 @@ func (m *MassiveClient) consumeEvents(ctx context.Context) {
 				case <-ctx.Done():
 					return
 				default:
-					// Drop quote if no one is reading (buffer full)
+					// Drop quote when buffer is full; increment metric so ops can alert on data loss.
+					observability.DroppedQuotes.Inc()
 				}
 			}
 		}

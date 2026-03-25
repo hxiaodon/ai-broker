@@ -42,6 +42,10 @@ func (m *mockQuoteRepo) GetBySymbolMarketTimestamp(_ context.Context, _ string, 
 	return nil, nil
 }
 
+func (m *mockQuoteRepo) FindPrevClose(_ context.Context, _ string, _ domain.Market) (decimal.Decimal, error) {
+	return decimal.Zero, nil
+}
+
 type mockCacheRepo struct {
 	setErr error
 	setCalled int
@@ -56,6 +60,10 @@ func (m *mockCacheRepo) Get(_ context.Context, _ domain.Market, _ string) (*doma
 }
 func (m *mockCacheRepo) MGet(_ context.Context, _ domain.Market, _ []string) ([]*domain.Quote, error) {
 	return nil, nil
+}
+
+func (m *mockCacheRepo) IsDedup(_ context.Context, _ string, _ domain.Market, _ int64) (bool, error) {
+	return false, nil
 }
 
 type mockOutboxRepo struct {
@@ -109,7 +117,7 @@ func TestUpdateQuoteUsecase_Execute_HappyPath(t *testing.T) {
 	outboxRepo := &mockOutboxRepo{}
 	stale := domain.NewStaleDetector(domain.DefaultStaleThreshold())
 
-	uc := app.NewUpdateQuoteUsecase(quoteRepo, cacheRepo, outboxRepo, noopTxFunc, stale, zap.NewNop())
+	uc := app.NewUpdateQuoteUsecase(quoteRepo, cacheRepo, outboxRepo, noopTxFunc, stale, nil, zap.NewNop())
 	q := newTestQuote()
 
 	err := uc.Execute(context.Background(), q)
@@ -132,7 +140,7 @@ func TestUpdateQuoteUsecase_Execute_NilQuoteReturnsError(t *testing.T) {
 		&mockQuoteRepo{}, &mockCacheRepo{}, &mockOutboxRepo{},
 		noopTxFunc,
 		domain.NewStaleDetector(domain.DefaultStaleThreshold()),
-		zap.NewNop(),
+		nil, zap.NewNop(),
 	)
 	err := uc.Execute(context.Background(), nil)
 	require.Error(t, err)
@@ -148,7 +156,7 @@ func TestUpdateQuoteUsecase_Execute_SetsLastUpdatedAtUTC(t *testing.T) {
 		quoteRepo, &mockCacheRepo{}, &mockOutboxRepo{},
 		noopTxFunc,
 		domain.NewStaleDetector(domain.DefaultStaleThreshold()),
-		zap.NewNop(),
+		nil, zap.NewNop(),
 	)
 	q := newTestQuote()
 	feedTimestamp := time.Now().UTC().Add(-500 * time.Millisecond) // Feed timestamp 500ms ago
@@ -170,7 +178,7 @@ func TestUpdateQuoteUsecase_Execute_OutboxPayloadIsValidJSON(t *testing.T) {
 		&mockQuoteRepo{}, &mockCacheRepo{}, outboxRepo,
 		noopTxFunc,
 		domain.NewStaleDetector(domain.DefaultStaleThreshold()),
-		zap.NewNop(),
+		nil, zap.NewNop(),
 	)
 	q := newTestQuote()
 	require.NoError(t, uc.Execute(context.Background(), q))
@@ -192,7 +200,7 @@ func TestUpdateQuoteUsecase_Execute_OutboxEventTimestampUTC(t *testing.T) {
 		&mockQuoteRepo{}, &mockCacheRepo{}, outboxRepo,
 		noopTxFunc,
 		domain.NewStaleDetector(domain.DefaultStaleThreshold()),
-		zap.NewNop(),
+		nil, zap.NewNop(),
 	)
 	require.NoError(t, uc.Execute(context.Background(), newTestQuote()))
 
@@ -210,7 +218,7 @@ func TestUpdateQuoteUsecase_Execute_TxFailure_NoOutboxEvent(t *testing.T) {
 		&mockQuoteRepo{}, cacheRepo, outboxRepo,
 		errorTxFunc, // tx always fails
 		domain.NewStaleDetector(domain.DefaultStaleThreshold()),
-		zap.NewNop(),
+		nil, zap.NewNop(),
 	)
 
 	err := uc.Execute(context.Background(), newTestQuote())
@@ -230,7 +238,7 @@ func TestUpdateQuoteUsecase_Execute_OutboxInsertFailure_RollsBack(t *testing.T) 
 		&mockQuoteRepo{}, &mockCacheRepo{}, outboxRepo,
 		noopTxFunc,
 		domain.NewStaleDetector(domain.DefaultStaleThreshold()),
-		zap.NewNop(),
+		nil, zap.NewNop(),
 	)
 
 	err := uc.Execute(context.Background(), newTestQuote())
@@ -245,7 +253,7 @@ func TestUpdateQuoteUsecase_Execute_CacheFailureIsNonFatal(t *testing.T) {
 		&mockQuoteRepo{}, cacheRepo, &mockOutboxRepo{},
 		noopTxFunc,
 		domain.NewStaleDetector(domain.DefaultStaleThreshold()),
-		zap.NewNop(),
+		nil, zap.NewNop(),
 	)
 
 	err := uc.Execute(context.Background(), newTestQuote())
@@ -262,7 +270,7 @@ func TestUpdateQuoteUsecase_Execute_EvaluatesStale(t *testing.T) {
 		quoteRepo, &mockCacheRepo{}, &mockOutboxRepo{},
 		noopTxFunc,
 		domain.NewStaleDetector(domain.DefaultStaleThreshold()),
-		zap.NewNop(),
+		nil, zap.NewNop(),
 	)
 	q := newTestQuote()
 	q.LastUpdatedAt = time.Now().UTC() // Simulate feed handler setting exchange timestamp

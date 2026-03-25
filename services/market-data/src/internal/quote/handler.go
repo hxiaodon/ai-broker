@@ -141,28 +141,40 @@ func (h *Handler) handleGetQuotes(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Determine delayed flag from JWT presence (spec §1.5).
-	// TODO(Phase-6): replace with full JWT validation.
+	// WARNING: IsValidJWT is a structural stub only — see TODO in httputil package.
 	delayed := !httputil.IsValidJWT(r)
+
+	// Infer market from symbol format; group by market for batch cache read.
+	// Symbols may be mixed US/HK in one request, so we issue one batch per market.
+	usSymbols := make([]string, 0, len(symbols))
+	hkSymbols := make([]string, 0, len(symbols))
+	for _, sym := range symbols {
+		if inferMarket(sym) == domain.MarketHK {
+			hkSymbols = append(hkSymbols, sym)
+		} else {
+			usSymbols = append(usSymbols, sym)
+		}
+	}
 
 	quotes := make(map[string]*quoteResponse, len(symbols))
 	asOf := time.Now().UTC()
 
-	for _, sym := range symbols {
-		// Infer market from symbol format: HK stocks are 4–5 digit codes.
-		market := inferMarket(sym)
-
-		q, err := h.getQuote.Execute(r.Context(), market, sym)
-		if err != nil {
-			// Spec §3.6: silently omit symbols that cannot be resolved.
-			continue
+	addBatch := func(market domain.Market, syms []string) {
+		if len(syms) == 0 {
+			return
 		}
-
-		quotes[sym] = domainQuoteToResponse(q, delayed)
-		if q.LastUpdatedAt.After(time.Time{}) && q.LastUpdatedAt.After(asOf.Add(-time.Second)) {
-			// Keep asOf as current server time; exchange timestamps may be older.
-			_ = q.LastUpdatedAt
+		batch, err := h.getQuote.ExecuteBatch(r.Context(), market, syms, delayed)
+		if err != nil {
+			// Non-fatal: log and continue; partial results are valid per spec §3.6.
+			return
+		}
+		for _, q := range batch {
+			quotes[q.Symbol] = domainQuoteToResponse(q, delayed)
 		}
 	}
+
+	addBatch(domain.MarketUS, usSymbols)
+	addBatch(domain.MarketHK, hkSymbols)
 
 	httputil.WriteJSON(w, &quotesResponse{
 		Quotes: quotes,

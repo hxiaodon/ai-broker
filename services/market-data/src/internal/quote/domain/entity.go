@@ -76,6 +76,19 @@ func DefaultStaleThreshold() StaleThreshold {
 	}
 }
 
+// ApplyChange computes and sets Change, ChangePct, and PrevClose from the given prevClose price.
+// Spec: market-data-system.md Appendix C — change basis = previous Regular Session close (unadjusted).
+// Change    = Price - PrevClose
+// ChangePct = Change / PrevClose * 100  (rounded to 4 dp; 0 when PrevClose is zero)
+func (q *Quote) ApplyChange(prevClose decimal.Decimal) {
+	if prevClose.IsZero() {
+		return
+	}
+	q.PrevClose = prevClose
+	q.Change = q.Price.Sub(prevClose)
+	q.ChangePct = q.Change.Div(prevClose).Mul(decimal.NewFromInt(100)).Round(4)
+}
+
 // ApplyStaleCheck applies the result of StaleDetector.Evaluate() to the Quote.
 // Separating computation (StaleDetector) from mutation (Quote) keeps the domain
 // service free of side effects and the aggregate in control of its own state.

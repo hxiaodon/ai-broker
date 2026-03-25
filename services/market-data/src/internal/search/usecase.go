@@ -36,9 +36,10 @@ func (uc *SearchStocksUsecase) Execute(ctx context.Context, query string, market
 		return nil, fmt.Errorf("search stocks %q: %w", query, err)
 	}
 
-	// Increment hot search ranking (best-effort, do not fail the search).
+	// Increment hot search ranking by query term (best-effort, do not fail the search).
+	// We rank by query so that multiple spellings ("AAPL", "apple", "苹果") all count.
 	if len(stocks) > 0 {
-		_ = uc.hotRepo.IncrementScore(ctx, stocks[0].Symbol)
+		_ = uc.hotRepo.IncrementScore(ctx, query)
 	}
 
 	return stocks, nil

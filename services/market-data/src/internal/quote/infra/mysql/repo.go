@@ -6,6 +6,9 @@ import (
 	"crypto/rand"
 	"fmt"
 	"strings"
+	"time"
+
+	"github.com/shopspring/decimal"
 
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/quote/app"
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/quote/domain"
@@ -73,6 +76,32 @@ func (r *QuoteRepository) GetBySymbolMarketTimestamp(ctx context.Context, symbol
 		return nil, fmt.Errorf("quote repo get by timestamp: %w", result.Error)
 	}
 	return toDomain(&m), nil
+}
+
+// FindPrevClose returns the most recent 1D K-line close price before today's midnight UTC.
+// This is used to compute Change and ChangePct when the feed does not supply them.
+// Falls back gracefully to decimal.Zero when no historical data exists.
+func (r *QuoteRepository) FindPrevClose(ctx context.Context, symbol string, market domain.Market) (decimal.Decimal, error) {
+	todayMidnight := time.Now().UTC().Truncate(24 * time.Hour)
+
+	// klines table: symbol, interval, close, start_time
+	// Query the most recent 1D candle whose start_time < today's midnight.
+	var closePrice decimal.Decimal
+	result := r.db.WithContext(ctx).
+		Table("klines").
+		Select("close").
+		Where("symbol = ? AND market = ? AND interval = ? AND start_time < ?",
+			symbol, string(market), "1D", todayMidnight).
+		Order("start_time DESC").
+		Limit(1).
+		Pluck("close", &closePrice)
+	if result.Error != nil {
+		if result.Error == gorm.ErrRecordNotFound {
+			return decimal.Zero, nil
+		}
+		return decimal.Zero, fmt.Errorf("find prev close %s: %w", symbol, result.Error)
+	}
+	return closePrice, nil
 }
 
 // MarketStatusRepository implements domain.MarketStatusRepo using GORM.

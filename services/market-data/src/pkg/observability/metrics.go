@@ -43,4 +43,12 @@ var (
 		Name:      "active_connections",
 		Help:      "Number of active WebSocket connections.",
 	})
+
+	// DroppedQuotes counts quotes dropped because the feed buffer was full.
+	// A sustained non-zero value indicates the feed is producing faster than the worker consumes.
+	DroppedQuotes = promauto.NewCounter(prometheus.CounterOpts{
+		Namespace: "market_data",
+		Name:      "dropped_quotes_total",
+		Help:      "Total quotes dropped due to full feed buffer.",
+	})
 )

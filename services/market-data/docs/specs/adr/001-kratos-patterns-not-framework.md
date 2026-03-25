@@ -55,3 +55,6 @@ internal/conf/conf.go    → kratos/config
 ```
 
 subdomain 下的 domain/app/infra 层完全不受影响。
+
+
+# ADR-002: 后面可能会接入沧海行情数据 https://tsanghi.com/fin/index

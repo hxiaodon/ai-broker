@@ -58,7 +58,19 @@ func (r *QuoteCacheRepository) Get(ctx context.Context, market domain.Market, sy
 	return &q, nil
 }
 
-// MGet retrieves quotes for multiple symbols from Redis (all from same market).
+// IsDedup returns true if a quote with this (market, symbol, tsMicro) has already been processed.
+// Uses Redis SET NX so the check-and-set is atomic; TTL = 5 minutes (well beyond any feed retry window).
+// Returns (false, nil) when no connection issues occur and the key is new.
+func (r *QuoteCacheRepository) IsDedup(ctx context.Context, symbol string, market domain.Market, tsMicro int64) (bool, error) {
+	key := fmt.Sprintf("dedup:%s:%s:%d", string(market), symbol, tsMicro)
+	set, err := r.rdb.SetNX(ctx, key, 1, 5*time.Minute).Result()
+	if err != nil {
+		return false, fmt.Errorf("quote dedup check %s: %w", symbol, err)
+	}
+	// SetNX returns true when the key was NEW (not a duplicate).
+	// We invert: isDuplicate = !set.
+	return !set, nil
+}
 func (r *QuoteCacheRepository) MGet(ctx context.Context, market domain.Market, symbols []string) ([]*domain.Quote, error) {
 	if len(symbols) == 0 {
 		return nil, nil

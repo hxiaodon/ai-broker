@@ -5,6 +5,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/hxiaodon/ai-broker/services/market-data/internal/kline"
 	"github.com/hxiaodon/ai-broker/services/market-data/internal/quote/app"
 )
 
@@ -12,14 +13,17 @@ import (
 type Worker struct {
 	client      *MassiveClient
 	updateQuote *app.UpdateQuoteUsecase
+	tickAcc     *kline.TickAccumulator // optional; nil disables K-line accumulation
 	logger      *zap.Logger
 }
 
 // NewWorker creates a new feed worker.
-func NewWorker(client *MassiveClient, updateQuote *app.UpdateQuoteUsecase, logger *zap.Logger) *Worker {
+// tickAcc may be nil (K-line accumulation disabled).
+func NewWorker(client *MassiveClient, updateQuote *app.UpdateQuoteUsecase, tickAcc *kline.TickAccumulator, logger *zap.Logger) *Worker {
 	return &Worker{
 		client:      client,
 		updateQuote: updateQuote,
+		tickAcc:     tickAcc,
 		logger:      logger,
 	}
 }
@@ -49,7 +53,13 @@ func (w *Worker) Run(ctx context.Context) error {
 				w.logger.Error("update quote failed",
 					zap.String("symbol", quote.Symbol),
 					zap.Error(err))
+				continue
+			}
+			// Accumulate tick for K-line aggregation (best-effort).
+			if w.tickAcc != nil {
+				w.tickAcc.Add(quote)
 			}
 		}
 	}
 }
+

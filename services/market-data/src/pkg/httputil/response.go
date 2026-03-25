@@ -32,7 +32,9 @@ func WriteJSON(w http.ResponseWriter, v interface{}) {
 }
 
 // IsValidJWT performs a lightweight structural check on the Authorization header.
-// TODO(Phase-6): Replace with proper RS256 JWT verification using AMS public key.
+// WARNING: This stub only checks that the token has 3 dot-separated segments.
+// It does NOT verify the RS256 signature or validate claims (exp, iss, etc.).
+// TODO(Phase-6): integrate AMS RS256 public key — MUST NOT be deployed to production with this stub.
 func IsValidJWT(r *http.Request) bool {
 	auth := r.Header.Get("Authorization")
 	if !strings.HasPrefix(auth, "Bearer ") {
