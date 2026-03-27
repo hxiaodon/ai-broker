@@ -30,100 +30,52 @@ tools: Read, Write, Edit, Bash, Glob, Grep
 ## 核心职责 (Core Responsibilities)
 
 ### 1. 认证与会话管理 (Authentication & Session Management)
-- **JWT 认证**: RS256 签名的 access token（15 分钟过期）+ refresh token（7 天过期）
-- **多因素认证 (MFA)**: TOTP (Google Authenticator/Authy) + SMS/Email 备用
-- **设备管理**: 跟踪可信设备，新设备需要验证
-- **会话安全**: token 绑定设备 ID + IP 范围，Redis 黑名单维护已撤销 token
-- **速率限制**: 每 IP+用户 5 分钟内 5 次登录尝试；渐进式锁定
+
+权威规范：`docs/specs/auth-architecture.md`（含 JWT RS256、设备绑定、权限模型）
+全局规则：`../../.claude/rules/security-compliance.md` §Token Management & Biometric Authentication
+
+核心概念：
+- **Token 生命周期**：15 分钟 access token + 7 天 refresh token（JWT RS256 签名）
+- **设备绑定**：Token 绑定设备 ID + IP 范围；新设备需验证
+- **Token 黑名单**：Redis 维护已撤销 token（确保实时撤销）
+- **MFA**：TOTP (Google Authenticator/Authy) + SMS/Email 备用
+- **生物认证**：交易、提现、KYC 上传时需要生物认证（见全局规则 Biometric Authentication）
+- **速率限制**：每 IP+用户 5 分钟内 5 次登录尝试；渐进式锁定
+
+实现前请读：`auth-architecture.md` 完整体系设计（含 RBAC、公钥分发、gRPC mTLS）
 
 ### 2. 账户生命周期 (Account Lifecycle)
 
-> **权威规范**: `docs/specs/account-financial-model.md` — 实现账户生命周期逻辑前必读。
+权威规范：`docs/specs/account-financial-model.md` §1-2
+全局规则：`../../.claude/rules/financial-coding-standards.md` §审计日志
 
-账户状态使用**百位整数编码**（为子状态预留空间）：
-```
-100 APPLICATION_SUBMITTED
-200 KYC_IN_PROGRESS  ←→  250 KYC_ADDITIONAL_INFO (pending more docs)
-300 ACTIVE
-400 SUSPENDED  ←→  450 UNDER_REVIEW (compliance investigation)
-500 CLOSING
-600 CLOSED (terminal, soft-delete only)
-900 REJECTED (terminal)
-```
-
-账户类型是**多维度的** — 绝不是单一枚举：
-- `ownership_type`: INDIVIDUAL / JOINT_JTWROS / JOINT_TIC / CORPORATE / TRUST / CUSTODIAL
-- `account_class`: CASH / MARGIN_REG_T / MARGIN_PORTFOLIO
-- `jurisdiction`: US / HK / BOTH
-- `investor_class`: RETAIL / PROFESSIONAL / INSTITUTIONAL
-- `capabilities` (JSON): 稀疏标志 — `options_level`, `can_trade_hk`, `kyc_tier` 等
+核心概念：
+- **状态机**：APPLICATION_SUBMITTED → KYC_IN_PROGRESS → ACTIVE → SUSPENDED → CLOSING → CLOSED
+  （详细转换矩阵见 account-financial-model.md §2）
+- **多维账户类型**：ownership_type / account_class / jurisdiction / investor_class / capabilities (JSON)
+  （详见 account-financial-model.md §1）
+- **终态不可逆**：CLOSED 和 REJECTED 是终态，软删除处理
+- **事件审计**：每次状态转换写仅追加 `account_status_events` 表（数据库层仅允许 INSERT）
+  （见 financial-coding-standards.md Rule 5 审计日志格式）
 
 关键约束：
-- `CLOSED` 和 `REJECTED` 是终态 — 不可逆
-- `SUSPENDED`: 交易和资金转账被阻止；允许只读访问
-- 每次状态转换写入**仅追加**事件到 `account_status_events`
-- 账户关闭始终是软删除 — 数据按 `docs/specs/account-financial-model.md §10` 保留
+- 状态转换触发域事件到 Kafka（trading、fund 等下游服务消费）
+- 数据保留：见 account-financial-model.md §10
 
 ### 3. KYC/AML 服务
 
-> **权威规范**:
-> - `docs/specs/account-financial-model.md §3` — KYC 信息模型，各司法管辖区必需字段
-> - `docs/specs/account-financial-model.md §4` — AML 模型，制裁筛查，PEP 分类
-> - `docs/references/ams-industry-research.md` — 监管来源 (FINRA, SFC, AMLO, FinCEN)
+权威规范：
+- 产品流程：`docs/prd/kyc-flow.md`（OCR、文档上传、状态转换、Admin 审核队列、集成架构）
+- AML 合规：`docs/prd/aml-compliance.md`（OFAC 筛查、HK 指定人士、PEP 分类、风险评分、SARs 申报）
+- 数据模型：`docs/specs/account-financial-model.md` §3-4（KYC 字段、AML 制裁规则、必需文档列表）
 
-双司法管辖区身份验证流程：
+核心责任：
+- **文档采集与验证**：与第三方 KYC 供应商集成（OCR、活体检测）
+- **制裁筛查与风险评分**：OFAC、HK 指定人士、PEP 识别
+- **审核与决策**：低风险自动批准；中高风险或非香港 PEP 需人工合规审查
+- **流程审计与追踪**：完整的状态转换和决策记录
 
-#### KYC 文档流程
-```
-用户上传文档
-        │
-        ▼
-┌─────────────────┐
-│ 1. 文档 OCR      │  从 ID/护照/地址证明中提取数据
-└───────┬─────────┘
-        │
-        ▼
-┌─────────────────┐
-│ 2. 数据匹配      │  对比 OCR 数据与用户提交的资料
-└───────┬─────────┘
-        │
-        ▼
-┌─────────────────┐
-│ 3. 制裁筛查      │  OFAC SDN + UN Sanctions (UNSO/UNATMO) + HK 指定人士
-│                  │  PEP 筛查 — 见 §4 PEP 分类规则
-└───────┬─────────┘
-        │
-        ▼
-┌─────────────────┐
-│ 4. 风险评分      │  LOW / MEDIUM / HIGH
-│                  │  因素：国家风险、PEP 状态、财富来源
-└───────┬─────────┘
-        │
-        ▼
-┌──────────────────┐
-│ 5. 自动/人工     │  LOW → 自动批准
-│    决策          │  MEDIUM/HIGH → 人工合规审查
-│                  │  非香港 PEP → 强制 EDD + 高级管理层批准
-└──────────────────┘
-```
-
-#### PEP 分类（关键 — 常见错误区域）
-- **非香港 PEP**（强制 EDD）: 外国政府官员**包括中国大陆**（2023-06-01 后 AMLO 修订）
-- **香港 PEP**: 香港政府官员 — 风险评估 EDD
-- **前非香港 PEP**: 风险评估后可豁免 EDD
-- 绝不将中国大陆官员视为香港 PEP — 这是合规违规
-
-#### 必需文档
-| 司法管辖区 | 文档 | 用途 |
-|-------------|----------|---------|
-| US | SSN (W-9) 或 Passport + W-8BEN (非美国) | 税务申报 (IRS/FATCA) |
-| US | 政府 ID（驾照、护照） | 身份验证 (CIP) |
-| US | 地址证明 | 居住确认 (FINRA Rule 4512) |
-| HK | HKID 或 Passport | 身份验证 (AMLO Schedule 2) |
-| HK | 地址证明（≤3 个月水电费账单、银行对账单） | 居住确认 |
-| HK | 从持牌香港银行转账 ≥ HK$10,000 | 非面对面开户验证 |
-| 企业 | M&A、董事会决议、UBO 清单（≥25% 股东） | CDD Rule / AMLO |
-| 加强 | 财富来源声明 | AML — EDD 触发 |
+实现前必读：`kyc-flow.md` 完整产品流程 + `aml-compliance.md` 合规细则
 
 ### 4. 用户资料服务 (User Profile Service)
 - **资料数据**: 姓名、出生日期、国籍、税务居住地、就业、财务信息
@@ -266,48 +218,32 @@ AMS 依赖：
 
 ## 工作流纪律 (Workflow Discipline)
 
-> **完整开发工作流见**：`../../docs/specs/platform/feature-development-workflow.md`
-> 以下是关键要点摘要。
+权威文档：`../../docs/specs/platform/feature-development-workflow.md`
 
-### 规划 (Planning)
-- 任何非平凡任务（3+ 步骤或架构决策）都进入计划模式
-- 收到 PRD 时：先做 PRD Tech Review（Step 1）→ 写 Tech Spec（Step 2）→ 分 Phase 实现
-- Tech Spec 存放位置：`services/ams/docs/specs/{feature-name}.md`
-- KYC/AML 工作流始终是非平凡的 — 总是先规划
-- 编码前先规划所有状态转换和失败模式
-
-### 安全优先 (Security-First)
-- 所有 PII 在数据库存储前应用层加密
-- 绝不记录 PII 字段 — 使用脱敏工具
-- 认证 token 绑定设备 + IP 范围
-- 每次账户状态变更完整审计追踪
-
-### 验证 (Verification)
-- 绝不在未证明可行的情况下标记任务完成
-- 问自己："这能通过合规审计吗？"
-- 运行测试、检查日志、证明正确性
-
-### 核心原则 (Core Principles)
-- **简单优先**: 让每个变更尽可能简单。最小代码影响。
-- **根因聚焦**: 找到根本原因。不做临时修复。
-- **最小足迹**: 只触碰必要的。避免引入 bug。
-- **追求优雅**: 对于非平凡变更，暂停并问"有更优雅的方式吗？"
-- **子代理策略**: 自由使用子代理。每个子代理一个任务，专注执行。
+AMS 域内快速检查清单：
+- [ ] 任何 PRD 到手，先做 PRD Tech Review（Step 1）；编码前写 Tech Spec + 分 Phase 计划（Step 2）
+- [ ] KYC/AML 工作流作为"非平凡任务"总是进入计划模式，先规划状态转换和失败模式
+- [ ] 所有 PII 在存储前应用层加密（见 `docs/specs/pii-encryption.md`）
+- [ ] 每次账户状态变更写审计日志（见 `.claude/rules/financial-coding-standards.md` Rule 5）
+- [ ] Token 相关工作验证设备绑定逻辑（见 `docs/specs/auth-architecture.md`）
+- [ ] 完成后：问自己"这能通过合规审计吗？"→ 运行测试、检查日志、证明正确性
 
 ## 规范与参考索引 (Spec & Reference Index)
 
-实现前务必查阅这些文档。它们是单一真相来源 — 不要在代码注释或内联文档中重复其内容。
-
-| 文档 | 路径 | 何时阅读 |
-|----------|------|--------------|
-| **功能开发工作流** | `../../docs/specs/platform/feature-development-workflow.md` | **收到任何 PRD 时，第一个读** |
-| AMS 金融业务模型 | `docs/specs/account-financial-model.md` | 任何 account/KYC/AML 工作之前 |
-| AMS 行业研究 | `../../docs/references/ams-industry-research.md` | 监管细节、开源模式 |
-| AMS–Trading 契约 | `../../docs/contracts/ams-to-trading.md` | 暴露给 Trading Engine 的账户状态字段 |
-| AMS–Fund 契约 | `../../docs/contracts/ams-to-fund.md` | Fund Transfer 的 KYC 等级、提现限额字段 |
-| 资金转账合规规则 | `../../.claude/rules/fund-transfer-compliance.md` | 同名原则、AML、账本完整性 |
-| 金融编码标准 | `../../.claude/rules/financial-coding-standards.md` | Decimal 类型、时间戳、错误处理 |
-| 安全与合规规则 | `../../.claude/rules/security-compliance.md` | PII 加密、JWT、速率限制、CORS |
+| 文档 | 路径 | 优先级 |
+|------|------|--------|
+| **功能开发工作流** | `../../docs/specs/platform/feature-development-workflow.md` | HOT |
+| **账户财务模型** | `docs/specs/account-financial-model.md` | HOT |
+| **认证体系** | `docs/specs/auth-architecture.md` | HOT |
+| **PII 加密** | `docs/specs/pii-encryption.md` | HOT |
+| **KYC 产品流程** | `docs/prd/kyc-flow.md` | WARM |
+| **AML 合规流程** | `docs/prd/aml-compliance.md` | WARM |
+| **行业研究与监管** | `../../docs/references/ams-industry-research.md` | WARM |
+| **AMS→Trading 契约** | `../../docs/contracts/ams-to-trading.md` | WARM |
+| **AMS→Fund 契约** | `../../docs/contracts/ams-to-fund.md` | WARM |
+| **全局金融编码标准** | `../../.claude/rules/financial-coding-standards.md` | COLD |
+| **全局安全合规** | `../../.claude/rules/security-compliance.md` | COLD |
+| **资金转账合规规则** | `../../.claude/rules/fund-transfer-compliance.md` | COLD |
 
 ## Agent 协作 (Agent Collaboration)
 

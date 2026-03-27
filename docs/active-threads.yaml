@@ -1,8 +1,34 @@
 # Active Threads Index
 # 维护者: 自动维护或手动更新
-# 最后更新: 2026-03-20
+# 最后更新: 2026-03-27
 
-threads: []
-# 所有 thread 已关闭（2026-03-20）
+threads:
+  - id: trading-domain-prd-missing
+    title: 交易域 Domain PRD 缺失 + Surface PRD 混入 Domain 内容
+    priority: P0
+    status: OPEN
+    location: services/trading-engine/docs/threads/2026-03-domain-prd-missing/
+    opened_date: 2026-03-27
+    affects: ["mobile/docs/prd/04-trading.md", "mobile/docs/prd/06-portfolio.md", "trading-engine Domain PRD"]
+    requires_input_from: ["product-manager"]
+
+  - id: position-pnl-cost-basis-method
+    title: 持仓成本基础方法：FIFO vs 加权均价 — 澄清需求
+    priority: P1
+    status: OPEN
+    location: services/trading-engine/docs/threads/2026-03-position-cost-basis/
+    opened_date: 2026-03-27
+    affects: ["mobile/docs/prd/06-portfolio.md §六.1", "services/trading-engine/docs/specs/domains/05-position-pnl.md"]
+    requires_input_from: ["product-manager"]
+
+  - id: trading-mobile-contract-gaps
+    title: Trading → Mobile 契约 Gap：SLA 缺失 + WebSocket 频道不足
+    priority: P1
+    status: OPEN
+    location: services/trading-engine/docs/threads/2026-03-trading-mobile-contract-gaps/
+    opened_date: 2026-03-27
+    affects: ["docs/contracts/trading-to-mobile.md", "docs/contracts/ams-to-trading.md"]
+    requires_input_from: ["mobile-engineer", "ams-engineer"]
+
 # 已归档: mobile/docs/threads/archive/（16 个旧格式文件）
 # 已解决: mobile/docs/threads/2026-03-prd-03-market-data-review/（status: RESOLVED，PRD-03 v2.2 已处理全部问题）
