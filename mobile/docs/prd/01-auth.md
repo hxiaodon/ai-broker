@@ -1,4 +1,24 @@
-# PRD-01：登录与认证模块
+---
+type: surface-prd
+version: v3.0
+updated_date: 2026-03-29T15:00+08:00
+domain_prd:
+  - path: ../../../services/ams/docs/prd/kyc-flow.md
+    description: "认证架构、KYC 流程设计、状态机"
+revisions:
+  - rev: 3
+    date: 2026-03-29T15:00+08:00
+    author: product-manager
+    summary: "补充 Frontmatter，声明与 Domain PRD 的关系"
+  - rev: 2.1
+    date: 2026-03-15
+    author: product-manager
+    summary: "修复 — 补充已登录用户再次冷启动流程分支；澄清登录与注册合并为单一入口的产品决策；补充 App 后台唤醒与 Session 状态判断规则"
+  - rev: 2
+    date: 2026-03-01
+    author: product-manager
+    summary: "初版完成，覆盖 OTP、生物识别、访客、设备管理"
+---
 
 > **文档状态**: Phase 1 正式版
 > **版本**: v2.1

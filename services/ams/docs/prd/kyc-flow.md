@@ -1,10 +1,18 @@
-# AMS PRD: KYC 流程规格
-
-> **版本**: v0.1
-> **日期**: 2026-03-17
-> **作者**: AMS Engineering
-> **状态**: Draft — 待产品 & 合规评审
->
+---
+type: domain-prd
+version: v1.0
+updated_date: 2026-03-29T16:00+08:00
+surface_prd:
+  - path: ../../../mobile/docs/prd/01-auth.md
+    description: "用户登录与注册流程"
+  - path: ../../../mobile/docs/prd/02-kyc.md
+    description: "用户开户 UI 流程、7 步开户、审核状态显示"
+revisions:
+  - rev: 1
+    date: 2026-03-29T16:00+08:00
+    author: product-manager
+    summary: "新增状态聚合规则表、W-8BEN 冻结逻辑、审核 SLA 完整定义、大陆居民 PEP 官职采集"
+---
 > 本文档定义 AMS KYC 流程的完整产品规格，覆盖供应商选型决策、各用户群体开户路径、状态机设计、W-8BEN 续签工作流，以及与移动端/Admin Panel 的集成接口。
 
 ---
@@ -225,6 +233,27 @@ func (h *KYCWebhookHandler) Handle(w http.ResponseWriter, r *http.Request) {
    → 大陆银行账户的 HK$10,000 验证：实际操作需确认跨境汇款是否满足 AMLO 要求
 ```
 
+#### 4.3.1 官员职务信息采集（新增，仅大陆居民触发）
+
+当大陆居民勾选"是否为中国政府官员或国企高管"时，引导用户进入新的职务信息采集步骤：
+
+**采集字段：**
+- 职务类型：中央政府 / 地方政府 / 国有企业 / 其他
+- 具体职务：（文本输入，如"省长"、"地级市副市长"、"央企一把手"）
+- 任职地区：（文本输入）
+- 任职年限：（数字选择）
+- 财富来源说明（可选）：继承 / 经营 / 薪资 / 投资等
+
+**系统行为：**
+- 根据职务自动分类为 Non-HK PEP 的 Level 1 / 2 / 3（详见 § 后续 AML Compliance PRD）
+- Level 1（高风险）：立即进入强制 EDD，需合规高管批准
+- Level 2（中等风险）：常规 KYC 后人工评估，根据财富来源决定是否升级 EDD
+- Level 3（低风险）：标记监控，正常激活
+
+详见 [AML 合规规格 § 4.3 Non-HK PEP 分类标准](../../../services/ams/docs/prd/aml-compliance.md#43-non-hk-pep-分类标准平衡方案)
+
+
+
 **待确认的开放问题**：
 - SFC 对大陆居民使用内地账户进行 HK$10,000 验证是否认可？还是必须是香港持牌银行账户？
 - 大陆居民的 AML 风险评级：`MEDIUM`（非居民、资金来源跨境），须人工审核
@@ -305,7 +334,72 @@ ACTIVE                      ← 账户完全激活
 
 ---
 
-## 6. HK 非面对面开户合规要求
+---
+
+## 6. 审核 SLA（包含 KYC + EDD 总时长）
+
+根据 2026-03-29 的产品决策，所有 SLA 时间计算从 `APPLICATION_SUBMITTED` 状态开始，到 `ACTIVE` 或 `KYC_REJECTED` 状态结束，**包含所有步骤的总时长**（KYC + 制裁筛查 + AML/PEP + EDD）。
+
+### 6.1 SLA 定义
+
+| 账户类型 | 自动通过 | 需人工审核 | 触发 EDD |
+|---------|---------|---------|---------|
+| **普通个人** | **即时** (< 5 分钟) | **1 个工作日** | N/A |
+| **PEP（高风险）** | N/A | **2-3 个工作日** | **包含**（自动触发） |
+| **高风险 AML** | N/A | **3-5 个工作日** | **按需** |
+| **公司账户** | N/A | **5 个工作日** | **按需** |
+
+### 6.2 SLA 计时规则
+
+**工作日定义**：周一至周五，排除中国公众假期和香港公众假期
+
+**计时起点**：`APPLICATION_SUBMITTED` 时间戳（用户完成最后一步提交时）
+
+**计时终点**：
+- 通过：`ACTIVE` 时间戳
+- 拒绝：`KYC_REJECTED` 时间戳
+- 需补件：首次进入 `KYC_MANUAL_REVIEW` 状态，开始计时；补件重新提交后，计时**重置**
+
+**SLA 告知**：
+- 开户时：告知用户"您的审核预计需要 X-Y 个工作日"
+- 进入 EDD：告知用户"由于风险评估要求，审核延长至 2-3 个工作日"
+
+### 6.3 Admin Panel 显示设计
+
+```
+[审核卡片]
+┌─────────────────────────────────────────┐
+│ 申请人：张三                              │
+│ 账户 ID：ACC-123                         │
+│ KYC 状态：AML_PEP_REVIEW（审核中）        │
+│ 应完成状态：ACTIVE                       │
+│                                        │
+│ ⏱️  已用时间：1.5 个工作日              │
+│ 📌 SLA 承诺：2-3 个工作日（PEP）        │
+│ 🚨 预警：还剩 1-1.5 个工作日（黄色）     │
+│                                        │
+│ [继续审核] [延期] [拒绝]                 │
+└─────────────────────────────────────────┘
+```
+
+---
+
+## 7. HK 非面对面开户合规要求
+
+
+### 5.3 状态聚合规则（Domain 状态 → Surface 状态映射）
+
+在 kyc-flow.md 中定义了 11 个细粒度的内部状态，以支持工程调试、合规追踪和可扩展性。但用户看到的应该是简化的 5 个状态，通过以下规则进行映射：
+
+| 用户看到的状态（Surface）| 对应的 Domain 状态（组合） | 含义 |
+|--------------------------|------------------------|------|
+| 未开始 | `NOT_STARTED` | 用户尚未上传任何文件 |
+| 审核中 | `KYC_UNDER_REVIEW` + `KYC_MANUAL_REVIEW` + `SANCTIONS_SCREENING` + `AML_PEP_REVIEW` + `PENDING_EDD` | 系统正在审核中（包括自动检查、人工审核、制裁筛查、EDD） |
+| 需补件 | `KYC_MANUAL_REVIEW`（RejectType = RETRY） | 审核发现问题，需用户重新上传或补充信息 |
+| 已通过 | `ACTIVE` | 账户完全激活，可开始交易 |
+| 已拒绝 | `KYC_REJECTED` (RejectType = FINAL) 或 `ACCOUNT_BLOCKED` | 审核最终不通过，无法重试 |
+
+**说明**：Mobile 工程师基于 Surface 状态编码，后端基于 Domain 状态转换。状态聚合规则确保两侧的映射清晰无歧义。
 
 ### 6.1 AMLO 要求
 
@@ -355,7 +449,7 @@ accepted_banks:
 
 ---
 
-## 7. 联名账户 KYC 设计（Joint Account）
+## 8. 联名账户 KYC 设计（Joint Account）
 
 ### 7.1 MVP 范围建议
 
@@ -384,7 +478,7 @@ accepted_banks:
 
 ---
 
-## 8. 公司账户 KYC（UBO 穿透）
+## 9. 公司账户 KYC（UBO 穿透）
 
 ### 8.1 UBO 穿透规则
 
@@ -412,7 +506,7 @@ accepted_banks:
 
 ---
 
-## 9. 专业投资者（PI）认定流程
+## 10. 专业投资者（PI）认定流程
 
 ### 9.1 PI 门槛（HK SFC）
 
@@ -454,7 +548,52 @@ pi_expires_at：investor_class 降回 RETAIL，限制 PI 专属产品访问
 
 ---
 
-## 10. W-8BEN 续签工作流
+
+### 6.1 SLA 定义
+
+| 账户类型 | 自动通过 | 需人工审核 | 触发 EDD |
+|---------|---------|---------|---------|
+| **普通个人** | **即时** (< 5 分钟) | **1 个工作日** | N/A |
+| **PEP（高风险）** | N/A | **2-3 个工作日** | **包含**（自动触发） |
+| **高风险 AML** | N/A | **3-5 个工作日** | **按需** |
+| **公司账户** | N/A | **5 个工作日** | **按需** |
+
+### 6.2 SLA 计时规则
+
+**工作日定义**：周一至周五，排除中国公众假期和香港公众假期
+
+**计时起点**：`APPLICATION_SUBMITTED` 时间戳（用户完成最后一步提交时）
+
+**计时终点**：
+- 通过：`ACTIVE` 时间戳
+- 拒绝：`KYC_REJECTED` 时间戳
+- 需补件：首次进入 `KYC_MANUAL_REVIEW` 状态，开始计时；补件重新提交后，计时**重置**
+
+**SLA 告知**：
+- 开户时：告知用户"您的审核预计需要 X-Y 个工作日"
+- 进入 EDD：告知用户"由于风险评估要求，审核延长至 2-3 个工作日"
+
+### 6.3 Admin Panel 显示设计
+
+```
+[审核卡片]
+┌─────────────────────────────────────────┐
+│ 申请人：张三                              │
+│ 账户 ID：ACC-123                         │
+│ KYC 状态：AML_PEP_REVIEW（审核中）        │
+│ 应完成状态：ACTIVE                       │
+│                                        │
+│ ⏱️  已用时间：1.5 个工作日              │
+│ 📌 SLA 承诺：2-3 个工作日（PEP）        │
+│ 🚨 预警：还剩 1-1.5 个工作日（黄色）     │
+│                                        │
+│ [继续审核] [延期] [拒绝]                 │
+└─────────────────────────────────────────┘
+```
+
+---
+
+## 11. W-8BEN 续签工作流
 
 ### 10.1 W-8BEN 生命周期
 
@@ -503,14 +642,66 @@ c.AddFunc("0 2 * * *", func() {
 
 ### 10.3 W-8BEN 到期冻结逻辑
 
-到期后未更新的账户：
-- `dividend_hold = true`（Fund Transfer 服务读取此字段）
-- 推送高优先级通知（多渠道：App + Email + SMS）
-- Admin Panel 展示"待续签"队列
+#### 实施细节（参考 decisions-2026-03-29.md § 决策 1）
+
+**决策**：到期后 **24 小时冻结股息分配**（而非立即冻结）
+
+**理由**：
+1. IRS 要求未提交 W-8BEN 的非美国税务居民在 30 天后启动预扣，24 小时给用户短暂的"补救窗口"
+2. 给予用户通知后 24 小时的缓冲时间，避免体验问题
+3. 与同行实践（Interactive Brokers、Saxo）一致
+
+##### 数据库操作
+
+```sql
+-- 表结构（在 account_tax_forms 表中）
+ALTER TABLE account_tax_forms ADD COLUMN dividend_hold_at TIMESTAMP NULL;
+
+-- Cron Job 逻辑（每天 UTC 02:00 执行）
+SELECT account_id, tax_form_expires_at
+  FROM account_tax_forms
+ WHERE form_type IN ('W8BEN', 'W8BENE')
+   AND tax_form_expires_at < NOW()
+   AND tax_form_expires_at > NOW() - INTERVAL 1 DAY  -- 到期后 24 小时内
+   AND dividend_hold_at IS NULL;  -- 尚未记录
+
+UPDATE account_tax_forms
+   SET dividend_hold_at = NOW()
+ WHERE id IN (...);
+
+-- Fund Transfer 服务在计算可用余额时读取 dividend_hold_at，如果不为空则冻结股息
+```
+
+##### 用户通知时间表
+
+| 时间 | 通知类型 | 内容 |
+|------|--------|------|
+| 到期前 90 天 | App Push + Email | "您的美国税务表 W-8BEN 将在 90 天后到期，请尽早续签" |
+| 到期前 30 天 | App Push（红色）+ Email | "警告：W-8BEN 即将到期，续签后才能继续获得股息" |
+| 到期前 7 天 | App Push（红色）+ SMS | "紧急：仅 7 天即过期，请立即续签" |
+| 到期当天 | App Push（红色） | "W-8BEN 已过期，股息分配已暂停。请立即续签。" |
+| 到期后 24 小时 | 内部日志（不通知用户） | 系统自动设置 `dividend_hold = true` |
+
+##### API 返回值变化
+
+```json
+// 到期后 24 小时内的账户查询结果
+{
+  "account_id": "user-123",
+  "tax_form": {
+    "form_type": "W8BEN",
+    "status": "EXPIRED",
+    "expires_at": "2026-03-28T23:59:59Z",
+    "dividend_hold": true,
+    "dividend_hold_reason": "W-8BEN 已到期，股息分配已冻结。请立即续签。",
+    "dividend_hold_until": "2026-03-28T23:59:59Z"
+  }
+}
+```
 
 ---
 
-## 11. Admin Panel KYC 审核队列
+## 12. Admin Panel KYC 审核队列
 
 ### 11.1 审核角色权限
 
@@ -541,7 +732,7 @@ POST /internal/compliance/kyc/{kycID}/request-docs  # 要求补充材料
 
 ---
 
-## 12. KYC 被拒申诉流程
+## 13. KYC 被拒申诉流程
 
 ### 12.1 申诉状态机
 
@@ -573,7 +764,7 @@ appeal_resolved_by   VARCHAR(36) NULL, -- 合规官 ID
 
 ---
 
-## 13. 开放决策点
+## 14. 开放决策点
 
 以下问题需 PM / 合规团队确认，再完成详细设计：
 
@@ -584,8 +775,8 @@ appeal_resolved_by   VARCHAR(36) NULL, -- 合规官 ID
 | 3 | **大陆居民用内地银行账户能否满足 AMLO HK$10,000 验证？** | 港股 KYC 可行性 | High |
 | 4 | **虚拟银行（Mox, ZA Bank）是否在 HK 银行接受名单内？** | 影响港股用户开户路径 | Medium |
 | 5 | **KYC 拒绝后最多允许申诉几次？** | 申诉状态机设计 | Medium |
-| 6 | **PI 认定是否纯人工，还是支持部分自动化（资产金额超过 HK$800万直接通过）？** | PI 认定流程效率 | Medium |
-| 7 | **Sumsub vs Jumio 最终选型** | 集成方式、合同谈判 | High |
+| 6.1 | **PI 认定是否纯人工，还是支持部分自动化（资产金额超过 HK$800万直接通过）？** | PI 认定流程效率 | Medium |
+| 6.2 | **Sumsub vs Jumio 最终选型** | 集成方式、合同谈判 | High |
 
 ---
 
