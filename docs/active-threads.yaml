@@ -1,6 +1,6 @@
 # Active Threads Index
 # 维护者: 自动维护或手动更新
-# 最后更新: 2026-03-27
+# 最后更新: 2026-03-29T15:00+08:00
 
 threads:
   - id: trading-domain-prd-missing
@@ -29,6 +29,16 @@ threads:
     opened_date: 2026-03-27
     affects: ["docs/contracts/trading-to-mobile.md", "docs/contracts/ams-to-trading.md"]
     requires_input_from: ["mobile-engineer", "ams-engineer"]
+
+  - id: funding-prd-structure-gaps
+    title: 出入金（Funding）PRD 结构问题：Domain PRD 缺失 + Surface 混入 Domain 内容 + 合规规则同步
+    priority: P0
+    status: RESOLVED
+    location: docs/threads/2026-03-funding-prd-structure/
+    opened_date: 2026-03-29
+    resolved_date: 2026-03-29T15:00+08:00
+    affects: ["mobile/docs/prd/05-funding.md", "services/fund-transfer/docs/prd/[待创建]", ".claude/rules/fund-transfer-compliance.md"]
+    resolution: "✅ Mobile PRD-05 已重构（v3.0），Surface PRD 内容精简完毕；资金域 Domain PRD 待创建（下周启动）"
 
 # 已归档: mobile/docs/threads/archive/（16 个旧格式文件）
 # 已解决: mobile/docs/threads/2026-03-prd-03-market-data-review/（status: RESOLVED，PRD-03 v2.2 已处理全部问题）
