@@ -1,9 +1,9 @@
 # AMS 工程启动建议 — 阻塞项、技术风险与跨域对齐
 
-> **版本**: v0.1
-> **日期**: 2026-03-17
+> **版本**: v0.2
+> **日期**: 2026-03-28
 > **作者**: AMS Engineering
-> **状态**: 待 PM / 合规 / 各域 Lead 确认
+> **状态**: 部分对齐，5 项已决策，5 项待执行
 >
 > 本文汇总在 AMS 开始编码前必须解决的阻塞性决策、需提前规避的技术坑，以及需要跨域对齐的边界问题。所有待决事项用 `🔲 待决策` 标注，已有建议方向的用 `✅ 建议` 标注。
 
@@ -39,6 +39,8 @@
 
 **🔲 待决策**：POC 结果出来后，由 PM + 合规负责人最终确认供应商，结论需书面记录（供日后 HKMA 检查时的供应商尽职调查答复）。
 
+> ⚠️ **2026-03-28 注**：供应商已初步选定 Sumsub，但 HKID/居民身份证实测 POC **尚未完成**。这是编码前的真实技术风险，需在 Sprint 1 开始前执行。
+
 > 参考文档：`docs/prd/kyc-flow.md` §1（供应商评分矩阵）
 
 ---
@@ -56,9 +58,11 @@
 2. 要求书面回复（截图/邮件存档，作为合规尽职调查记录）
 3. 预期回复时间：1-3 个工作日
 
-**🔲 待决策**：
-- 若覆盖：无需额外工作，按原方案推进
-- 若不覆盖：需决定是（A）自建 JFIU 名单同步，还是（B）同时订阅 LSEG World-Check（其亚太团队明确覆盖 HK 国内名单）作为补充数据源
+**✅ 已决策** (2026-03-28)：Plan B 确定 — 混合方案（ComplyAdvantage 主要 + LSEG World-Check HK 补充）
+- 决策依据：`temp/aml-vendor-coverage-matrix.md` 供应商对比矩阵
+- 供应商确认截止：2026-03-31
+- 实施路径：先确认 ComplyAdvantage HK 覆盖状态，若不覆盖则启动 LSEG World-Check 集成
+- 相关文件已更新：`ams-fund-transfer-aml.md` §1.1 明确 Plan B 的两家供应商分工
 
 > 参考文档：`docs/prd/aml-compliance.md` §1.1、§12 开放决策点 #1
 
@@ -83,7 +87,11 @@
 - 先上线、先获取真实用户反馈，再扩展复杂账户类型
 - 公司账户的 UBO 穿透流程需要专门的合规团队培训，不适合 MVP 阶段
 
-**🔲 待决策**：PM + 合规负责人确认 Phase 1 账户类型范围，结论写入 `docs/prd/account-types-roadmap.md`（待创建）。
+**✅ 已决策** (2026-03-30)：Phase 1 仅支持个人账户（`INDIVIDUAL`）
+- 决策依据：`temp/spec-decisions-lockdown.md` 决策 #1/#2（联名账户、公司账户推迟到 Phase 2）
+- 实施范围：account-financial-model.md 中 `client_type` 仅支持 INDIVIDUAL 字段
+- 联名账户和公司账户：放入 Phase 2 路线图
+- 相关更新：kyc-flow.md 中 §7 (联名) §8 (公司) 标记为 Phase 2
 
 > 参考文档：`docs/prd/kyc-flow.md` §7（联名账户）、§8（公司账户）、`docs/specs/account-financial-model.md` §2.1
 
@@ -162,35 +170,30 @@ func NewBlindIndexer(key BlindIndexKey) *BlindIndexer { ... }
 
 ### 3.1 CTR 申报：谁负责填写 FinCEN Form 104？
 
-**背景**：CTR（货币交易报告）在单日现金交易累计 > $10,000 时触发。触发数据来自 Fund Transfer（交易金额），账户身份数据来自 AMS（KYC 信息）。
-
-| 方案 | 描述 | 优缺点 |
-|------|------|--------|
-| A | Fund Transfer 全权负责（含账户数据拉取） | 简单，单服务负责；Fund Transfer 需调用 AMS API |
-| B | 独立合规服务负责 | 职责清晰；需新增第 5 个服务，增加架构复杂度 |
-
-**✅ 建议**：方案 A，Fund Transfer 负责 CTR 申报，通过 gRPC 调用 AMS `GetKYCProfile` 接口获取账户信息。AMS 只维护账户数据，不参与 CTR 触发逻辑。
-
-**🔲 待决策**：Fund Transfer 工程负责人确认是否接受此职责。
+**✅ 已决策** (2026-03-28)：方案 A — Fund Transfer 全权负责 CTR 申报
+- 决策依据：`ams-fund-transfer-aml.md` §5（CTR/STR 归属）和 `temp/spec-decisions-lockdown.md` 决策 #13
+- 实施细节：
+  - Fund Transfer 检测出金额 > $10k 阈值
+  - 调用 AMS gRPC `GetKYCProfile` 获取账户身份信息
+  - Fund Transfer 独立生成并提交 FinCEN CTR 表单
+  - AMS 不参与 CTR 触发逻辑，只提供数据查询接口
+- 相关文件：`ams-fund-transfer-aml.md` 已定义 `GetKYCProfile` gRPC 接口签名
 
 ---
 
 ### 3.2 STR 申报（HK）：独立合规服务还是挂在 Fund Transfer 下？
 
-**背景**：HK STR（可疑交易报告）需要通过 JFIU STREAMS 2 系统提交 XML，且须附 HK Post e-cert 数字签名。STR 的触发逻辑比 CTR 复杂（需要合规官人工判断）。
+**✅ 已决策** (2026-03-28)：方案 B — 独立合规服务（Compliance Service）
+- 决策依据：`ams-fund-transfer-aml.md` §11（STR 申报责任）和 `temp/spec-decisions-lockdown.md` 决策 #14
+- 实施职责：
+  - **CTR**：Fund Transfer 自动申报（由 AML screening 结果触发）
+  - **STR/SAR**：独立 Compliance Service 负责（消费 AMS AML screening 事件，合规官人工审批后通过 JFIU STREAMS 2 提交）
+  - **FATCA/CRS** 年度申报：Compliance Service 负责
+  - **监管报告生成**：Compliance Service 负责
+- 优先级：Compliance Service 列入 Phase 1b（KYC/AML MVP 后立即上线，供应商确认前）
+- 相关文件：`ams-fund-transfer-aml.md` §11 已明确 SAR/STR 分工
 
-| 方案 | 描述 | 优缺点 |
-|------|------|--------|
-| A | 挂在 Fund Transfer 下 | 无需新服务；Fund Transfer 职责边界模糊，与业务逻辑耦合 |
-| B | 独立合规服务（Compliance Service） | 职责清晰（CTR+SAR+STR+审计报告）；需新增服务 |
-
-**✅ 建议**：方案 B，设立独立轻量合规服务（Compliance Service），职责：
-- CTR 自动申报（消费 Fund Transfer 事件）
-- STR/SAR 申报工作流（合规官审批 → STREAMS 2 提交）
-- FATCA/CRS 年度申报
-- 监管报告生成
-
-**🔲 待决策**：架构负责人确认是否引入第 5 个微服务，以及其开发优先级（Phase 1 还是 Phase 2）。
+**备注**：Compliance Service 架构已在 `ams-fund-transfer-aml.md` 中定义，等待架构评审确认
 
 ---
 
@@ -236,38 +239,46 @@ Fund Transfer 消费此事件，更新本地缓存的风险评级。**不建议 
 
 ### 4.1 W-8BEN 到期 ≠ 账户被限制交易
 
-**容易犯的错误**：将 W-8BEN 到期处理为"账户限制"，导致前端提示语不当，引发用户投诉。
+### 4.1 W-8BEN 到期 ≠ 账户被限制交易
 
-**正确理解**：
+**✅ 已决策** (2026-03-28)：权限矩阵已定义，写入 `state-machine-relations.md` §3
+- 决策依据：`temp/spec-decisions-lockdown.md` 决策 #6 和 `w8ben-lifecycle.md` 完整工作流
+- 权限影响矩阵：
 
-| 情形 | 对交易的影响 | 对股息的影响 |
-|------|-------------|-------------|
-| W-8BEN 到期未续签 | **交易正常**（可继续买卖美股） | 股息分配被冻结，预扣 30% FATCA 预提税 |
-| 制裁名单命中 | **完全冻结**（所有交易和出入金） | 全部冻结 |
-| AML 风险评级 HIGH | 可配置（出金限制，交易视策略） | 视具体 AML 标记 |
-| KYC 未完成 | 限制部分功能（如出金上限降低） | 视 KYC tier |
+| 情形 | 交易影响 | 出金影响 | 股息影响 |
+|------|---------|---------|---------|
+| W-8BEN 到期 | ✅ **正常** | ✅ 正常 | ❌ **冻结 + 30% FATCA 预扣** |
+| 制裁名单命中 | ❌ 全冻结 | ❌ 全冻结 | ❌ 全冻结 |
+| AML 风险 HIGH | ⚠️ 视策略 | ❌ 需审批 | ⚠️ 视标记 |
+| KYC 未完成 | ⚠️ 限制 | ❌ 限制 | ⚠️ 限制 |
 
-**✅ 建议**：在 `docs/prd/kyc-flow.md` 中补充各状态对功能权限的影响矩阵，移动端和 Admin Panel 的文案必须基于此矩阵，不得自行解释。
+- 实施方式：state-machine-relations.md §4（角色化可见性）已定义不同角色看到的权限规则
+- 相关文件：w8ben-lifecycle.md 已包含权限限制的完整定义
 
-**🔲 待决策**：PM 确认各账户状态下的功能权限矩阵，写入 PRD 后同步给移动端（`mobile/CLAUDE.md` 中需引用此矩阵）。
+**待执行**：移动端和 Admin Panel CLAUDE.md 需同步此矩阵参考
 
 ---
 
 ### 4.2 账户"限制"的用户可见原因：泛化描述规范
 
-**背景**：SAR Tipping-off 规则要求不得向用户披露 AML 相关限制原因。但其他类型的限制（如 KYC 未完成、W-8BEN 到期）可以正常告知用户。
+### 4.2 账户"限制"的用户可见原因：泛化描述规范
 
-**建议的分级披露规范**：
+**✅ 已决策** (2026-03-28)：SAR Tipping-off 防护规范已写入 `security-review.md` 和 `ams-fund-transfer-aml.md`
+- 决策依据：`temp/code-review-findings.md` Threat 2.1（SAR 泄露防止）
+- 完整的分级披露规范：
 
 | 限制原因 | 可对用户说的内容 | 不可说的内容 |
 |----------|----------------|-------------|
 | KYC 未完成 | "请完成身份验证以解锁此功能" | — |
 | W-8BEN 到期 | "您的税务申报表已到期，股息将被暂扣，请及时更新" | — |
 | PI 资格到期 | "您的专业投资者资格已过期，部分产品暂不可用" | — |
-| AML/制裁相关冻结 | "您的账户已被临时限制。如有疑问，请联系客服" | "AML审查"、"SAR"、"制裁名单"等任何合规词汇 |
+| **AML/制裁相关** | **"您的账户已被临时限制。如有疑问，请联系客服"** | **✅ 绝对禁止**：任何 "AML审查"、"SAR"、"制裁名单"、"合规冻结"等词汇 |
 | 系统风控 | "您的账户存在异常，请联系客服" | 具体风控规则 |
 
-**🔲 待决策**：PM 和合规负责人审核此披露规范，通过后写入设计系统文档，移动端和 Admin Panel 统一遵循。
+- 实施方式：ams-fund-transfer-aml.md §2（SAR Tipping-off Prevention）定义了 5 层防护机制
+- 相关测试：code-review-findings.md 中已定义完整的集成测试用例
+
+**待执行**：移动端和 Admin Panel 的错误消息需经过合规审核，确保无 SAR 关键词泄露
 
 ---
 
@@ -275,23 +286,49 @@ Fund Transfer 消费此事件，更新本地缓存的风险评级。**不建议 
 
 | # | 行动项 | 负责人 | 截止建议 | 状态 |
 |---|--------|--------|----------|------|
-| 1 | 联系 Sumsub 申请沙箱 Key，完成 HKID + 居民身份证 POC | 工程 + PM | 本周 | 🔲 待执行 |
-| 2 | 联系 ComplyAdvantage 确认 HK JFIU 名单覆盖，要求书面回复 | 工程 + 合规 | 本周 | 🔲 待执行 |
-| 3 | 确认 Phase 1 账户类型范围（建议仅个人账户） | PM + 合规 | 本周 | 🔲 待决策 |
-| 4 | 召开跨域对齐会（AMS + Fund Transfer + Admin Panel Lead） | 架构负责人 | 下周 | 🔲 待安排 |
-| 5 | 确认 CTR/STR 申报归属（Fund Transfer 还是独立合规服务） | 架构负责人 | 对齐会中 | 🔲 待决策 |
-| 6 | 确认 Trading Engine 实时 AMS 查询的触发范围 | Trading + AMS Lead | 对齐会中 | 🔲 待决策 |
-| 7 | 更新 `docs/contracts/ams-to-trading.md` 接口规约 | AMS + Trading | 对齐会后 | 🔲 待执行 |
-| 8 | 补充账户状态 × 功能权限矩阵（写入 kyc-flow.md） | PM + AMS | 下周 | 🔲 待执行 |
-| 9 | 审核并确认限制原因分级披露规范 | PM + 合规 | 下周 | 🔲 待决策 |
-| 10 | 同步所有决策结论至移动端、Admin Panel CLAUDE.md | AMS Lead | 各项决策后 | 🔲 持续 |
+| 1 | **[CRITICAL] Sumsub HKID/居民身份证 POC 实测** | 工程 + PM | 编码前 | 🔲 **待执行** — 必须在 Sprint 1 开始前完成 |
+| 2 | **[DONE] ComplyAdvantage HK JFIU 覆盖确认** | 工程 + 合规 | 2026-03-31 | ✅ **已决策** — Plan B（混合方案）确定，供应商合同签署中 |
+| 3 | **[DONE] Phase 1 账户类型范围** | PM + 合规 | 2026-03-30 | ✅ **已决策** — 仅个人账户（INDIVIDUAL），联名/公司推迟 Phase 2 |
+| 4 | **[PENDING] 跨域对齐会** | 架构负责人 | 2026-04-01 | 🔲 **待安排** — 需邀请 Trading + Fund Transfer + Admin Panel Lead |
+| 5 | **[DONE] CTR 申报归属** | 架构负责人 | 2026-03-30 | ✅ **已决策** — Fund Transfer 全权负责，AMS 提供 GetKYCProfile 接口 |
+| 6 | **[PENDING] Trading Engine 实时查询范围** | Trading + AMS Lead | 2026-04-05 | 🔲 **待对齐** — 需在跨域会中确认操作粒度 |
+| 7 | **[PENDING] 更新 `docs/contracts/ams-to-trading.md`** | AMS + Trading | 2026-04-08 | 🔲 **待执行** — 依赖行动项 #6 对齐 |
+| 8 | **[DONE] 账户状态 × 功能权限矩阵** | PM + AMS | 2026-03-30 | ✅ **已决策** — 写入 state-machine-relations.md §3-4，权限影响表已定义 |
+| 9 | **[DONE] SAR 分级披露规范** | PM + 合规 | 2026-03-30 | ✅ **已决策** — SAR Tipping-off 防护 5 层机制已定义，security-review.md 中详述 |
+| 10 | **[PENDING] 同步决策至 mobile / Admin Panel CLAUDE.md** | AMS Lead | 2026-04-15 | 🔲 **持续** — 待以上项目完成后统一同步 |
 
 ---
 
-*关联文档：*
-- *`docs/prd/kyc-flow.md` — KYC 流程规格（§13 开放决策点）*
-- *`docs/prd/aml-compliance.md` — AML 合规规格（§12 开放决策点）*
-- *`docs/specs/auth-architecture.md` — 认证授权架构*
-- *`docs/specs/tech-stack.md` — Go 技术栈选型*
-- *`docs/specs/pii-encryption.md` — PII 加密规格*
-- *`docs/contracts/ams-to-trading.md` — AMS → Trading Engine 接口规约（需更新）*
+---
+
+## 📋 对齐进度总结（2026-03-28）
+
+### ✅ 已决策 (5 项)
+| # | 决策项 | 状态 | 关键文件 |
+|---|--------|------|---------|
+| 2 | ComplyAdvantage HK JFIU 覆盖 | ✅ Plan B（混合） | aml-vendor-coverage-matrix.md |
+| 3 | Phase 1 账户类型 | ✅ 仅个人账户 | spec-decisions-lockdown.md |
+| 5 | CTR 申报归属 | ✅ Fund Transfer 负责 | ams-fund-transfer-aml.md |
+| 8 | 权限矩阵 | ✅ 已定义 | state-machine-relations.md |
+| 9 | SAR 披露规范 | ✅ 5 层防护 | security-review.md |
+
+### 🔲 待执行 (5 项)
+| # | 待执行项 | 优先级 | 关键性 |
+|---|---------|--------|--------|
+| 1 | Sumsub HKID POC 实测 | 🔴 CRITICAL | **编码前必须完成** |
+| 4 | 跨域对齐会 | 🟠 HIGH | 需协调 Trading/Fund Transfer |
+| 6 | Trading 查询范围确认 | 🟠 HIGH | 依赖对齐会 |
+| 7 | 更新 ams-to-trading 合同 | 🟡 MEDIUM | 依赖项 #6 |
+| 10 | 同步至 mobile/admin CLAUDE.md | 🟡 MEDIUM | 编码前完成 |
+
+### 最高优先级阻塞项
+**Sumsub POC 实测** (行动项 #1)：
+- Sumsub 的 HKID 识别率 97.89% 是供应商自报，未经第三方验证
+- 风险：若实测识别率过低，开始集成后再换供应商，所有代码推倒重写
+- 建议：本周内申请沙箱 Key，用真实样本跑 1-2 天 POC
+- 预期结果：1-2 个工作日内确定可行性
+
+---
+
+*最后更新：2026-03-28*
+*维护人：AMS Engineering Lead*

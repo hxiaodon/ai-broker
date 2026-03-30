@@ -4,7 +4,15 @@
 > 业务架构基础（托管模式、入金匹配机制、悬挂资金、资金边界、银行高可用）
 > 请先阅读 [`fund-custody-and-matching.md`](./fund-custody-and-matching.md)。
 
-## 1. 系统概述
+---
+
+> **业务规则源头**：本文档的所有审批阈值、合规要求、SLA 承诺均实现自
+> [出入金系统 Domain PRD](../prd/fund-transfer-system.md)。
+>
+> 如发现本 Spec 与 Domain PRD 的冲突或差异，**以 Domain PRD 为准**。
+> 关键映射关系见 [Domain PRD vs Tech Specs 对标文档](../prd/DOMAIN-SPEC-MAPPING.md)。
+
+---## 1. 系统概述
 
 出入金系统负责用户资金在银行账户与券商账户之间的双向流转，包括入金（Deposit）、出金（Withdrawal）、对账（Reconciliation）和合规审查。
 
@@ -37,7 +45,8 @@
 │  ┌────────────────────────────────────────┐ │
 │  │  Compliance Engine                     │ │
 │  │  - Same-name verification              │ │
-│  │  - AML screening (OFAC/UN/EU)          │ │
+│  │  - AML screening (OFAC/Sanctions/SFC/  │ │
+│  │      AMLO)                              │ │
 │  │  - Travel Rule (>$3000)                │ │
 │  │  - KYC tier limits                     │ │
 │  └────────────────────────────────────────┘ │
@@ -132,8 +141,11 @@ Bank Confirmation → Ledger Update → Notification
 1. 用户提交出金请求
 2. 检查可用余额（已结算资金）
 3. 检查是否有未结算交易（US T+1, HK T+2）
-4. 合规检查（AML、Travel Rule）
-5. 审批流程（>$10,000 需人工审批）
+4. 合规检查（AML、Travel Rule、同名账户）
+5. 审批流程（自动审批/人工审核/合规专员，详见 Domain PRD）
+   - 自动审批：金额 ≤ 日限额 + 无 AML 标记 + 低风险评分
+   - 人工审核：金额 > $50,000 USD 或其他条件（1 工作日）
+   - 合规专员：金额 > $200,000 USD 或 SAR 触发（1-2 工作日）
 6. 发起银行转账
 7. 等待银行确认
 8. 更新分类账和余额
@@ -164,9 +176,10 @@ CONFIRMED → LEDGER_UPDATED → COMPLETED
 - 支持中文/英文姓名对比
 
 **AML 筛查**
-- OFAC SDN List
-- UN Sanctions List
-- EU Sanctions List
+- OFAC SDN List（美国出口管制）
+- OFAC Sectoral Sanctions（行业制裁）
+- SFC Designated Persons List（香港金融管理局指定人员，Phase 2）
+- AMLO Part 4A Designated Entities（香港反洗钱条例，Phase 2）
 - 实时 API 调用或本地缓存（每日更新）
 
 **Travel Rule**
@@ -179,6 +192,10 @@ CONFIRMED → LEDGER_UPDATED → COMPLETED
 | Tier 1 | $5K | $10K | $50K |
 | Tier 2 | $50K | $100K | $500K |
 | Tier 3 | $500K | $1M | $10M |
+
+> **📝 NOTE**: 出金审批阈值已更新对齐 Domain PRD。人工审核 > $50K，合规专员 > $200K。
+> 详见 [Domain PRD § 2.4](../prd/fund-transfer-system.md#24-出金审批规则) 和
+> [Domain-Spec 对标](../prd/DOMAIN-SPEC-MAPPING.md)。
 
 ## 7. 双币种处理
 

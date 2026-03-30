@@ -28,7 +28,7 @@
 ### 1.1 KYC 工作流状态
 
 ```
-KYC 状态代表用户身份验证进度
+KYC 状态代表用户身份验证进度（共 11 个状态）
 
 APPLICATION_SUBMITTED
     │ 用户提交基本信息 + 文件
@@ -40,22 +40,69 @@ KYC_DOCUMENT_PENDING
     ▼
 KYC_UNDER_REVIEW
     │ 人工审核（高风险、文件不清晰等）
+    ├─ 需补充官职信息 ──► PENDING_OFFICIAL_INFO
+    ├─ 需补充其他资料 ──► PENDING_SUPPLEMENT
+    ├─ 高风险PEP ──► EDD_PENDING (自动进入增强尽调)
     ├─ 拒绝 ──► KYC_REJECTED (终态)
     │
     ▼
 KYC_APPROVED
     │ KYC 通过，可进行交易
     ▼
+
+PENDING_OFFICIAL_INFO
+    │ 等待用户补充：职务类型、具体职务、任职地区等（仅限官员）
+    ├─ 用户补充后通过审核 ──► KYC_APPROVED
+    ├─ 虚假信息 ──► KYC_REJECTED
+    └─ 重新审核需要 ──► KYC_UNDER_REVIEW
+
+PENDING_SUPPLEMENT
+    │ 等待用户补充其他资料（身份证件、财务信息等）
+    ├─ 用户补充后通过 ──► KYC_APPROVED
+    ├─ 虚假信息 ──► KYC_REJECTED
+    └─ 重新审核 ──► KYC_UNDER_REVIEW
+
+EDD_PENDING
+    │ 高风险用户进入增强尽调（Enhanced Due Diligence）
+    │ 合规经理评估：财富来源、交易模式、政治背景等
+    ├─ EDD 通过 ──► EDD_APPROVED
+    └─ EDD 不通过 ──► EDD_REJECTED
+
+EDD_APPROVED
+    │ EDD 完成，用户通过增强审查
+    └─ 激活账户 ──► KYC_APPROVED
+
+EDD_REJECTED
+    │ EDD 不通过（无法合理解释风险因素）
+    └─ 账户拒绝（终态） ──► KYC_REJECTED
+
+APPEAL_PENDING
+    │ 用户对 KYC_REJECTED 提出申诉
+    ├─ 申诉通过 ──► KYC_APPROVED
+    └─ 申诉驳回 ──► KYC_REJECTED (终态)
 ```
 
-**枚举值**:
+**完整枚举值**:
 ```go
 const (
+    // 基础状态 (5 个)
     KYCStatusApplicationSubmitted = "APPLICATION_SUBMITTED"
     KYCStatusDocumentPending      = "KYC_DOCUMENT_PENDING"
     KYCStatusUnderReview          = "KYC_UNDER_REVIEW"
     KYCStatusApproved             = "KYC_APPROVED"
     KYCStatusRejected             = "KYC_REJECTED"
+
+    // 补充资料状态 (2 个)
+    KYCStatusPendingOfficialInfo  = "PENDING_OFFICIAL_INFO"  // 补充官员职务信息
+    KYCStatusPendingSupplement    = "PENDING_SUPPLEMENT"     // 补充其他资料
+
+    // EDD 流程状态 (3 个)
+    KYCStatusEDDPending           = "EDD_PENDING"            // EDD 审核中
+    KYCStatusEDDApproved          = "EDD_APPROVED"           // EDD 通过，待激活
+    KYCStatusEDDRejected          = "EDD_REJECTED"           // EDD 拒绝（转REJECTED）
+
+    // 申诉状态 (1 个)
+    KYCStatusAppealPending        = "APPEAL_PENDING"         // 申诉中
 )
 ```
 
@@ -172,16 +219,60 @@ KYC_DOCUMENT_PENDING → {KYC_UNDER_REVIEW | KYC_DOCUMENT_REJECTED}
     ├─ OCR 失败/不清晰 ──► KYC_DOCUMENT_REJECTED (允许重新上传)
     └─ 文件缺失/格式错误 ──► KYC_DOCUMENT_REJECTED
 
-KYC_UNDER_REVIEW → {KYC_APPROVED | KYC_REJECTED}
+KYC_DOCUMENT_REJECTED → APPLICATION_SUBMITTED
+  触发：用户重新上传文件
+  规则：允许无限次重新上传
+
+KYC_UNDER_REVIEW → {KYC_APPROVED | KYC_REJECTED | PENDING_OFFICIAL_INFO | PENDING_SUPPLEMENT | EDD_PENDING}
   触发：合规人员手动审批
   规则：
-    ├─ 文件真实、身份确认 ──► KYC_APPROVED
+    ├─ 用户为官员，需补充职务信息 ──► PENDING_OFFICIAL_INFO
+    ├─ 需补充其他资料（身份、财务等） ──► PENDING_SUPPLEMENT
+    ├─ 文件真实、身份确认、低风险 ──► KYC_APPROVED
+    ├─ 高风险PEP（Level 1）或AML=HIGH ──► EDD_PENDING (自动升级)
     ├─ 文件伪造/欺诈迹象 ──► KYC_REJECTED (不可逆)
-    └─ 需补充资料 ──► 回到 APPLICATION_SUBMITTED (允许重新开户)
+    └─ 决议暂无（等待更多信息） ──► 保持 KYC_UNDER_REVIEW
 
-KYC_REJECTED → (终态，不可转移)
+PENDING_OFFICIAL_INFO → {KYC_APPROVED | KYC_UNDER_REVIEW | KYC_REJECTED}
+  触发：用户补充官员职务信息，或合规经理重新审核
+  规则：
+    ├─ 信息真实、可验证 ──► KYC_APPROVED
+    ├─ 信息可信度待确认 ──► KYC_UNDER_REVIEW (重新人工审核)
+    └─ 虚假信息、欺诈迹象 ──► KYC_REJECTED (不可逆)
 
-KYC_APPROVED → (稳定，仅变更为 REJECTED 如欺诈检测)
+PENDING_SUPPLEMENT → {KYC_APPROVED | KYC_UNDER_REVIEW | KYC_REJECTED}
+  触发：用户补充资料，或合规经理重新审核
+  规则：
+    ├─ 补充资料齐全、通过验证 ──► KYC_APPROVED
+    ├─ 补充资料可信度待确认 ──► KYC_UNDER_REVIEW (重新人工审核)
+    └─ 虚假信息、欺诈迹象 ──► KYC_REJECTED (不可逆)
+
+EDD_PENDING → {EDD_APPROVED | EDD_REJECTED}
+  触发：合规经理进行增强尽调（评估财富来源、交易模式、政治背景）
+  SLA：2-3 个工作日（高风险账户）
+  规则：
+    ├─ EDD 通过（风险可接受） ──► EDD_APPROVED (待激活)
+    └─ EDD 不通过（无法合理解释） ──► EDD_REJECTED (转REJECTED)
+
+EDD_APPROVED → KYC_APPROVED
+  触发：自动（EDD 通过后立即激活）
+  规则：用户从 PENDING 转 ACTIVE
+
+EDD_REJECTED → KYC_REJECTED
+  触发：自动（EDD 不通过，账户拒绝）
+  规则：用户账户进入 REJECTED（终态）
+
+KYC_REJECTED → APPEAL_PENDING
+  触发：用户对拒绝决议提出申诉
+  规则：申诉期限 30 天（从 KYC_REJECTED 时起）
+
+APPEAL_PENDING → {KYC_APPROVED | KYC_REJECTED}
+  触发：合规经理或审查委员会审议申诉
+  规则：
+    ├─ 申诉理由成立、有新证据 ──► KYC_APPROVED (恢复账户)
+    └─ 申诉驳回 ──► KYC_REJECTED (终态，不可再申诉)
+
+KYC_APPROVED → (稳定，仅变更为 REJECTED 如后续欺诈检测)
 ```
 
 ### 3.2 Account 状态转换
@@ -229,6 +320,113 @@ MEDIUM ──{风险清除}──► LOW
 ├─ 制裁列表新增 ──► HIGH
 ├─ 异常交易模式 ──► MEDIUM → HIGH
 └─ 人工审核解除 ──► * → MEDIUM
+```
+
+### 3.4 SLA 约束与转换时限
+
+本部分定义各 KYC 状态转换的业务承诺和时间限制。详细 SLA 定义见 `docs/prd/kyc-flow.md` § 6.5。
+
+#### KYC 状态转换的 SLA
+
+```
+APPLICATION_SUBMITTED → KYC_DOCUMENT_PENDING
+  ├─ 触发：用户上传文件到 Sumsub
+  ├─ SLA：立即（异步，无阻塞）
+  └─ 承诺：文件接收确认 <1 分钟
+
+KYC_DOCUMENT_PENDING → KYC_UNDER_REVIEW
+  ├─ 触发：Sumsub OCR 完成
+  ├─ SLA：自动转移 (<1 天，依赖 Sumsub)
+  └─ 承诺：文件通过 OCR → 自动进入人工审核队列
+
+KYC_UNDER_REVIEW → {KYC_APPROVED | PENDING_OFFICIAL_INFO | EDD_PENDING | KYC_REJECTED}
+  ├─ 触发：合规人员手动审批
+  ├─ SLA：承诺矩阵（来自 kyc-flow.md § 6.5）
+  │  ├─ 普通个人 (Low Risk): 1 工作日
+  │  ├─ PEP Level 2 或 Medium Risk: 2-3 工作日
+  │  ├─ PEP Level 1 或 High Risk: 3-5 工作日 (含 EDD)
+  │  └─ 公司账户 (UBO 穿透): 5 工作日
+  ├─ 工作日定义：排除周末 + 中国/香港公众假期
+  └─ 计时规则：从 APPLICATION_SUBMITTED 到 KYC_APPROVED（最终态）
+
+PENDING_OFFICIAL_INFO → {KYC_APPROVED | KYC_UNDER_REVIEW}
+  ├─ 触发：用户补充官职信息
+  ├─ SLA：用户补充后 2 工作日内完成审核
+  └─ 逾期风险：若用户 7 天未补充，发送催促通知
+
+PENDING_SUPPLEMENT → {KYC_APPROVED | KYC_UNDER_REVIEW}
+  ├─ 触发：用户补充资料
+  ├─ SLA：用户补充后 2 工作日内完成审核
+  └─ 逾期风险：若用户 7 天未补充，发送催促通知
+
+EDD_PENDING → {EDD_APPROVED | EDD_REJECTED}
+  ├─ 触发：合规团队进行增强尽调
+  ├─ SLA：根据 PEP 等级
+  │  ├─ Level 1 (高风险): 2 工作日
+  │  ├─ Level 2 (中风险): 3 工作日
+  │  └─ Level 3 (低风险): 5 工作日
+  ├─ 工作日定义：同上
+  └─ 注意：EDD SLA 包含在总体审核 SLA 内（不是额外时间）
+
+EDD_APPROVED → KYC_APPROVED
+  ├─ 触发：自动（EDD 通过后）
+  ├─ SLA：立即(<1 分钟)
+  └─ 承诺：EDD 批准 → 账户自动激活
+
+EDD_REJECTED → KYC_REJECTED
+  ├─ 触发：自动（EDD 拒绝）
+  ├─ SLA：立即(<1 分钟)
+  └─ 承诺：EDD 拒绝 → 账户自动转 REJECTED
+```
+
+#### 账户激活的总体 SLA（Application Submitted → Active）
+
+```
+┌────────────────────────────────────────────┐
+│ 完整开户 SLA（从用户首次提交到账户激活）  │
+├────────────────────────────────────────────┤
+│                                            │
+│ 普通个人 (无风险)：                        │
+│  OCR (1天) + 人工审核 (1天) = 2 工作日    │
+│                                            │
+│ PEP / 高风险：                             │
+│  OCR (1天) + 人工审核 (3-5天) + EDD (2天) │
+│  = 5-7 工作日（总时长）                   │
+│                                            │
+│ 公司账户：                                 │
+│  OCR (1天) + UBO 穿透 (2天) + 人工审核 (2天) │
+│  = 5 工作日                                │
+│                                            │
+│ 工作日定义：周一-周五，排除公众假期       │
+│ 计时起点：APPLICATION_SUBMITTED            │
+│ 计时终点：ACTIVE (账户激活)                │
+│                                            │
+│ 补件重置规则：                             │
+│  若用户需补充资料，计时重置为补件提交时刻 │
+│  例：T0 提交 → T3 要求补件 → T4 用户补件  │
+│      SLA 重置，重新计算 2 工作日           │
+│                                            │
+└────────────────────────────────────────────┘
+```
+
+#### Admin Panel SLA 监控
+
+```
+Admin Panel 应显示每个待审核案件的：
+  ├─ 案件 ID
+  ├─ 申请人名字
+  ├─ 申请时间 (APPLICATION_SUBMITTED 时刻)
+  ├─ 当前状态
+  ├─ SLA 倒计时 (距离 deadline 剩余时间)
+  │  ├─ 绿色：剩余 > 50%
+  │  ├─ 黄色：剩余 25-50%
+  │  └─ 红色：剩余 < 25% 或已逾期
+  ├─ 优先级排序：
+  │  1. 超期案件（红色）
+  │  2. 即将逾期案件（黄色）
+  │  3. 正常案件（绿色）
+  └─ 自动告警：
+     若案件超期 > 24 小时，自动向主管发送告警邮件
 ```
 
 ---

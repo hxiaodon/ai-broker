@@ -35,6 +35,28 @@ revisions:
 
 ---
 
+## 账户类型与 KYC 范围
+
+本文档覆盖的账户类型由 `docs/specs/account-financial-model.md` § 2 完整定义。**本 PRD 仅涉及 MVP 支持的三种类型**：
+
+| 账户类型 | 定义 | KYC 流程 | MVP 支持 |
+|---------|------|---------|---------|
+| **INDIVIDUAL** | 个人账户（单一所有人） | 本文档全覆盖 | ✅ Phase 1 |
+| **JOINT_JTWROS** | 联名账户（共同继承权） | § 7 专述 | ✅ Phase 1 |
+| **CORPORATE** | 公司/机构账户（需 UBO 穿透） | § 8 专述 | ✅ Phase 1 |
+| TRUST | 信托账户 | ❌ 本文档未覆盖 | ⏳ Phase 2 |
+| IRA_TRADITIONAL | 美国传统 IRA | ❌ 本文档未覆盖 | ⏳ Phase 2 |
+| IRA_ROTH | 美国 Roth IRA | ❌ 本文档未覆盖 | ⏳ Phase 2 |
+| CUSTODIAL | 未成年人托管账户 | ❌ 本文档未覆盖 | ⏳ Phase 2 |
+| JOINT_TIC | 联名账户（分权共有） | ❌ 本文档未覆盖 | ⏳ Phase 2 |
+
+**规则**：
+- 用户在开户时选择账户类型，之后无法变更（设计约束）
+- 每个用户可持有多个账户，但每个账户只属一个类型
+- 本 KYC 流程（7 步）对三种 MVP 类型均适用，但 UBO 穿透逻辑详见 § 8
+
+---
+
 ## 1. KYC 供应商选型决策
 
 ### 1.1 选型结论
@@ -640,59 +662,87 @@ c.AddFunc("0 2 * * *", func() {
 })
 ```
 
-### 10.3 W-8BEN 到期冻结逻辑
+### 10.3 W-8BEN 到期处理机制
 
-#### 实施细节（参考 decisions-2026-03-29.md § 决策 1）
+#### 实施细节（参考 decisions-2026-03-29.md § 决策 1 + w8ben-lifecycle.md）
 
-**决策**：到期后 **24 小时冻结股息分配**（而非立即冻结）
+**决策**：W-8BEN 到期 → **立即标记 EXPIRED**，**账户保持 ACTIVE，选择性限制交易**（非全面冻结）
+
+**处理流程**：
+
+```
+到期日期 (T+0)
+    │
+    ├─ [Cron Job - AMS] 标记账户
+    │  ├─ tax_form_status = EXPIRED
+    │  ├─ w8ben_expired_at = NOW()
+    │  └─ account_status 保持 ACTIVE（不冻结）
+    │
+    ├─ [Kafka Event] 发布 ams.tax_form_expired 事件
+    │
+    ├─ [Trading Engine] 接收事件
+    │  └─ 检查：用户持有 US 股票？
+    │     ├─ YES ──► 标记账户 "tax_form_expired"
+    │     │          新仓 BUY 订单：拒绝（HTTP 403）
+    │     │          SELL / 已有持仓：正常处理
+    │     └─ NO ──► 无影响，继续交易
+    │
+    ├─ [Fund Transfer] 接收事件
+    │  ├─ 股利分配：适用 30% FATCA 预扣
+    │  └─ 出金：无限制（照常允许）
+    │
+    └─ [通知] 用户通知 + 账户内警告条
+```
 
 **理由**：
-1. IRS 要求未提交 W-8BEN 的非美国税务居民在 30 天后启动预扣，24 小时给用户短暂的"补救窗口"
-2. 给予用户通知后 24 小时的缓冲时间，避免体验问题
-3. 与同行实践（Interactive Brokers、Saxo）一致
+1. 完全冻结（SUSPENDED）太严厉，用户无法出金、无法卖出持仓，体验问题大
+2. 选择性限制（仅阻止 US 股票 BUY）更合理，既满足合规要求，也保留必要操作
+3. 股利自动预扣 30% FATCA 符合 IRS 要求，无需用户干预
+4. 与国际经纪商实践一致（Interactive Brokers、Saxo 采用类似方案）
 
 ##### 数据库操作
 
 ```sql
--- 表结构（在 account_tax_forms 表中）
-ALTER TABLE account_tax_forms ADD COLUMN dividend_hold_at TIMESTAMP NULL;
+-- 表结构扩展（如需追踪到期事件时间）
+ALTER TABLE account_tax_forms ADD COLUMN w8ben_expired_at TIMESTAMP NULL;
 
 -- Cron Job 逻辑（每天 UTC 02:00 执行）
 SELECT account_id, tax_form_expires_at
   FROM account_tax_forms
  WHERE form_type IN ('W8BEN', 'W8BENE')
-   AND tax_form_expires_at < NOW()
-   AND tax_form_expires_at > NOW() - INTERVAL 1 DAY  -- 到期后 24 小时内
-   AND dividend_hold_at IS NULL;  -- 尚未记录
+   AND tax_form_expires_at <= NOW()
+   AND w8ben_expired_at IS NULL;  -- 尚未标记为过期
 
 UPDATE account_tax_forms
-   SET dividend_hold_at = NOW()
- WHERE id IN (...);
+   SET tax_form_status = 'EXPIRED',
+       w8ben_expired_at = NOW()
+ WHERE account_id IN (...);
 
--- Fund Transfer 服务在计算可用余额时读取 dividend_hold_at，如果不为空则冻结股息
+-- 注意：不设置 dividend_hold，而是在 Fund Transfer 处理股利时动态判断 tax_form_status
 ```
 
 ##### 用户通知时间表
 
-| 时间 | 通知类型 | 内容 |
-|------|--------|------|
-| 到期前 90 天 | App Push + Email | "您的美国税务表 W-8BEN 将在 90 天后到期，请尽早续签" |
-| 到期前 30 天 | App Push（红色）+ Email | "警告：W-8BEN 即将到期，续签后才能继续获得股息" |
-| 到期前 7 天 | App Push（红色）+ SMS | "紧急：仅 7 天即过期，请立即续签" |
-| 到期当天 | App Push（红色） | "W-8BEN 已过期，股息分配已暂停。请立即续签。" |
-| 到期后 24 小时 | 内部日志（不通知用户） | 系统自动设置 `dividend_hold = true` |
+| 时间 | 通知类型 | 内容 | 限制生效 |
+|------|--------|------|--------|
+| 到期前 90 天 | App Push + Email | "您的美国税务表 W-8BEN 将在 90 天后到期，请尽早续签" | — |
+| 到期前 30 天 | App Push（橙）+ Email | "警告：W-8BEN 即将到期，续签后才能继续获得股息" | — |
+| 到期前 7 天 | App Push（红）+ SMS | "紧急：仅 7 天即过期，请立即续签" | — |
+| T+0（到期当日） | 系统标记（不显示用户通知） | 账户标记为 EXPIRED | — |
+| T+1（到期次日） | App Push（红）+ Email | "W-8BEN 已过期。美股交易受限，股息将按 30% 预扣。请立即续签。" | **生效：US股票BUY拒绝、30% FATCA预扣** |
 
 ##### API 返回值变化
 
 ```json
-// 到期后 24 小时内的账户查询结果
+// 到期后的账户查询结果
 {
   "account_id": "user-123",
+  "account_status": "ACTIVE",  // 保持ACTIVE，未冻结
   "tax_form": {
     "form_type": "W8BEN",
     "status": "EXPIRED",
     "expires_at": "2026-03-28T23:59:59Z",
-    "dividend_hold": true,
+    "w8ben_expired_at": "2026-03-29T00:00:00Z",
     "dividend_hold_reason": "W-8BEN 已到期，股息分配已冻结。请立即续签。",
     "dividend_hold_until": "2026-03-28T23:59:59Z"
   }

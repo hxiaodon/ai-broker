@@ -25,7 +25,11 @@
 
 | 路径 | 内容 |
 |------|------|
-| `docs/prd/` | 域级产品需求文档 —— KYC 规则、账户生命周期（TBD） |
+| `docs/prd/` | 域级产品需求文档 —— KYC 规则、账户生命周期 |
+| `docs/prd/kyc-flow.md` | KYC 产品规格：供应商选型、流程、状态机、规则矩阵 |
+| `docs/prd/aml-compliance.md` | AML 产品规格：制裁筛查、PEP 分类、EDD 流程 |
+| `docs/prd/decisions-2026-03-29.md` | 🔴 **关键决策记录**：W-8BEN 冻结时机、PEP 分类标准等 4 项产品决策 |
+| `docs/research/` | 🔵 **调研资料**：Non-HK PEP 分类标准的国际监管分析（Security Engineer） |
 | `docs/specs/` | 技术规范 —— 认证流程、KYC 流程设计 |
 | `docs/specs/*.tracker.md` | 实现跟踪文件（动态进度 + 验收记录） |
 | `docs/active-features.yaml` | 域级功能实现进度仪表盘 |
