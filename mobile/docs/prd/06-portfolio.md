@@ -165,9 +165,11 @@ flowchart TD
 
 ## 六、业务规则
 
-### 6.1 平均成本计算
+### 6.1 成本基础计算方法
 
-> **待澄清**（2026-03-30）：本章内容采用加权均价法；具体成本基础计算方法应由交易引擎 Domain PRD 明确定义（FIFO vs 加权均价）。如有变更将在 `services/trading-engine/docs/prd/position-pnl.md` 确认后同步更新。
+> **PM 确认方案**（2026-03-30）：本系统采用**加权均价法（Weighted Average Cost）**，适用于 Phase 1（美股）和 Phase 2（港股）。选择理由见 Domain PRD `services/trading-engine/docs/prd/position-pnl.md §1.1`。
+
+**实现：加权平均成本法**
 
 采用加权平均成本法，每次买入后重新计算：
 
@@ -177,7 +179,7 @@ flowchart TD
 
 示例：已持 100 股 @ $180，再买 50 股 @ $190，新均价 = (100×180 + 50×190) / 150 = **$183.33**
 
-> **详见 Domain PRD**：完整的成本基础计算方法、FIFO 与加权均价的选择依据、公司行动调整逻辑见 `services/trading-engine/docs/prd/position-pnl.md`
+> **详见 Domain PRD**：完整的成本基础计算方法、加权均价法 vs FIFO 的选择依据、公司行动调整逻辑见 `services/trading-engine/docs/prd/position-pnl.md` §1-§3
 
 ### 6.2 已结算 vs 未结算股数
 
