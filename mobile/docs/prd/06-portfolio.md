@@ -1,9 +1,25 @@
+---
+type: surface-prd
+domain_prd:
+  - services/trading-engine/docs/prd/position-pnl.md
+  - services/trading-engine/docs/prd/settlement.md
+revisions:
+  - rev: 1
+    date: 2026-03-15T00:00+08:00
+    author: product-manager
+    summary: "初始版本"
+  - rev: 2
+    date: 2026-03-30T00:00+08:00
+    author: product-manager
+    summary: "修复 PRD 结构：补充 frontmatter，提取 Domain PRD 内容（成本基础方法、结算规则、Wash Sale 规则），加入澄清脚注"
+---
+
 # PRD-06：持仓与组合模块
 
 > **文档状态**: Phase 1 正式版
-> **版本**: v2.1
-> **日期**: 2026-03-15
-> **变更说明**: v2.0 整改 — 移除接口规格与数据模型，改用 Mermaid 流程图，补充业务规则与用户场景
+> **版本**: v2.2
+> **日期**: 2026-03-30
+> **变更说明**: v2.1 → v2.2：补充 frontmatter，提取 Domain PRD 内容（成本基础计算方法、T+1 结算规则、Wash Sale 逻辑），简化为用户旅程和前端展示规则
 
 > **低保真原型**：[资产总览 + 持仓列表](prototypes/06-portfolio/index.html) · [持仓详情](prototypes/06-portfolio/position-detail.html)
 
@@ -117,7 +133,7 @@ flowchart TD
 |------|------|
 | 股票代码 + 公司名 | 如 AAPL · Apple Inc. |
 | 持有股数 | 整数 |
-| 持仓均价 | 买入的加权平均成本 |
+| 持仓均价 | 买入的成本价 |
 | 当前价格 | 实时行情 |
 | 持仓市值 | 当前价 × 持有股数 |
 | 浮动盈亏（金额 + 百分比） | 颜色随涨跌方向 |
@@ -149,7 +165,9 @@ flowchart TD
 
 ## 六、业务规则
 
-### 6.1 平均成本计算（FIFO 原则）
+### 6.1 平均成本计算
+
+> **待澄清**（2026-03-30）：本章内容采用加权均价法；具体成本基础计算方法应由交易引擎 Domain PRD 明确定义（FIFO vs 加权均价）。如有变更将在 `services/trading-engine/docs/prd/position-pnl.md` 确认后同步更新。
 
 采用加权平均成本法，每次买入后重新计算：
 
@@ -158,6 +176,8 @@ flowchart TD
 ```
 
 示例：已持 100 股 @ $180，再买 50 股 @ $190，新均价 = (100×180 + 50×190) / 150 = **$183.33**
+
+> **详见 Domain PRD**：完整的成本基础计算方法、FIFO 与加权均价的选择依据、公司行动调整逻辑见 `services/trading-engine/docs/prd/position-pnl.md`
 
 ### 6.2 已结算 vs 未结算股数
 
@@ -172,6 +192,8 @@ flowchart TD
 可卖出：100 股（已结算）
 未结算：50 股（预计 2026-03-15 结算后可卖）
 ```
+
+> **详见 Domain PRD**：T+1 结算制度的完整规则、未结算资金冻结逻辑、交易所差异（US T+1 vs HK T+2）见 `services/trading-engine/docs/prd/settlement.md`
 
 ### 6.3 价格刷新规则
 
@@ -189,14 +211,20 @@ flowchart TD
 
 ---
 
-## 七、合规要求
+## 七、合规要求与前端展示
 
-| 要求 | 适用规定 |
-|------|---------|
-| 待结算资金说明 | SEC T+1 结算制度；界面必须明确区分可用资金与待结算资金 |
-| Wash Sale 规则提示 | IRS Wash Sale Rule；卖出亏损后 30 天内买回相同股票，亏损不可抵税；在已实现盈亏记录中标注 |
-| 成本基础记录 | IRS 报税要求；持仓均价须准确记录，用于报税参考（Phase 2 出具 1099-B） |
-| 集中度提示 | 内部风险管理；平台可提示但不强制限制（Phase 1 现金账户无杠杆风险） |
+| 要求 | 前端处理 | 适用规定 |
+|------|---------|---------|
+| 待结算资金说明 | 区分可用资金与待结算资金，点击"?"显示 T+1 制度说明 | SEC T+1 结算制度 |
+| Wash Sale 规则提示 | 已实现盈亏记录中标注 ⚠️；提示用户咨询税务顾问 | IRS Wash Sale Rule |
+| 成本基础记录 | 准确展示持仓均价；用于报税参考 | IRS 报税要求 |
+| 集中度提示 | 单只股票占比 > 30% 时显示警告横幅 | 内部风险管理 |
+
+> **后端合规义务**（由交易引擎实现，不在此 Surface PRD 中阐述）：
+> - Wash Sale 识别与标记逻辑
+> - T+1 结算约束与冻结规则
+> - 成本基础持久化与报税文件生成
+> - 见 `services/trading-engine/docs/prd/position-pnl.md` 和 `settlement.md`
 
 ---
 

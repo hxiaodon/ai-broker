@@ -1,9 +1,26 @@
+---
+type: surface-prd
+domain_prd:
+  - services/trading-engine/docs/prd/order-lifecycle.md
+  - services/trading-engine/docs/prd/risk-rules.md
+  - services/trading-engine/docs/prd/settlement.md
+revisions:
+  - rev: 1
+    date: 2026-03-15T00:00+08:00
+    author: product-manager
+    summary: "初始版本"
+  - rev: 2
+    date: 2026-03-30T00:00+08:00
+    author: product-manager
+    summary: "修复 PRD 结构：补充 frontmatter，提取 Domain PRD 内容，保留用户旅程与前端展示规则"
+---
+
 # PRD-04：交易模块
 
 > **文档状态**: Phase 1 正式版
-> **版本**: v2.1
-> **日期**: 2026-03-15
-> **变更说明**: v2.0 整改 — 移除接口规格、数据模型、GTC 调度器伪代码，改用 Mermaid 流程图与状态图，补充用户旅程与业务规则
+> **版本**: v2.2
+> **日期**: 2026-03-30
+> **变更说明**: v2.1 → v2.2：补充 frontmatter，提取 Domain PRD 内容（订单状态机完整定义、PDT 规则计算、价格保护参数），简化为用户旅程和前端展示规则
 
 > **低保真原型**：[下单面板](prototypes/04-trading/order-entry.html) · [订单确认](prototypes/04-trading/order-confirm.html) · [订单列表](prototypes/04-trading/order-list.html)
 
@@ -155,30 +172,9 @@ flowchart TD
 
 ## 五、订单状态生命周期
 
-```mermaid
-stateDiagram-v2
-    [*] --> 待提交: 用户点击确认\n（客户端本地状态）
-    待提交 --> 风控检查中: HTTP 响应成功
-    风控检查中 --> 已提交: 风控通过
-    风控检查中 --> 已拒绝: 风控拒绝\n（资金不足/限制/合规）
+订单在系统中经历多个内部状态转换，用户界面展示的状态名称及其含义如下：
 
-    已提交 --> 待成交: 交易所确认接受
-    待成交 --> 部分成交: 部分数量成交
-    待成交 --> 已成交: 全部数量成交
-    待成交 --> 已撤销: 用户撤单且交易所确认
-    待成交 --> 已过期: DAY 单收盘 / GTC 满90天
-    待成交 --> 交易所拒绝: 交易所拒绝
-
-    部分成交 --> 已成交: 剩余数量成交
-    部分成交 --> 部分成交后撤销: 用户撤单
-
-    已成交 --> [*]
-    已拒绝 --> [*]
-    已撤销 --> [*]
-    部分成交后撤销 --> [*]
-    已过期 --> [*]
-    交易所拒绝 --> [*]
-```
+> **详见 Domain PRD**：完整的订单状态转换矩阵、各类型订单规则（市价/限价/DAY/GTC）及其幂等性要求由交易引擎实现，见 `services/trading-engine/docs/prd/order-lifecycle.md`
 
 **订单状态的用户感知标识：**
 
@@ -214,7 +210,9 @@ stateDiagram-v2
 | 市价单 | 以当前市场最优价格立即成交，适合追求速度；实际成交价可能与显示价格有差异（特别是在波动剧烈时） |
 | 限价单 | 仅在价格达到您指定的价格时成交，适合有价格要求的投资者；若市价未触及委托价，订单将持续挂单 |
 
-**市价单提示：** 系统会对市价单设置价格保护区间（常规时段 ±5%，盘前盘后 ±3%），防止在流动性差时以极端价格成交。用户无需操作，自动生效。
+**市价单提示：** 系统会对市价单设置价格保护区间，防止在流动性差时以极端价格成交。用户无需操作，自动生效。
+
+> **详见 Domain PRD**：市价单的具体保护参数（常规时段 ±5%、盘前盘后 ±3% 等）由交易引擎管理，见 `services/trading-engine/docs/prd/risk-rules.md`
 
 ### 6.3 数量输入规则
 
@@ -332,14 +330,13 @@ stateDiagram-v2
 
 ## 九、PDT 规则（Pattern Day Trader）
 
-> **监管要求**：FINRA Rule 4210，不可绕过
+> **监管要求**：FINRA Rule 4210
 
-| 项目 | 说明 |
-|------|------|
-| Phase 1（现金账户） | 不受 PDT 规则约束，但 App 内提供 PDT 教育内容 |
-| Phase 2（融资账户） | 5 个交易日内日内交易次数 ≥ 4 次 → 触发 PDT；账户权益须维持 ≥ $25,000 |
-| 前端处理 | "设置 → 交易规则 → PDT 说明"页面；不提供绕过按钮 |
-| 拦截方式 | Phase 2 工程师在交易引擎层实现，PM 不参与技术实现 |
+**Phase 1 现金账户**：不受 PDT 规则约束。为了帮助用户了解 PDT 概念，App 在"设置 → 交易规则"提供 PDT 教育页面。
+
+**Phase 2 融资账户**：融资账户受 PDT 规则约束。系统在下单时自动检查 PDT 状态；如触发 PDT 限制，用户将看到限制提示。详见"设置 → 交易规则 → PDT 说明"。
+
+> **详见 Domain PRD**：PDT 的完整计算逻辑、阈值定义（5 个交易日内日内交易次数、最小权益要求等）由交易引擎实现，见 `services/trading-engine/docs/prd/risk-rules.md`
 
 ---
 
@@ -358,16 +355,21 @@ stateDiagram-v2
 
 ---
 
-## 十一、合规要求
+## 十一、合规要求与前端展示
 
-| 要求 | 适用规定 |
-|------|---------|
-| 最优执行披露 | SEC Reg NMS Rule 606；在确认页明确说明订单路由原则 |
-| 不接受 PFOF | SEC Reg NMS；确认页须明确告知 |
-| PDT 规则告知 | FINRA Rule 4210；用户在 KYC Step 6 阅读 PDT 风险披露文件 |
-| 交易确认书 | FINRA Rule 2232；成交后 24 小时内发送确认书（Phase 1 使用 App 通知替代，Phase 2 完整文档） |
-| 下单生物识别 | 安全规定；所有委托须经生物识别或密码二次确认 |
-| 交易审计记录 | SEC Rule 17a-4；所有委托、成交、撤单记录保留 7 年 |
+| 要求 | 前端实现 | 适用规定 |
+|------|---------|---------|
+| 最优执行披露 | 在订单确认页明确说明订单路由原则 | SEC Reg NMS Rule 606 |
+| 不接受 PFOF | 确认页明确披露：不接受交易所或做市商的价格改善费用 | SEC Reg NMS |
+| PDT 风险披露 | "交易设置 → 交易规则"页面展示 PDT 规则说明 | FINRA Rule 4210 |
+| 下单生物识别 | 所有委托须通过生物识别或 2FA 二次确认 | 安全规定 |
+| 交易确认书 | 成交后通过 App 推送确认信息（Phase 1）；Phase 2 发送完整文档 | FINRA Rule 2232 |
+
+> **后端合规义务**（由交易引擎实现，不在此 Surface PRD 中阐述）：
+> - 交易审计记录保留 7 年（SEC Rule 17a-4）
+> - CAT 合规上报
+> - 交易所监管上报
+> - 见 `services/trading-engine/docs/prd/order-lifecycle.md`
 
 ---
 
