@@ -102,8 +102,25 @@ UIUX 工程师可参考 `mobile/docs/design/` 下的设计规范文档。
 
 ---
 
+## 与 Domain PRD 的关系
+
+本低保真原型为 **Surface PRD** 配套交付物。以下模块的业务规则已分离至对应 Domain PRD：
+
+| 原型模块 | Domain PRD | 关键内容 |
+|---------|-----------|---------|
+| 02-kyc | [services/ams/docs/prd/kyc-flow.md](../../../services/ams/docs/prd/kyc-flow.md) | KYC 供应商选型、流程设计、状态机、W-8BEN 续签工作流 |
+| 02-kyc | [services/ams/docs/prd/aml-compliance.md](../../../services/ams/docs/prd/aml-compliance.md) | AML 筛查规则、PEP 分类、EDD 流程 |
+| 04-trading | [services/trading-engine/docs/prd/order-lifecycle.md](../../../services/trading-engine/docs/prd/order-lifecycle.md) | 订单状态机、生命周期完整定义 |
+| 04-trading | [services/trading-engine/docs/prd/risk-rules.md](../../../services/trading-engine/docs/prd/risk-rules.md) | PDT 规则、风险控制、价格保护参数 |
+| 05-funding | [services/fund-transfer/docs/prd/fund-transfer-system.md](../../../services/fund-transfer/docs/prd/fund-transfer-system.md) | 出入金业务规则、AML 筛查、同名账户验证、审批流程 |
+| 06-portfolio | [services/trading-engine/docs/prd/position-pnl.md](../../../services/trading-engine/docs/prd/position-pnl.md) | 成本基础计算、P&L 展示规则 |
+| 06-portfolio | [services/trading-engine/docs/prd/settlement.md](../../../services/trading-engine/docs/prd/settlement.md) | T+1 结算、Wash Sale 规则 |
+
+---
+
 ## 版本记录
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
 | v1.0 | 2026-03-14 | 初版：覆盖全部 8 个 PRD 模块，共 18 个页面 |
+| v1.1 | 2026-03-31 | 补充 Domain PRD 引用表；确认与最新 Surface PRD（v2.0+）一致 |
