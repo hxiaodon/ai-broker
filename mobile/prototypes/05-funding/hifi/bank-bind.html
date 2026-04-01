@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>05-Funding — 银行卡绑定</title>
+
+  <link rel="stylesheet" href="../../_design-system/tokens.css">
+  <link rel="stylesheet" href="../../_design-system/components.css">
+  <link rel="stylesheet" href="../../_design-system/proto-base.css">
+
+  <style>
+    .bank-bind-step {
+      display: flex;
+      justify-content: space-between;
+      gap: var(--space-2);
+      margin-bottom: var(--space-6);
+    }
+
+    .step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex: 1;
+    }
+
+    .step-circle {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: var(--font-weight-bold);
+      margin-bottom: var(--space-2);
+      transition: all var(--transition-fast);
+    }
+
+    .step.active .step-circle {
+      background: var(--color-primary);
+      color: #fff;
+    }
+
+    .step.completed .step-circle {
+      background: var(--color-gain);
+      color: #fff;
+    }
+
+    .step.inactive .step-circle {
+      background: var(--color-bg-elevated);
+      color: var(--color-text-tertiary);
+    }
+
+    .step-label {
+      font-size: var(--text-xs);
+      text-align: center;
+      color: var(--color-text-secondary);
+    }
+
+    .step.active .step-label {
+      color: var(--color-text-primary);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .form-section {
+      background: var(--color-bg-surface);
+      border-radius: var(--radius-lg);
+      padding: var(--space-4);
+      margin-bottom: var(--space-4);
+    }
+
+    .form-label {
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-2);
+    }
+
+    .form-field {
+      margin-bottom: var(--space-3);
+    }
+
+    .form-field:last-child {
+      margin-bottom: 0;
+    }
+
+    .form-input {
+      width: 100%;
+      padding: var(--space-3);
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-divider);
+      border-radius: var(--radius-md);
+      font-size: var(--text-base);
+      color: var(--color-text-primary);
+      outline: none;
+      transition: all var(--transition-fast);
+    }
+
+    .form-input:focus {
+      border-color: var(--color-primary);
+      background: var(--color-bg-elevated);
+    }
+
+    .form-input::placeholder {
+      color: var(--color-text-tertiary);
+    }
+
+    .bank-list {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .bank-item {
+      padding: var(--space-3);
+      background: var(--color-bg-elevated);
+      border: 2px solid var(--color-divider);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+    }
+
+    .bank-item.selected {
+      border-color: var(--color-primary);
+      background: rgba(13, 101, 242, 0.05);
+    }
+
+    .bank-icon {
+      width: 44px;
+      height: 44px;
+      background: var(--color-bg-surface);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--text-2xl);
+      flex-shrink: 0;
+    }
+
+    .bank-details {
+      flex: 1;
+    }
+
+    .bank-name {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+    }
+
+    .bank-code {
+      font-size: var(--text-xs);
+      color: var(--color-text-tertiary);
+      margin-top: 2px;
+    }
+
+    .bank-check {
+      color: var(--color-primary);
+      font-size: var(--text-lg);
+    }
+
+    .alert-warning {
+      background: rgba(255, 193, 7, 0.1);
+      border-left: 3px solid #FFC107;
+      padding: var(--space-3);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-3);
+    }
+
+    .alert-title {
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-semibold);
+      color: #F59E0B;
+      margin-bottom: var(--space-1);
+    }
+
+    .alert-message {
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+      line-height: 1.5;
+    }
+
+    .verification-section {
+      padding: var(--space-6) var(--space-4);
+      text-align: center;
+    }
+
+    .verification-icon {
+      font-size: var(--text-6xl);
+      margin-bottom: var(--space-4);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    .verification-title {
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-2);
+    }
+
+    .verification-message {
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+      margin-bottom: var(--space-6);
+    }
+
+    .countdown {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xl);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-primary);
+    }
+
+    .success-section {
+      padding: var(--space-8) var(--space-4);
+      text-align: center;
+    }
+
+    .success-icon {
+      font-size: var(--text-6xl);
+      margin-bottom: var(--space-4);
+    }
+
+    .success-title {
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-2);
+    }
+
+    .success-message {
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+      margin-bottom: var(--space-6);
+    }
+
+    .success-detail {
+      background: var(--color-bg-surface);
+      border-radius: var(--radius-lg);
+      padding: var(--space-4);
+      margin-bottom: var(--space-4);
+      text-align: left;
+    }
+
+    .success-detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: var(--space-2) 0;
+      border-bottom: 1px solid var(--color-divider);
+    }
+
+    .success-detail-row:last-child {
+      border-bottom: none;
+    }
+  </style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>📱 05-Funding — 银行卡绑定</strong><br>
+  🔗 <a href="index.html">← 返回</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar">
+    <div class="status-bar-left"><span class="status-bar-time">9:41</span></div>
+    <div class="status-bar-right"><span>●●●</span><span>WiFi</span><span>100%</span></div>
+  </div>
+
+  <div class="nav-bar">
+    <div class="nav-bar-left">
+      <div class="nav-bar-back" onclick="history.back()">‹</div>
+    </div>
+    <div class="nav-bar-center">
+      <div class="nav-bar-title">绑定银行卡</div>
+    </div>
+    <div class="nav-bar-right"></div>
+  </div>
+
+  <div class="screen">
+
+    <!-- [STATE: BANK_SELECT] 选择银行 -->
+    <div data-state="bank_select">
+      <div class="bank-bind-step">
+        <div class="step active">
+          <div class="step-circle">1</div>
+          <div class="step-label">选择银行</div>
+        </div>
+        <div class="step inactive">
+          <div class="step-circle">2</div>
+          <div class="step-label">账户信息</div>
+        </div>
+        <div class="step inactive">
+          <div class="step-circle">3</div>
+          <div class="step-label">完成</div>
+        </div>
+      </div>
+
+      <div class="alert-warning">
+        <div class="alert-title">⚠️ 账户名称必须一致</div>
+        <div class="alert-message">银行卡账户名必须与 KYC 认证时的账户名一致，否则审核可能被拒绝</div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-label">选择银行</div>
+        <div class="bank-list">
+          <div class="bank-item" onclick="selectBank(this, 'cmb')">
+            <div class="bank-icon">🏦</div>
+            <div class="bank-details">
+              <div class="bank-name">招商银行</div>
+              <div class="bank-code">China Merchants Bank</div>
+            </div>
+          </div>
+          <div class="bank-item selected" onclick="selectBank(this, 'icbc')">
+            <div class="bank-icon">🏦</div>
+            <div class="bank-details">
+              <div class="bank-name">中国工商银行</div>
+              <div class="bank-code">ICBC</div>
+            </div>
+            <div class="bank-check">✓</div>
+          </div>
+          <div class="bank-item" onclick="selectBank(this, 'boc')">
+            <div class="bank-icon">🏦</div>
+            <div class="bank-details">
+              <div class="bank-name">中国银行</div>
+              <div class="bank-code">Bank of China</div>
+            </div>
+          </div>
+          <div class="bank-item" onclick="selectBank(this, 'abc')">
+            <div class="bank-icon">🏦</div>
+            <div class="bank-details">
+              <div class="bank-name">农业银行</div>
+              <div class="bank-code">ABC</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary" style="width: 100%; margin-top: var(--space-4);" onclick="setState('account_info')">下一步</button>
+    </div>
+
+    <!-- [STATE: ACCOUNT_INFO] 账户信息 -->
+    <div data-state="account_info" style="display: none;">
+      <div class="bank-bind-step">
+        <div class="step completed">
+          <div class="step-circle">✓</div>
+          <div class="step-label">选择银行</div>
+        </div>
+        <div class="step active">
+          <div class="step-circle">2</div>
+          <div class="step-label">账户信息</div>
+        </div>
+        <div class="step inactive">
+          <div class="step-circle">3</div>
+          <div class="step-label">完成</div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-field">
+          <div class="form-label">银行卡号</div>
+          <input type="text" class="form-input" placeholder="请输入银行卡号" value="6226 2567 8901 2345">
+        </div>
+        <div class="form-field">
+          <div class="form-label">持卡人名</div>
+          <input type="text" class="form-input" placeholder="请输入持卡人名" value="张三">
+        </div>
+        <div class="form-field">
+          <div class="form-label">身份证号</div>
+          <input type="text" class="form-input" placeholder="请输入身份证号" value="110101199001011234">
+        </div>
+      </div>
+
+      <div class="alert-warning">
+        <div class="alert-title">ℹ️ 信息将用于验证</div>
+        <div class="alert-message">您提供的信息仅用于银行卡绑定验证，我们确保您的隐私和数据安全</div>
+      </div>
+
+      <button class="btn btn-primary" style="width: 100%; margin-top: var(--space-4);" onclick="setState('verifying')">下一步</button>
+      <button class="btn btn-ghost" style="width: 100%; margin-top: var(--space-2);" onclick="setState('bank_select')">返回修改</button>
+    </div>
+
+    <!-- [STATE: VERIFYING] 验证中 -->
+    <div data-state="verifying" style="display: none;">
+      <div class="bank-bind-step">
+        <div class="step completed">
+          <div class="step-circle">✓</div>
+          <div class="step-label">选择银行</div>
+        </div>
+        <div class="step completed">
+          <div class="step-circle">✓</div>
+          <div class="step-label">账户信息</div>
+        </div>
+        <div class="step active">
+          <div class="step-circle">3</div>
+          <div class="step-label">完成</div>
+        </div>
+      </div>
+
+      <div class="verification-section">
+        <div class="verification-icon">✓</div>
+        <div class="verification-title">验证中...</div>
+        <div class="verification-message">正在验证您的银行卡信息</div>
+      </div>
+    </div>
+
+    <!-- [STATE: OTP] OTP 验证 -->
+    <div data-state="otp" style="display: none;">
+      <div class="bank-bind-step">
+        <div class="step completed">
+          <div class="step-circle">✓</div>
+          <div class="step-label">选择银行</div>
+        </div>
+        <div class="step active">
+          <div class="step-circle">2</div>
+          <div class="step-label">账户信息</div>
+        </div>
+        <div class="step inactive">
+          <div class="step-circle">3</div>
+          <div class="step-label">完成</div>
+        </div>
+      </div>
+
+      <div class="verification-section">
+        <div style="font-size: var(--text-2xl); margin-bottom: var(--space-4);">📱</div>
+        <div class="verification-title">输入验证码</div>
+        <div class="verification-message">我们已向您的预留手机号发送 6 位验证码</div>
+
+        <div class="form-section" style="margin-top: var(--space-4);">
+          <input type="text" class="form-input" placeholder="000000" style="text-align: center; letter-spacing: 8px; font-size: var(--text-2xl);">
+        </div>
+
+        <div style="font-size: var(--text-sm); color: var(--color-text-secondary); margin-top: var(--space-3);">
+          重新发送验证码 <span class="countdown" style="color: var(--color-primary);">60</span> 秒
+        </div>
+
+        <button class="btn btn-primary" style="width: 100%; margin-top: var(--space-6);" onclick="setState('success')">确认验证</button>
+      </div>
+    </div>
+
+    <!-- [STATE: SUCCESS] 成功 -->
+    <div data-state="success" style="display: none;">
+      <div class="bank-bind-step">
+        <div class="step completed">
+          <div class="step-circle">✓</div>
+          <div class="step-label">选择银行</div>
+        </div>
+        <div class="step completed">
+          <div class="step-circle">✓</div>
+          <div class="step-label">账户信息</div>
+        </div>
+        <div class="step completed">
+          <div class="step-circle">✓</div>
+          <div class="step-label">完成</div>
+        </div>
+      </div>
+
+      <div class="success-section">
+        <div class="success-icon">✓</div>
+        <div class="success-title">银行卡绑定成功</div>
+        <div class="success-message">您的银行卡已成功绑定，72 小时后可用于提现</div>
+
+        <div class="success-detail">
+          <div class="success-detail-row">
+            <span style="color: var(--color-text-secondary);">银行</span>
+            <span style="font-weight: var(--font-weight-semibold);">中国工商银行</span>
+          </div>
+          <div class="success-detail-row">
+            <span style="color: var(--color-text-secondary);">卡号</span>
+            <span style="font-family: var(--font-mono); font-weight: var(--font-weight-semibold);">****2345</span>
+          </div>
+          <div class="success-detail-row">
+            <span style="color: var(--color-text-secondary);">绑定时间</span>
+            <span style="font-weight: var(--font-weight-semibold);">2026-03-31 14:35</span>
+          </div>
+          <div class="success-detail-row">
+            <span style="color: var(--color-text-secondary);">激活时间</span>
+            <span style="font-weight: var(--font-weight-semibold); color: var(--color-primary);">2026-04-03</span>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" style="width: 100%;" onclick="goto('index.html')">返回资金中心</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab-item" onclick="goto('../../03-market/hifi/index.html')"><div class="tab-item-icon">📈</div><span>行情</span></div>
+    <div class="tab-item" onclick="goto('../../04-trading/hifi/order-list.html')"><div class="tab-item-icon">📝</div><span>交易</span></div>
+    <div class="tab-item" onclick="goto('../../06-portfolio/hifi/index.html')"><div class="tab-item-icon">💼</div><span>持仓</span></div>
+    <div class="tab-item"><div class="tab-item-icon">⚙️</div><span>我的</span></div>
+  </div>
+</div>
+
+<div class="dev-toolbar">
+  <div class="dev-toolbar-title">🔧 State Preview</div>
+  <button class="dev-state-btn active" data-state="bank_select" onclick="setState('bank_select')">选银行</button>
+  <button class="dev-state-btn" data-state="account_info" onclick="setState('account_info')">账户信息</button>
+  <button class="dev-state-btn" data-state="verifying" onclick="setState('verifying')">验证中</button>
+  <button class="dev-state-btn" data-state="otp" onclick="setState('otp')">OTP</button>
+  <button class="dev-state-btn" data-state="success" onclick="setState('success')">成功</button>
+</div>
+
+<script src="../../_shared/proto-router.js"></script>
+<script>
+  function setState(state) {
+    document.querySelectorAll('[data-state]').forEach(el => el.style.display = 'none');
+    document.querySelector(`[data-state="${state}"]`).style.display = 'block';
+    document.querySelectorAll('.dev-state-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.state === state);
+    });
+  }
+
+  function selectBank(element, bankCode) {
+    document.querySelectorAll('.bank-item').forEach(item => {
+      item.classList.remove('selected');
+      const check = item.querySelector('.bank-check');
+      if (check) check.remove();
+    });
+    element.classList.add('selected');
+    const checkEl = document.createElement('div');
+    checkEl.className = 'bank-check';
+    checkEl.textContent = '✓';
+    element.appendChild(checkEl);
+  }
+</script>
+
+</body>
+</html>

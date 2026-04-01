@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>01-Auth — 冷启动</title>
+
+  <link rel="stylesheet" href="../../_design-system/tokens.css">
+  <link rel="stylesheet" href="../../_design-system/components.css">
+  <link rel="stylesheet" href="../../_design-system/proto-base.css">
+
+  <style>
+    .splash-screen {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      background: var(--color-bg-default);
+    }
+
+    .splash-logo-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-8) var(--space-4);
+      gap: var(--space-3);
+    }
+
+    .splash-logo {
+      width: 80px;
+      height: 80px;
+      background: var(--color-primary);
+      border-radius: var(--radius-xl);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--text-3xl);
+      color: #fff;
+      margin-bottom: var(--space-2);
+    }
+
+    .splash-app-name {
+      font-size: var(--text-2xl);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+    }
+
+    .splash-tagline {
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+    }
+
+    .splash-actions {
+      padding: var(--space-4);
+      padding-bottom: calc(var(--space-4) + 34px);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+    }
+
+    .splash-guest-link {
+      text-align: center;
+      font-size: var(--text-sm);
+      color: var(--color-primary);
+      cursor: pointer;
+      padding: var(--space-2) 0;
+    }
+
+    /* ── Session Expired Bottom Sheet ── */
+    .sheet-overlay {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 100;
+      border-radius: var(--radius-phone);
+    }
+
+    .sheet-overlay.visible {
+      display: flex;
+      align-items: flex-end;
+    }
+
+    .sheet {
+      width: 100%;
+      background: var(--color-bg-surface);
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+      padding: var(--space-4);
+      padding-bottom: calc(var(--space-4) + 34px);
+    }
+
+    .sheet-handle {
+      width: 40px;
+      height: 4px;
+      background: var(--color-divider);
+      border-radius: var(--radius-full);
+      margin: 0 auto var(--space-4);
+    }
+
+    .sheet-title {
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-2);
+    }
+
+    .sheet-desc {
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+      margin-bottom: var(--space-4);
+      line-height: 1.5;
+    }
+
+    .sheet-actions {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+  </style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>📱 01-Auth — 冷启动</strong><br>
+  🔗 <a href="phone.html">手机号输入</a> | <a href="biometric-login.html">生物识别登录</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar">
+    <div class="status-bar-left"><span class="status-bar-time">9:41</span></div>
+    <div class="status-bar-right"><span>●●●</span><span>WiFi</span><span>100%</span></div>
+  </div>
+
+  <div class="screen" style="padding: 0; position: relative;">
+
+    <!-- [STATE: splash] 冷启动主页 -->
+    <div data-state="splash" class="splash-screen">
+      <div class="splash-logo-area">
+        <div class="splash-logo">📈</div>
+        <div class="splash-app-name">MetaStock</div>
+        <div class="splash-tagline">美港股跨境交易平台</div>
+      </div>
+
+      <div class="splash-actions">
+        <button class="btn btn-primary" onclick="goto('phone.html')">手机号登录 / 注册</button>
+        <button class="btn btn-ghost" onclick="goto('biometric-login.html')">Face ID 快捷登录</button>
+        <div class="splash-guest-link" onclick="goto('../../03-market/hifi/index.html')">先逛逛 →</div>
+        <div style="font-size: var(--text-xs); color: var(--color-text-tertiary); text-align: center; margin-top: var(--space-1);">
+          访客行情为延迟 15 分钟数据
+        </div>
+      </div>
+    </div>
+
+    <!-- Session 过期 Bottom Sheet（覆盖在 splash 之上）-->
+    <div class="sheet-overlay" id="expired-sheet">
+      <div class="sheet">
+        <div class="sheet-handle"></div>
+        <div class="sheet-title">登录已过期</div>
+        <div class="sheet-desc">您的登录状态已过期，请重新登录以继续使用</div>
+        <div class="sheet-actions">
+          <button class="btn btn-primary" onclick="hideExpiredSheet()">重新登录</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="tab-bar" style="display: none;"></div>
+</div>
+
+<div class="dev-toolbar">
+  <div class="dev-toolbar-title">🔧 State Preview</div>
+  <button class="dev-state-btn active" data-state="splash" onclick="setState('splash')">冷启动</button>
+  <button class="dev-state-btn" data-state="expired" onclick="setState('expired')">登录已过期</button>
+</div>
+
+<script src="../../_shared/proto-router.js"></script>
+<script>
+  function setState(state) {
+    document.querySelectorAll('.dev-state-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.state === state);
+    });
+    if (state === 'expired') {
+      document.getElementById('expired-sheet').classList.add('visible');
+    } else {
+      document.getElementById('expired-sheet').classList.remove('visible');
+    }
+  }
+
+  function hideExpiredSheet() {
+    document.getElementById('expired-sheet').classList.remove('visible');
+    document.querySelectorAll('.dev-state-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.state === 'splash');
+    });
+  }
+</script>
+
+</body>
+</html>

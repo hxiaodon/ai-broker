@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>01-Auth — 生物识别设置</title>
+
+  <link rel="stylesheet" href="../../_design-system/tokens.css">
+  <link rel="stylesheet" href="../../_design-system/components.css">
+  <link rel="stylesheet" href="../../_design-system/proto-base.css">
+
+  <style>
+    .setup-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 100%;
+      background: var(--color-bg-default);
+      padding: var(--space-8) var(--space-4) calc(var(--space-4) + 34px);
+      text-align: center;
+    }
+
+    .bio-icon-wrap {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      border: 3px solid var(--color-primary);
+      background: rgba(13, 101, 242, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 48px;
+      margin-bottom: var(--space-6);
+      flex-shrink: 0;
+    }
+
+    .setup-title {
+      font-size: var(--text-xl);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-2);
+    }
+
+    .setup-subtitle {
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+      margin-bottom: var(--space-6);
+      line-height: 1.5;
+    }
+
+    .setup-actions {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      margin-top: auto;
+    }
+
+    .skip-link {
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      padding: var(--space-2) 0;
+    }
+
+    .skip-link:hover {
+      color: var(--color-text-primary);
+    }
+  </style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>📱 01-Auth — 生物识别设置</strong><br>
+  🔗 <a href="otp.html">← OTP 验证</a> | <a href="devices.html">设备管理 →</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar">
+    <div class="status-bar-left"><span class="status-bar-time">9:41</span></div>
+    <div class="status-bar-right"><span>●●●</span><span>WiFi</span><span>100%</span></div>
+  </div>
+
+  <div class="nav-bar">
+    <div class="nav-bar-left"></div>
+    <div class="nav-bar-center">
+      <div class="nav-bar-title">设置 Face ID</div>
+    </div>
+    <div class="nav-bar-right">
+      <span style="font-size: var(--text-sm); color: var(--color-primary); cursor: pointer;" onclick="goto('../../03-market/hifi/index.html')">跳过</span>
+    </div>
+  </div>
+
+  <div class="screen" style="padding: 0; background: var(--color-bg-default);">
+    <div class="setup-screen">
+      <div class="bio-icon-wrap">👁️</div>
+
+      <div class="setup-title">开启 Face ID 快捷登录</div>
+      <div class="setup-subtitle">
+        下次打开 App 无需输入验证码，<br>一眼即可完成登录
+      </div>
+
+      <div class="alert alert-info" style="width: 100%; text-align: left; margin-bottom: var(--space-4);">
+        <div class="alert-icon">ℹ️</div>
+        <div class="alert-content">
+          <div class="alert-title">关于 Face ID 安全</div>
+          <div class="alert-message">生物识别仅存储于本设备，MetaStock 无法读取您的面容数据</div>
+        </div>
+      </div>
+
+      <div class="setup-actions">
+        <button class="btn btn-primary" onclick="enableFaceID()">开启 Face ID</button>
+        <div class="skip-link" onclick="goto('../../03-market/hifi/index.html')">暂不开启</div>
+        <div style="font-size: var(--text-xs); color: var(--color-text-tertiary);">
+          最多提醒 3 次，之后可在「设置 › 安全」中手动开启
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-bar" style="display: none;"></div>
+</div>
+
+<script src="../../_shared/proto-router.js"></script>
+<script>
+  function enableFaceID() {
+    showToast('Face ID 已开启');
+    setTimeout(() => goto('../../03-market/hifi/index.html'), 1200);
+  }
+</script>
+
+</body>
+</html>

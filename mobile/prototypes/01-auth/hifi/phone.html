@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>01-Auth — 手机号输入</title>
+
+  <link rel="stylesheet" href="../../_design-system/tokens.css">
+  <link rel="stylesheet" href="../../_design-system/components.css">
+  <link rel="stylesheet" href="../../_design-system/proto-base.css">
+
+  <style>
+    .auth-body {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      background: var(--color-bg-default);
+    }
+
+    .auth-content {
+      flex: 1;
+      padding: var(--space-6) var(--space-4) var(--space-4);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .auth-page-title {
+      font-size: var(--text-2xl);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-1);
+    }
+
+    .auth-page-subtitle {
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+      margin-bottom: var(--space-6);
+    }
+
+    .phone-row {
+      display: flex;
+      gap: var(--space-2);
+      margin-bottom: var(--space-2);
+    }
+
+    .region-btn {
+      display: flex;
+      align-items: center;
+      gap: var(--space-1);
+      padding: var(--space-3) var(--space-3);
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-divider);
+      border-radius: var(--radius-md);
+      font-size: var(--text-base);
+      color: var(--color-text-primary);
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .region-btn:active {
+      background: var(--color-bg-elevated);
+    }
+
+    .form-input {
+      flex: 1;
+      padding: var(--space-3);
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-divider);
+      border-radius: var(--radius-md);
+      font-size: var(--text-base);
+      color: var(--color-text-primary);
+      outline: none;
+      transition: all var(--transition-fast);
+    }
+
+    .form-input:focus {
+      border-color: var(--color-primary);
+    }
+
+    .form-input::placeholder {
+      color: var(--color-text-tertiary);
+    }
+
+    .form-hint {
+      font-size: var(--text-xs);
+      color: var(--color-text-tertiary);
+      margin-bottom: var(--space-6);
+    }
+
+    .auth-footer {
+      margin-top: auto;
+      padding: var(--space-4);
+      padding-bottom: calc(var(--space-4) + 34px);
+    }
+
+    .auth-footer-note {
+      font-size: var(--text-xs);
+      color: var(--color-text-tertiary);
+      text-align: center;
+      margin-top: var(--space-3);
+    }
+
+    .auth-footer-note a {
+      color: var(--color-primary);
+      text-decoration: none;
+    }
+
+    /* Sending state */
+    .sending-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      gap: var(--space-4);
+    }
+
+    .sending-spinner {
+      font-size: var(--text-4xl);
+      animation: spin 1.5s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+
+    .sending-text {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+    }
+
+    .sending-sub {
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+    }
+  </style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>📱 01-Auth — 手机号输入</strong><br>
+  🔗 <a href="index.html">← 冷启动</a> | <a href="otp.html">OTP 验证 →</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar">
+    <div class="status-bar-left"><span class="status-bar-time">9:41</span></div>
+    <div class="status-bar-right"><span>●●●</span><span>WiFi</span><span>100%</span></div>
+  </div>
+
+  <div class="nav-bar">
+    <div class="nav-bar-left">
+      <div class="nav-bar-back" onclick="goto('index.html')">‹</div>
+    </div>
+    <div class="nav-bar-center">
+      <div class="nav-bar-title">登录 / 注册</div>
+    </div>
+    <div class="nav-bar-right"></div>
+  </div>
+
+  <div class="screen" style="padding: 0; background: var(--color-bg-default);">
+
+    <!-- [STATE: input] 输入手机号 -->
+    <div data-state="input" class="auth-body">
+      <div class="auth-content">
+        <div class="auth-page-title">输入手机号</div>
+        <div class="auth-page-subtitle">新用户将自动创建账号</div>
+
+        <div class="phone-row">
+          <button class="region-btn">🌐 +86 ▾</button>
+          <input type="tel" class="form-input" placeholder="请输入手机号" value="138****8888">
+        </div>
+        <div class="form-hint">支持 +86（中国大陆，11 位）· +852（香港，8 位）</div>
+      </div>
+
+      <div class="auth-footer">
+        <button class="btn btn-primary" style="width: 100%;" onclick="setState('sending')">获取验证码</button>
+        <div class="auth-footer-note">
+          继续即代表同意<a href="#">《用户协议》</a>和<a href="#">《隐私政策》</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- [STATE: sending] 发送中 -->
+    <div data-state="sending" class="auth-body" style="display: none;">
+      <div class="sending-wrap">
+        <div class="sending-spinner">⏳</div>
+        <div>
+          <div class="sending-text">发送中...</div>
+          <div class="sending-sub" style="text-align:center; margin-top: var(--space-1);">正在发送验证码</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="tab-bar" style="display: none;"></div>
+</div>
+
+<div class="dev-toolbar">
+  <div class="dev-toolbar-title">🔧 State Preview</div>
+  <button class="dev-state-btn active" data-state="input" onclick="setState('input')">输入</button>
+  <button class="dev-state-btn" data-state="sending" onclick="setState('sending')">发送中</button>
+</div>
+
+<script src="../../_shared/proto-router.js"></script>
+<script>
+  function setState(state) {
+    document.querySelectorAll('[data-state]').forEach(el => el.style.display = 'none');
+    document.querySelector(`[data-state="${state}"]`).style.display = 'flex';
+    document.querySelectorAll('.dev-state-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.state === state);
+    });
+
+    if (state === 'sending') {
+      setTimeout(() => goto('otp.html'), 800);
+    }
+  }
+</script>
+
+</body>
+</html>

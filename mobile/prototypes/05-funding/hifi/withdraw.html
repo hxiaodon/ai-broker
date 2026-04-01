@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>05-Funding — 出金</title>
+
+  <link rel="stylesheet" href="../../_design-system/tokens.css">
+  <link rel="stylesheet" href="../../_design-system/components.css">
+  <link rel="stylesheet" href="../../_design-system/proto-base.css">
+
+  <style>
+    .withdraw-step-indicator {
+      display: flex;
+      justify-content: space-between;
+      gap: var(--space-2);
+      margin-bottom: var(--space-6);
+    }
+
+    .step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex: 1;
+    }
+
+    .step-circle {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: var(--font-weight-bold);
+      margin-bottom: var(--space-2);
+      transition: all var(--transition-fast);
+    }
+
+    .step.active .step-circle {
+      background: var(--color-primary);
+      color: #fff;
+    }
+
+    .step.completed .step-circle {
+      background: var(--color-gain);
+      color: #fff;
+    }
+
+    .step.inactive .step-circle {
+      background: var(--color-bg-elevated);
+      color: var(--color-text-tertiary);
+    }
+
+    .step-label {
+      font-size: var(--text-xs);
+      text-align: center;
+      color: var(--color-text-secondary);
+    }
+
+    .step.active .step-label {
+      color: var(--color-text-primary);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .form-section {
+      background: var(--color-bg-surface);
+      border-radius: var(--radius-lg);
+      padding: var(--space-4);
+      margin-bottom: var(--space-4);
+    }
+
+    .form-label {
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-2);
+    }
+
+    .balance-info {
+      background: var(--color-bg-elevated);
+      padding: var(--space-3);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-3);
+    }
+
+    .balance-label {
+      font-size: var(--text-xs);
+      color: var(--color-text-secondary);
+      margin-bottom: var(--space-1);
+    }
+
+    .balance-value {
+      font-family: var(--font-mono);
+      font-size: var(--text-2xl);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+    }
+
+    .amount-input-group {
+      display: flex;
+      gap: var(--space-2);
+      margin-bottom: var(--space-3);
+    }
+
+    .amount-input {
+      flex: 1;
+      font-size: var(--text-3xl);
+      font-family: var(--font-mono);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+      padding: var(--space-2);
+      border: 2px solid var(--color-divider);
+      border-radius: var(--radius-md);
+      text-align: right;
+      outline: none;
+    }
+
+    .amount-currency {
+      display: flex;
+      align-items: center;
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+    }
+
+    .bank-selector {
+      padding: var(--space-3);
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-divider);
+      border-radius: var(--radius-md);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      margin-bottom: var(--space-3);
+    }
+
+    .bank-info {
+      flex: 1;
+    }
+
+    .bank-name {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+      margin-bottom: 2px;
+    }
+
+    .bank-account {
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+    }
+
+    .bank-selector-arrow {
+      color: var(--color-text-tertiary);
+      font-size: var(--text-lg);
+    }
+
+    .amount-suggestions {
+      display: flex;
+      gap: var(--space-2);
+      margin-bottom: var(--space-3);
+    }
+
+    .amount-btn {
+      flex: 1;
+      padding: var(--space-2) var(--space-3);
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-divider);
+      border-radius: var(--radius-md);
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .amount-btn:active {
+      background: var(--color-primary);
+      color: #fff;
+      border-color: var(--color-primary);
+    }
+
+    .info-card {
+      background: rgba(255, 71, 71, 0.1);
+      border-left: 3px solid var(--color-loss);
+      padding: var(--space-3);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-3);
+    }
+
+    .info-card-title {
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-loss);
+      margin-bottom: var(--space-1);
+    }
+
+    .info-card-message {
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+      line-height: 1.5;
+    }
+
+    .verification-card {
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-divider);
+      border-radius: var(--radius-lg);
+      padding: var(--space-4);
+      margin-bottom: var(--space-4);
+    }
+
+    .verification-icon {
+      width: 60px;
+      height: 60px;
+      margin: 0 auto var(--space-3);
+      background: var(--color-bg-elevated);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--text-4xl);
+    }
+
+    .verification-text {
+      text-align: center;
+      margin-bottom: var(--space-3);
+    }
+
+    .verification-title {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-1);
+    }
+
+    .verification-message {
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+    }
+  </style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>📱 05-Funding — 出金</strong><br>
+  🔗 <a href="index.html">← 返回</a> | <a href="deposit.html">入金</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar">
+    <div class="status-bar-left"><span class="status-bar-time">9:41</span></div>
+    <div class="status-bar-right"><span>●●●</span><span>WiFi</span><span>100%</span></div>
+  </div>
+
+  <div class="nav-bar">
+    <div class="nav-bar-left">
+      <div class="nav-bar-back" onclick="history.back()">‹</div>
+    </div>
+    <div class="nav-bar-center">
+      <div class="nav-bar-title">出金</div>
+    </div>
+    <div class="nav-bar-right"></div>
+  </div>
+
+  <div class="screen">
+
+    <!-- [STATE: ENTRY] 输入阶段 -->
+    <div data-state="entry">
+      <!-- 步骤指示器 -->
+      <div class="withdraw-step-indicator">
+        <div class="step active">
+          <div class="step-circle">1</div>
+          <div class="step-label">金额</div>
+        </div>
+        <div class="step inactive">
+          <div class="step-circle">2</div>
+          <div class="step-label">验证</div>
+        </div>
+        <div class="step inactive">
+          <div class="step-circle">3</div>
+          <div class="step-label">完成</div>
+        </div>
+      </div>
+
+      <!-- 可用余额 -->
+      <div class="form-section">
+        <div class="balance-info">
+          <div class="balance-label">可用余额</div>
+          <div class="balance-value">$12,450.00</div>
+        </div>
+      </div>
+
+      <!-- 提醒 -->
+      <div class="info-card">
+        <div class="info-card-title">⏱️ 出金到账时间</div>
+        <div class="info-card-message">银行工作日 1-3 个工作日到账。如银行卡绑定未满 72 小时，需等待激活期结束</div>
+      </div>
+
+      <!-- 金额输入 -->
+      <div class="form-section">
+        <div class="form-label">出金金额</div>
+        <div class="input-with-prefix">
+          <span class="input-prefix">$</span>
+          <input type="number" class="form-input" placeholder="0.00" value="5000.00" step="0.01">
+        </div>
+
+        <div class="form-label" style="margin-top: var(--space-4);">快速选择</div>
+        <div class="amount-suggestions">
+          <button class="amount-btn" onclick="setAmount(2000)">$2,000</button>
+          <button class="amount-btn" onclick="setAmount(5000)">$5,000</button>
+          <button class="amount-btn" onclick="setAmount(10000)">$10,000</button>
+        </div>
+      </div>
+
+      <!-- 银行卡选择 -->
+      <div class="form-section">
+        <div class="form-label">收款银行卡</div>
+        <div class="bank-selector">
+          <div class="bank-info">
+            <div class="bank-name">招商银行</div>
+            <div class="bank-account">****1234</div>
+          </div>
+          <div class="bank-selector-arrow">›</div>
+        </div>
+      </div>
+
+      <!-- 提交按钮 -->
+      <button class="btn btn-primary" style="width: 100%; margin-top: var(--space-4);" onclick="setState('verify')">下一步</button>
+
+      <div class="proto-note">
+        💡 <strong>设计说明</strong><br>
+        • 出金金额必须 ≥ $100<br>
+        • 未成交订单的冻结金额无法出金<br>
+        • 需要 AML 合规审查，可能延迟 24 小时<br>
+        • CTR 报告：出金 > $10,000 需申报
+      </div>
+    </div>
+
+    <!-- [STATE: VERIFY] 验证阶段 -->
+    <div data-state="verify" style="display: none;">
+      <!-- 步骤指示器 -->
+      <div class="withdraw-step-indicator">
+        <div class="step completed">
+          <div class="step-circle">✓</div>
+          <div class="step-label">金额</div>
+        </div>
+        <div class="step active">
+          <div class="step-circle">2</div>
+          <div class="step-label">验证</div>
+        </div>
+        <div class="step inactive">
+          <div class="step-circle">3</div>
+          <div class="step-label">完成</div>
+        </div>
+      </div>
+
+      <!-- 交易摘要 -->
+      <div class="form-section">
+        <div style="text-align: center; margin-bottom: var(--space-4);">
+          <div style="font-size: var(--text-sm); color: var(--color-text-secondary); margin-bottom: var(--space-1);">出金金额</div>
+          <div style="font-family: var(--font-mono); font-size: var(--text-4xl); font-weight: var(--font-weight-bold); color: var(--color-text-primary);">$5,000.00</div>
+        </div>
+
+        <div style="border-top: 1px solid var(--color-divider); padding-top: var(--space-3);">
+          <div style="display: flex; justify-content: space-between; padding: var(--space-2) 0;">
+            <span style="color: var(--color-text-secondary);">收款银行</span>
+            <span style="font-weight: var(--font-weight-semibold);">招商银行 ****1234</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding: var(--space-2) 0;">
+            <span style="color: var(--color-text-secondary);">预计到账</span>
+            <span style="font-weight: var(--font-weight-semibold);">1-3 个工作日</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 生物识别验证 -->
+      <div class="verification-card">
+        <div class="verification-icon">👆</div>
+        <div class="verification-text">
+          <div class="verification-title">请进行生物识别验证</div>
+          <div class="verification-message">使用 Face ID 或 Touch ID 确认出金</div>
+        </div>
+        <button class="btn btn-primary" style="width: 100%; margin-bottom: var(--space-2);" onclick="setState('biometric')">开始验证</button>
+        <button class="btn btn-ghost" style="width: 100%;" onclick="setState('entry')">返回修改</button>
+      </div>
+    </div>
+
+    <!-- [STATE: BIOMETRIC] 生物识别中 -->
+    <div data-state="biometric" style="display: none;">
+      <!-- 步骤指示器 -->
+      <div class="withdraw-step-indicator">
+        <div class="step completed">
+          <div class="step-circle">✓</div>
+          <div class="step-label">金额</div>
+        </div>
+        <div class="step active">
+          <div class="step-circle">2</div>
+          <div class="step-label">验证</div>
+        </div>
+        <div class="step inactive">
+          <div class="step-circle">3</div>
+          <div class="step-label">完成</div>
+        </div>
+      </div>
+
+      <div style="padding: var(--space-8) var(--space-4); text-align: center;">
+        <div style="font-size: var(--text-7xl); animation: pulse 1.5s ease-in-out infinite; margin-bottom: var(--space-4);">👆</div>
+        <div style="font-size: var(--text-lg); font-weight: var(--font-weight-bold); margin-bottom: var(--space-2);">请按住指纹传感器</div>
+        <div style="color: var(--color-text-secondary);">或抬起设备进行面部识别</div>
+      </div>
+    </div>
+
+    <!-- [STATE: SUCCESS] 成功 -->
+    <div data-state="success" style="display: none;">
+      <!-- 步骤指示器 -->
+      <div class="withdraw-step-indicator">
+        <div class="step completed">
+          <div class="step-circle">✓</div>
+          <div class="step-label">金额</div>
+        </div>
+        <div class="step completed">
+          <div class="step-circle">✓</div>
+          <div class="step-label">验证</div>
+        </div>
+        <div class="step completed">
+          <div class="step-circle">✓</div>
+          <div class="step-label">完成</div>
+        </div>
+      </div>
+
+      <div style="padding: var(--space-8) var(--space-4); text-align: center;">
+        <div style="font-size: var(--text-6xl); margin-bottom: var(--space-4);">✓</div>
+        <div style="font-size: var(--text-lg); font-weight: var(--font-weight-bold); margin-bottom: var(--space-2);">出金申请已提交</div>
+        <div style="color: var(--color-text-secondary); margin-bottom: var(--space-6);">1-3 个工作日内到账</div>
+
+        <div class="form-section" style="text-align: left;">
+          <div style="display: flex; justify-content: space-between; padding: var(--space-2) 0;">
+            <span style="color: var(--color-text-secondary);">出金金额</span>
+            <span style="font-family: var(--font-mono); font-weight: var(--font-weight-semibold);">$5,000.00</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding: var(--space-2) 0; border-top: 1px solid var(--color-divider); margin-top: var(--space-2); padding-top: var(--space-2);">
+            <span style="color: var(--color-text-secondary);">申请时间</span>
+            <span style="font-weight: var(--font-weight-semibold);">2026-03-31 14:35</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding: var(--space-2) 0;">
+            <span style="color: var(--color-text-secondary);">预计到账</span>
+            <span style="font-weight: var(--font-weight-semibold); color: var(--color-primary);">2026-04-02</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding: var(--space-2) 0;">
+            <span style="color: var(--color-text-secondary);">订单号</span>
+            <span style="font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-secondary);">WTH-20260331-005678</span>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" style="width: 100%; margin-top: var(--space-6);" onclick="goto('index.html')">返回资金中心</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab-item" onclick="goto('../../03-market/hifi/index.html')"><div class="tab-item-icon">📈</div><span>行情</span></div>
+    <div class="tab-item" onclick="goto('../../04-trading/hifi/order-list.html')"><div class="tab-item-icon">📝</div><span>交易</span></div>
+    <div class="tab-item" onclick="goto('../../06-portfolio/hifi/index.html')"><div class="tab-item-icon">💼</div><span>持仓</span></div>
+    <div class="tab-item"><div class="tab-item-icon">⚙️</div><span>我的</span></div>
+  </div>
+</div>
+
+<div class="dev-toolbar">
+  <div class="dev-toolbar-title">🔧 State Preview</div>
+  <button class="dev-state-btn active" data-state="entry" onclick="setState('entry')">输入</button>
+  <button class="dev-state-btn" data-state="verify" onclick="setState('verify')">验证</button>
+  <button class="dev-state-btn" data-state="biometric" onclick="setState('biometric')">生物识别</button>
+  <button class="dev-state-btn" data-state="success" onclick="setState('success')">成功</button>
+</div>
+
+<script src="../../_shared/proto-router.js"></script>
+<script>
+  function setState(state) {
+    document.querySelectorAll('[data-state]').forEach(el => el.style.display = 'none');
+    document.querySelector(`[data-state="${state}"]`).style.display = 'block';
+    document.querySelectorAll('.dev-state-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.state === state);
+    });
+  }
+
+  function setAmount(amount) {
+    document.querySelector('.amount-input').value = amount.toLocaleString();
+  }
+</script>
+
+</body>
+</html>

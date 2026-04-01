@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>05-Funding — 资金中心</title>
+
+  <link rel="stylesheet" href="../../_design-system/tokens.css">
+  <link rel="stylesheet" href="../../_design-system/components.css">
+  <link rel="stylesheet" href="../../_design-system/proto-base.css">
+
+  <style>
+    .funding-card {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+      color: #fff;
+      border-radius: var(--radius-lg);
+      padding: var(--space-5);
+      margin-bottom: var(--space-4);
+    }
+
+    .funding-label {
+      font-size: var(--text-xs);
+      opacity: 0.9;
+      margin-bottom: var(--space-2);
+    }
+
+    .funding-main {
+      font-family: var(--font-mono);
+      font-size: var(--text-3xl);
+      font-weight: var(--font-weight-bold);
+      margin-bottom: var(--space-3);
+    }
+
+    .funding-breakdown {
+      display: flex;
+      gap: var(--space-4);
+    }
+
+    .funding-item {
+      flex: 1;
+    }
+
+    .funding-item-label {
+      font-size: var(--text-xs);
+      opacity: 0.9;
+      margin-bottom: var(--space-1);
+    }
+
+    .funding-item-value {
+      font-family: var(--font-mono);
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-bold);
+    }
+
+    .section-title {
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-3);
+      margin-top: var(--space-4);
+    }
+
+    .section-title:first-child {
+      margin-top: 0;
+    }
+
+    .action-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-2);
+      margin-bottom: var(--space-4);
+    }
+
+    .info-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-3);
+      background: var(--color-bg-surface);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-2);
+      cursor: pointer;
+    }
+
+    .info-row-icon {
+      width: 44px;
+      height: 44px;
+      background: var(--color-bg-elevated);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-primary);
+      font-size: var(--text-lg);
+      flex-shrink: 0;
+    }
+
+    .info-row-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .info-row-title {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+      margin-bottom: 2px;
+    }
+
+    .info-row-detail {
+      font-size: var(--text-xs);
+      color: var(--color-text-secondary);
+    }
+
+    .info-row-arrow {
+      color: var(--color-text-tertiary);
+      font-size: var(--text-lg);
+    }
+
+    .bank-card {
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-divider);
+      border-radius: var(--radius-lg);
+      padding: var(--space-4);
+      margin-bottom: var(--space-2);
+    }
+
+    .bank-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--space-3);
+    }
+
+    .bank-card-name {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+    }
+
+    .bank-card-primary {
+      font-size: var(--text-xs);
+      color: var(--color-primary);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .bank-card-account {
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+      margin-bottom: var(--space-1);
+    }
+
+    .bank-card-status {
+      font-size: var(--text-xs);
+      color: var(--color-gain);
+    }
+  </style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>📱 05-Funding — 资金中心</strong><br>
+  🔗 <a href="deposit.html">入金</a> | <a href="withdraw.html">出金</a> | <a href="bank-bind.html">银行卡</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar">
+    <div class="status-bar-left"><span class="status-bar-time">9:41</span></div>
+    <div class="status-bar-right"><span>●●●</span><span>WiFi</span><span>100%</span></div>
+  </div>
+
+  <div class="nav-bar">
+    <div class="nav-bar-left"></div>
+    <div class="nav-bar-center">
+      <div class="nav-bar-title">资金</div>
+    </div>
+    <div class="nav-bar-right"></div>
+  </div>
+
+  <div class="screen">
+
+    <!-- [STATE: NORMAL] 有资金 -->
+    <div data-state="normal">
+      <!-- 资金总览 -->
+      <!-- [DESIGN] 显示账户现金余额、冻结金额、可用余额
+                   所有数字等宽显示，精确到分
+                   Flutter: 实时计算，涉及 Decimal 类 -->
+      <div class="funding-card">
+        <div class="funding-label">账户余额</div>
+        <div class="funding-main">$12,450.00</div>
+        <div class="funding-breakdown">
+          <div class="funding-item">
+            <div class="funding-item-label">可用</div>
+            <div class="funding-item-value">$12,450.00</div>
+          </div>
+          <div class="funding-item">
+            <div class="funding-item-label">冻结</div>
+            <div class="funding-item-value">$0.00</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- HKD 占位卡片 -->
+      <div class="bank-card" style="opacity: 0.55; display: flex; align-items: center; justify-content: space-between;">
+        <div>
+          <div class="bank-card-name" style="color: var(--color-text-secondary);">港元账户 HKD</div>
+          <div style="font-family: var(--font-mono); font-size: var(--text-2xl); font-weight: var(--font-weight-bold); color: var(--color-text-secondary); margin-top: var(--space-2);">HK$—</div>
+          <div style="font-size: var(--text-xs); color: var(--color-text-tertiary); margin-top: var(--space-2);">港股交易功能将在下一版本推出</div>
+        </div>
+        <div style="background: rgba(13, 197, 130, 0.15); color: var(--color-gain); font-size: var(--text-xs); font-weight: var(--font-weight-semibold); padding: var(--space-1) var(--space-2); border-radius: var(--radius-full); white-space: nowrap;">即将开放</div>
+      </div>
+
+      <!-- 快速操作 -->
+      <div class="action-buttons">
+        <button class="btn btn-primary" onclick="goto('deposit.html')">入金</button>
+        <button class="btn btn-secondary" onclick="goto('withdraw.html')">出金</button>
+      </div>
+
+      <!-- 银行卡管理 -->
+      <div class="section-title">我的银行卡</div>
+      <div class="bank-card">
+        <div class="bank-card-header">
+          <div>
+            <div class="bank-card-name">招商银行</div>
+            <div class="bank-card-account">****1234</div>
+          </div>
+          <div class="bank-card-primary">默认</div>
+        </div>
+        <div class="bank-card-status">✓ 已验证 • 绑定 3 天</div>
+      </div>
+
+      <div class="bank-card">
+        <div class="bank-card-header">
+          <div>
+            <div class="bank-card-name">工商银行</div>
+            <div class="bank-card-account">****5678</div>
+          </div>
+        </div>
+        <div class="bank-card-status">✓ 已验证 • 绑定 1 个月</div>
+      </div>
+
+      <button class="btn btn-ghost" style="width: 100%; margin-top: var(--space-3);" onclick="goto('bank-bind.html')">+ 添加银行卡</button>
+
+      <!-- 资金流水 -->
+      <div class="section-title">最近交易</div>
+      <div class="info-row" style="cursor: default;">
+        <div class="info-row-icon">⬆️</div>
+        <div class="info-row-content">
+          <div class="info-row-title">入金</div>
+          <div class="info-row-detail">2026-03-30 14:32 • CNY 10,000</div>
+        </div>
+        <div style="text-align: right; font-family: var(--font-mono); font-weight: var(--font-weight-semibold);">+¥10,000</div>
+      </div>
+
+      <div class="info-row" style="cursor: default;">
+        <div class="info-row-icon">⬇️</div>
+        <div class="info-row-content">
+          <div class="info-row-title">出金</div>
+          <div class="info-row-detail">2026-03-28 10:15 • 已到账</div>
+        </div>
+        <div style="text-align: right; font-family: var(--font-mono); font-weight: var(--font-weight-semibold); color: var(--color-text-secondary);">-$5,000.00</div>
+      </div>
+
+      <div class="proto-note">
+        💡 <strong>设计说明</strong><br>
+        • 可用余额 = 总余额 - 冻结金额（margin requirement）<br>
+        • 冻结金额包括：未成交的市价单、margin 保证金<br>
+        • 银行卡需要在 72 小时后才能用于出金（cooling off period）<br>
+        • 所有金额交易都需要 AML 审批和反洗钱检查<br>
+        • 出金限额基于 KYC 等级
+      </div>
+    </div>
+
+    <!-- [STATE: LOADING] 加载中 -->
+    <div data-state="loading" style="display: none;">
+      <div class="skeleton" style="height: 140px; border-radius: var(--radius-lg); margin-bottom: var(--space-4);"></div>
+      <div class="skeleton" style="height: 100px; border-radius: var(--radius-md); margin-bottom: var(--space-4);"></div>
+      <div class="skeleton" style="height: 80px; border-radius: var(--radius-md); margin-bottom: var(--space-2);"></div>
+      <div class="skeleton" style="height: 80px; border-radius: var(--radius-md);"></div>
+    </div>
+
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab-item" onclick="goto('../../03-market/hifi/index.html')"><div class="tab-item-icon">📈</div><span>行情</span></div>
+    <div class="tab-item" onclick="goto('../../04-trading/hifi/order-list.html')"><div class="tab-item-icon">📝</div><span>交易</span></div>
+    <div class="tab-item" onclick="goto('../../06-portfolio/hifi/index.html')"><div class="tab-item-icon">💼</div><span>持仓</span></div>
+    <div class="tab-item"><div class="tab-item-icon">⚙️</div><span>我的</span></div>
+  </div>
+</div>
+
+<div class="dev-toolbar">
+  <div class="dev-toolbar-title">🔧 State Preview</div>
+  <button class="dev-state-btn active" data-state="normal" onclick="setState('normal')">正常</button>
+  <button class="dev-state-btn" data-state="loading" onclick="setState('loading')">加载</button>
+</div>
+
+<script src="../../_shared/proto-router.js"></script>
+<script>
+  function setState(state) {
+    document.querySelectorAll('[data-state]').forEach(el => el.style.display = 'none');
+    document.querySelector(`[data-state="${state}"]`).style.display = 'block';
+    document.querySelectorAll('.dev-state-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.state === state);
+    });
+  }
+</script>
+
+</body>
+</html>

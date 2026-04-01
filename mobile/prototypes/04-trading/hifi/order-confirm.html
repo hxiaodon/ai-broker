@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>04-Trading — 订单确认</title>
+
+  <link rel="stylesheet" href="../../_design-system/tokens.css">
+  <link rel="stylesheet" href="../../_design-system/components.css">
+  <link rel="stylesheet" href="../../_design-system/proto-base.css">
+
+  <style>
+    .order-summary {
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-divider);
+      border-radius: var(--radius-lg);
+      padding: var(--space-4);
+      margin-bottom: var(--space-4);
+    }
+
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      padding: var(--space-2) 0;
+      border-bottom: 1px solid var(--color-divider);
+    }
+
+    .summary-row:last-child {
+      border-bottom: none;
+    }
+
+    .summary-label {
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+    }
+
+    .summary-value {
+      font-family: var(--font-mono);
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+      text-align: right;
+    }
+
+    .summary-total {
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+      padding-top: var(--space-3);
+    }
+
+    .biometric-verify {
+      text-align: center;
+      padding: var(--space-6) var(--space-4);
+    }
+
+    .biometric-icon {
+      font-size: 64px;
+      margin-bottom: var(--space-4);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(1.05); }
+    }
+
+    .biometric-text {
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-2);
+    }
+
+    .biometric-hint {
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+    }
+
+    .success-icon {
+      width: 64px;
+      height: 64px;
+      background: var(--color-gain-bg);
+      border: 2px solid var(--color-gain);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 32px;
+      margin: 0 auto var(--space-4);
+    }
+
+    .success-message {
+      text-align: center;
+      padding: var(--space-8) var(--space-4);
+    }
+
+    .success-title {
+      font-size: var(--text-xl);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-gain);
+      margin-bottom: var(--space-2);
+    }
+
+    .success-subtitle {
+      font-size: var(--text-base);
+      color: var(--color-text-secondary);
+      margin-bottom: var(--space-4);
+    }
+
+    .success-detail {
+      background: var(--color-bg-surface);
+      border-radius: var(--radius-md);
+      padding: var(--space-3);
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+      margin-bottom: var(--space-4);
+    }
+
+    .dev-state-btn.active {
+      background: var(--color-primary);
+      color: #fff;
+      border-color: var(--color-primary);
+    }
+  </style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>📱 04-Trading — 订单确认</strong><br>
+  🔗 <a href="order-entry.html">← 下单面板</a> | <a href="order-list.html">订单列表</a> | <a href="../../_design-system/showcase.html">Design System</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar">
+    <div class="status-bar-left"><span class="status-bar-time">9:41</span></div>
+    <div class="status-bar-right"><span>●●●</span><span>WiFi</span><span>100%</span></div>
+  </div>
+
+  <div class="nav-bar">
+    <div class="nav-bar-left">
+      <div class="nav-bar-back" onclick="history.back()">‹</div>
+    </div>
+    <div class="nav-bar-center">
+      <div class="nav-bar-title">订单确认</div>
+    </div>
+    <div class="nav-bar-right"></div>
+  </div>
+
+  <div class="screen">
+
+    <!-- [STATE: NORMAL] 确认页 -->
+    <div data-state="normal">
+      <div class="alert alert-info" style="margin-bottom: var(--space-4);">
+        <div class="alert-icon">ⓘ</div>
+        <div class="alert-content">
+          <div class="alert-title">确认您的订单</div>
+          <div class="alert-message">请仔细检查下方信息，使用生物识别进行确认</div>
+        </div>
+      </div>
+
+      <div class="order-summary">
+        <div class="summary-row">
+          <div class="summary-label">股票代码</div>
+          <div class="summary-value">AAPL</div>
+        </div>
+        <div class="summary-row">
+          <div class="summary-label">交易方向</div>
+          <div class="summary-value" style="color: var(--color-gain);">买入</div>
+        </div>
+        <div class="summary-row">
+          <div class="summary-label">订单类型</div>
+          <div class="summary-value">市价单</div>
+        </div>
+        <div class="summary-row">
+          <div class="summary-label">委托数量</div>
+          <div class="summary-value">10 股</div>
+        </div>
+        <div class="summary-row">
+          <div class="summary-label">预计总额</div>
+          <div class="summary-value">$1,782.50</div>
+        </div>
+        <div class="summary-row">
+          <div class="summary-label">手续费</div>
+          <div class="summary-value">$0.00</div>
+        </div>
+        <div class="summary-row summary-total">
+          <div class="summary-label">预计扣款</div>
+          <div class="summary-value" style="margin-top: var(--space-3);">$1,782.50</div>
+        </div>
+      </div>
+
+      <!-- [DESIGN] 生物识别验证界面
+                   显示指纹或Face ID图标，用户需要验证后才能提交
+                   动效：pulse animation 提示用户进行操作
+                   Flutter: 使用 local_auth package，biometricOnly: true -->
+      <div class="biometric-verify">
+        <div class="biometric-icon">👆</div>
+        <div class="biometric-text">请进行生物识别验证</div>
+        <div class="biometric-hint">使用 Face ID 或 Touch ID 确认订单</div>
+      </div>
+
+      <button class="btn btn-primary btn-lg" onclick="setState('verifying')" style="margin-bottom: var(--space-2);">
+        开始验证
+      </button>
+      <button class="btn btn-secondary btn-lg" onclick="history.back()">
+        返回修改
+      </button>
+
+      <div class="proto-note">
+        💡 <strong>设计说明</strong><br>
+        • 生物识别是资金操作的必需步骤，无法跳过<br>
+        • 验证失败最多重试 3 次后需要输入密码<br>
+        • 确认后订单立即提交到市场，无法撤回<br>
+        • 成功/失败都需要明确的视觉反馈
+      </div>
+    </div>
+
+    <!-- [STATE: VERIFYING] 验证中 -->
+    <div data-state="verifying" style="display: none;">
+      <div class="biometric-verify">
+        <div class="biometric-icon" style="animation: pulse 1s ease-in-out infinite;">🔒</div>
+        <div class="biometric-text">正在验证身份...</div>
+        <div class="biometric-hint">请在屏幕上放置指纹或看向摄像头</div>
+      </div>
+    </div>
+
+    <!-- [STATE: SUCCESS] 成功 -->
+    <div data-state="success" style="display: none;">
+      <div class="success-message">
+        <div class="success-icon">✓</div>
+        <div class="success-title">订单已提交</div>
+        <div class="success-subtitle">您的订单已成功提交到市场</div>
+
+        <div class="success-detail">
+          <div style="font-weight: var(--font-weight-semibold); margin-bottom: var(--space-2);">订单详情</div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-1);">
+            <span>订单号</span>
+            <span class="num-mono">ORD20260331001234</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span>时间</span>
+            <span class="num-mono">09:41:23 ET</span>
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-lg" onclick="goto('order-list.html')" style="margin-bottom: var(--space-2);">
+          查看订单列表
+        </button>
+        <button class="btn btn-secondary btn-lg" onclick="goto('../../03-market/hifi/index.html')">
+          返回行情
+        </button>
+      </div>
+    </div>
+
+    <!-- [STATE: ERROR] 验证失败 -->
+    <div data-state="error" style="display: none;">
+      <div class="alert alert-error" style="margin-bottom: var(--space-4);">
+        <div class="alert-icon">!</div>
+        <div class="alert-content">
+          <div class="alert-title">生物识别验证失败</div>
+          <div class="alert-message">指纹或 Face ID 不匹配，请重试或使用密码</div>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-lg" onclick="setState('verifying')" style="margin-bottom: var(--space-2);">
+        重新验证
+      </button>
+      <button class="btn btn-secondary btn-lg" onclick="setState('normal')">
+        返回
+      </button>
+    </div>
+
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab-item"><div class="tab-item-icon">📈</div><span>行情</span></div>
+    <div class="tab-item active"><div class="tab-item-icon">📝</div><span>交易</span></div>
+    <div class="tab-item"><div class="tab-item-icon">💼</div><span>持仓</span></div>
+    <div class="tab-item"><div class="tab-item-icon">⚙️</div><span>我的</span></div>
+  </div>
+</div>
+
+<div class="dev-toolbar">
+  <div class="dev-toolbar-title">🔧 State Preview</div>
+  <button class="dev-state-btn active" data-state="normal" onclick="setState('normal')">确认</button>
+  <button class="dev-state-btn" data-state="verifying" onclick="setState('verifying')">验证中</button>
+  <button class="dev-state-btn" data-state="success" onclick="setState('success')">成功</button>
+  <button class="dev-state-btn" data-state="error" onclick="setState('error')">失败</button>
+</div>
+
+<script src="../../_shared/proto-router.js"></script>
+<script>
+  function setState(state) {
+    document.querySelectorAll('[data-state]').forEach(el => el.style.display = 'none');
+    document.querySelector(`[data-state="${state}"]`).style.display = 'block';
+    document.querySelectorAll('.dev-state-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.state === state);
+    });
+  }
+</script>
+
+</body>
+</html>

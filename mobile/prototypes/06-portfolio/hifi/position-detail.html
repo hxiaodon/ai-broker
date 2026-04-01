@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>06-Portfolio — 持仓详情</title>
+
+  <link rel="stylesheet" href="../../_design-system/tokens.css">
+  <link rel="stylesheet" href="../../_design-system/components.css">
+  <link rel="stylesheet" href="../../_design-system/proto-base.css">
+
+  <style>
+    .detail-header {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+      color: #fff;
+      padding: var(--space-5);
+      border-radius: var(--radius-lg);
+      margin-bottom: var(--space-4);
+    }
+
+    .detail-symbol {
+      font-size: var(--text-2xl);
+      font-weight: var(--font-weight-bold);
+      margin-bottom: var(--space-1);
+    }
+
+    .detail-name {
+      font-size: var(--text-sm);
+      opacity: 0.9;
+      margin-bottom: var(--space-3);
+    }
+
+    .detail-metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-3);
+      margin-bottom: var(--space-3);
+    }
+
+    .metric {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: var(--radius-md);
+      padding: var(--space-3);
+    }
+
+    .metric-label {
+      font-size: var(--text-xs);
+      opacity: 0.9;
+      margin-bottom: var(--space-1);
+    }
+
+    .metric-value {
+      font-family: var(--font-mono);
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-bold);
+    }
+
+    .detail-card {
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-divider);
+      border-radius: var(--radius-lg);
+      padding: var(--space-4);
+      margin-bottom: var(--space-4);
+    }
+
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: var(--space-2) 0;
+      border-bottom: 1px solid var(--color-divider);
+    }
+
+    .detail-row:last-child {
+      border-bottom: none;
+    }
+
+    .detail-label {
+      color: var(--color-text-secondary);
+      font-size: var(--text-sm);
+    }
+
+    .detail-value {
+      font-family: var(--font-mono);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+    }
+
+    .card-title {
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-3);
+    }
+
+    .pnl-positive {
+      color: var(--color-gain);
+    }
+
+    .pnl-negative {
+      color: var(--color-loss);
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: var(--space-2);
+    }
+
+    .action-buttons button {
+      flex: 1;
+    }
+  </style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>📱 06-Portfolio — 持仓详情</strong><br>
+  🔗 <a href="index.html">← 返回</a> | <a href="../../03-market/hifi/stock-detail.html">股票详情</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar">
+    <div class="status-bar-left"><span class="status-bar-time">9:41</span></div>
+    <div class="status-bar-right"><span>●●●</span><span>WiFi</span><span>100%</span></div>
+  </div>
+
+  <div class="nav-bar">
+    <div class="nav-bar-left">
+      <div class="nav-bar-back" onclick="history.back()">‹</div>
+    </div>
+    <div class="nav-bar-center">
+      <div class="nav-bar-title">持仓详情</div>
+    </div>
+    <div class="nav-bar-right"></div>
+  </div>
+
+  <div class="screen">
+
+    <!-- 持仓信息头 -->
+    <div class="detail-header">
+      <div class="detail-symbol">AAPL</div>
+      <div class="detail-name">Apple Inc. · NASDAQ</div>
+      <div class="detail-metrics">
+        <div class="metric">
+          <div class="metric-label">当前价格</div>
+          <div class="metric-value">$178.25</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">市值</div>
+          <div class="metric-value">$8,912.50</div>
+        </div>
+      </div>
+      <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+        <div>
+          <div class="metric-label">持仓数量</div>
+          <div class="metric-value">50 股</div>
+        </div>
+        <div>
+          <div class="metric-label">浮动盈亏</div>
+          <div class="metric-value pnl-positive">+$637.50 (+7.15%)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 成本基础 -->
+    <!-- [DESIGN] 成本基础计算方法：平均成本法
+                 显示：总成本、成本均价、已实现盈亏（已卖出部分）
+                 未实现盈亏 = 当前市值 - 总成本
+                 Flutter: 需要追踪每笔成交记录，支持多种计算方法 -->
+    <div class="detail-card">
+      <div class="card-title">成本基础</div>
+      <div class="detail-row">
+        <span class="detail-label">成本均价</span>
+        <span class="detail-value">$165.50</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">总成本</span>
+        <span class="detail-value">$8,275.00</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">当前市值</span>
+        <span class="detail-value">$8,912.50</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">未实现盈亏</span>
+        <span class="detail-value pnl-positive">+$637.50</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">已实现盈亏</span>
+        <span class="detail-value pnl-positive">+$125.00</span>
+      </div>
+    </div>
+
+    <!-- 持仓成交明细 -->
+    <div class="detail-card">
+      <div class="card-title">成交明细</div>
+      <div class="detail-row">
+        <span class="detail-label">第 1 笔</span>
+        <span class="detail-value">2026-03-15 · 买入 30 股 @ $160.00</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">第 2 笔</span>
+        <span class="detail-value">2026-03-22 · 买入 20 股 @ $172.00</span>
+      </div>
+    </div>
+
+    <!-- Wash Sale 规则说明 -->
+    <!-- [DESIGN] 展示该持仓是否可以被用于 Wash Sale 规则的计算
+                 如果在过去 30 天内有亏损卖出，新买入会重设 cost basis
+                 Flutter: 后端返回 wash_sale_status，前端条件渲染 -->
+    <div class="alert alert-info" style="margin-bottom: var(--space-4);">
+      <div class="alert-icon">ⓘ</div>
+      <div class="alert-content">
+        <div class="alert-title">Wash Sale 规则</div>
+        <div class="alert-message">美国税务规定：如果在 30 天内卖出盈利后又买入相同证券，新的购入成本基础会被调整</div>
+      </div>
+    </div>
+
+    <!-- 操作按钮 -->
+    <div class="action-buttons">
+      <button class="btn btn-primary" onclick="goto('../../04-trading/hifi/order-entry.html')">卖出</button>
+      <button class="btn btn-secondary" onclick="goto('../../03-market/hifi/stock-detail.html')">查看行情</button>
+    </div>
+
+    <div class="proto-note">
+      💡 <strong>设计说明</strong><br>
+      • 成本均价 = 总成本 / 持仓数量<br>
+      • 未实现盈亏（浮动盈亏）= 市值 - 总成本<br>
+      • 已实现盈亏来自历史卖出成交<br>
+      • Wash Sale 规则仅适用美国税务居民<br>
+      • 用户可导出成本基础表用于税务报告
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab-item" onclick="goto('../../03-market/hifi/index.html')"><div class="tab-item-icon">📈</div><span>行情</span></div>
+    <div class="tab-item" onclick="goto('../../04-trading/hifi/order-list.html')"><div class="tab-item-icon">📝</div><span>交易</span></div>
+    <div class="tab-item active" onclick="goto('index.html')"><div class="tab-item-icon">💼</div><span>持仓</span></div>
+    <div class="tab-item"><div class="tab-item-icon">⚙️</div><span>我的</span></div>
+  </div>
+</div>
+
+<script src="../../_shared/proto-router.js"></script>
+
+</body>
+</html>

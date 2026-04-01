@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>02-KYC — Step 6 税务申报</title>
+
+  <link rel="stylesheet" href="../../_design-system/tokens.css">
+  <link rel="stylesheet" href="../../_design-system/components.css">
+  <link rel="stylesheet" href="../../_design-system/proto-base.css">
+
+  <style>
+    .kyc-header {
+      padding: var(--space-4) var(--space-4);
+      border-bottom: 1px solid var(--color-divider);
+      background: var(--color-bg-surface);
+    }
+
+    .kyc-progress {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      margin-bottom: var(--space-3);
+    }
+
+    .kyc-progress-bar {
+      flex: 1;
+      height: 6px;
+      background: var(--color-bg-elevated);
+      border-radius: var(--radius-full);
+      overflow: hidden;
+    }
+
+    .kyc-progress-fill {
+      height: 100%;
+      background: var(--color-primary);
+      border-radius: var(--radius-full);
+    }
+
+    .kyc-progress-text {
+      font-size: var(--text-xs);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-primary);
+      min-width: 50px;
+      text-align: right;
+    }
+
+    .kyc-title {
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-1);
+    }
+
+    .kyc-subtitle {
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+    }
+
+    .form-section {
+      background: var(--color-bg-surface);
+      border-radius: var(--radius-lg);
+      padding: var(--space-4);
+      margin-bottom: var(--space-4);
+    }
+
+    .form-label {
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-2);
+    }
+
+    .form-input {
+      width: 100%;
+      padding: var(--space-3);
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-divider);
+      border-radius: var(--radius-md);
+      font-size: var(--text-base);
+      color: var(--color-text-primary);
+      outline: none;
+      margin-bottom: var(--space-3);
+      transition: all var(--transition-fast);
+    }
+
+    .form-input:last-child {
+      margin-bottom: 0;
+    }
+
+    .form-input:focus {
+      border-color: var(--color-primary);
+    }
+
+    .form-group {
+      padding: var(--space-3);
+      background: var(--color-bg-elevated);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-3);
+      cursor: pointer;
+      border: 2px solid var(--color-divider);
+      transition: all var(--transition-fast);
+    }
+
+    .form-group.selected {
+      border-color: var(--color-primary);
+      background: rgba(13, 101, 242, 0.05);
+    }
+
+    .form-group-title {
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-1);
+    }
+
+    .form-group-desc {
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+    }
+
+    .tax-card {
+      background: rgba(13, 197, 130, 0.1);
+      border-left: 3px solid var(--color-gain);
+      padding: var(--space-3);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-3);
+      font-size: var(--text-sm);
+      line-height: 1.6;
+    }
+
+    .tax-card-title {
+      font-weight: var(--font-weight-bold);
+      color: var(--color-gain);
+      margin-bottom: var(--space-1);
+    }
+  </style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>📱 02-KYC — Step 6 税务申报</strong><br>
+  🔗 <a href="step-5-investment.html">Step 5 投资</a> | <a href="step-7-disclosure.html">Step 7</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar">
+    <div class="status-bar-left"><span class="status-bar-time">9:41</span></div>
+    <div class="status-bar-right"><span>●●●</span><span>WiFi</span><span>100%</span></div>
+  </div>
+
+  <div class="nav-bar">
+    <div class="nav-bar-left">
+      <div class="nav-bar-back" onclick="goto('step-5-investment.html')">‹</div>
+    </div>
+    <div class="nav-bar-center">
+      <div class="nav-bar-title">开户认证</div>
+    </div>
+    <div class="nav-bar-right"></div>
+  </div>
+
+  <div class="screen" style="padding: 0;">
+
+    <!-- 进度条 -->
+    <div class="kyc-header">
+      <div class="kyc-progress">
+        <div class="kyc-progress-bar">
+          <div class="kyc-progress-fill" style="width: 75%"></div>
+        </div>
+        <div class="kyc-progress-text">6/8</div>
+      </div>
+      <div class="kyc-title">税务申报</div>
+      <div class="kyc-subtitle">确认税务居住地，填写税务表格</div>
+    </div>
+
+    <div style="padding: var(--space-4);">
+      <div class="form-section">
+        <div class="form-label">您是否是美国税务居民？</div>
+
+        <div class="form-group selected" onclick="selectTaxForm(this)">
+          <div class="form-group-title">否，我不是美国税务居民</div>
+          <div class="form-group-desc">填写 W-8BEN 表格（非美国居民）</div>
+        </div>
+
+        <div class="form-group" onclick="selectTaxForm(this)">
+          <div class="form-group-title">是，我是美国税务居民</div>
+          <div class="form-group-desc">填写 W-9 表格（美国公民/绿卡持有人）</div>
+        </div>
+      </div>
+
+      <!-- W-8BEN 表格 -->
+      <div id="w8ben-form">
+        <div class="form-section">
+          <div class="tax-card">
+            <div class="tax-card-title">📋 W-8BEN 表格说明</div>
+            W-8BEN 是美国税务局（IRS）要求的表格，证明您不是美国税务居民。签署后适用税收协定优惠税率（如中美协定：股息税从 30% 降至 10%）。<strong>有效期 3 年</strong>。
+          </div>
+
+          <div class="form-label">税务居住国</div>
+          <select class="form-input">
+            <option selected>中国</option>
+            <option>中国香港</option>
+            <option>中国台湾</option>
+            <option>其他</option>
+          </select>
+
+          <div class="form-label">税务识别号（TIN）</div>
+          <input type="text" class="form-input" placeholder="中国：身份证号 / 香港：HKID号" value="110101199001011234">
+          <div style="font-size: var(--text-xs); color: var(--color-text-tertiary); margin-top: -6px; margin-bottom: var(--space-3);">
+            用于 IRS 验证，加密存储
+          </div>
+
+          <div class="form-label">是否申请税收协定优惠？</div>
+          <select class="form-input">
+            <option selected>是（适用中美税收协定）</option>
+            <option>否（适用标准 30% 预扣税）</option>
+          </select>
+
+          <div class="alert alert-info">
+            <div class="alert-icon">💰</div>
+            <div class="alert-content">
+              <div class="alert-title">税收协定优惠示例</div>
+              <div class="alert-message">
+                • 股息税：30% → 10%<br>
+                • 利息税：30% → 10%<br>
+                • 资本利得：免税
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- W-9 表格（隐藏，通过选择显示） -->
+      <div id="w9-form" style="display: none;">
+        <div class="form-section">
+          <div class="tax-card">
+            <div class="tax-card-title">📋 W-9 表格说明</div>
+            W-9 表格用于美国税务居民（包括美国公民、绿卡持有人、实质居住者）。请提供您的 SSN 或 EIN。
+          </div>
+
+          <div class="form-label">社会安全号码 (SSN)</div>
+          <input type="text" class="form-input" placeholder="XXX-XX-9999" style="font-family: var(--font-mono);">
+
+          <div class="alert alert-info">
+            <div class="alert-icon">🔒</div>
+            <div class="alert-content">
+              <div class="alert-title">信息保护</div>
+              <div class="alert-message">您的 SSN 将被加密存储，仅用于税务报告</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 操作按钮 -->
+  <div class="form-actions">
+    <button class="btn btn-ghost" onclick="goto('step-5-investment.html')">上一步</button>
+    <button class="btn btn-primary" onclick="goto('step-7-disclosure.html')">下一步</button>
+  </div>
+
+  <div class="tab-bar" style="display: none;"></div>
+</div>
+
+<script src="../../_shared/proto-router.js"></script>
+<script>
+  function selectTaxForm(element) {
+    document.querySelectorAll('.form-group').forEach(g => {
+      g.classList.remove('selected');
+    });
+    element.classList.add('selected');
+
+    const isW9 = element.querySelector('.form-group-desc').textContent.includes('W-9');
+    document.getElementById('w8ben-form').style.display = isW9 ? 'none' : 'block';
+    document.getElementById('w9-form').style.display = isW9 ? 'block' : 'none';
+  }
+</script>
+
+</body>
+</html>

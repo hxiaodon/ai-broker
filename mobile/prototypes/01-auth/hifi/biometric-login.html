@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>01-Auth — 生物识别登录</title>
+
+  <link rel="stylesheet" href="../../_design-system/tokens.css">
+  <link rel="stylesheet" href="../../_design-system/components.css">
+  <link rel="stylesheet" href="../../_design-system/proto-base.css">
+
+  <style>
+    .bio-login-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 100%;
+      background: var(--color-bg-default);
+      padding: var(--space-8) var(--space-4) calc(var(--space-4) + 34px);
+    }
+
+    .bio-app-logo {
+      width: 60px;
+      height: 60px;
+      background: var(--color-primary);
+      border-radius: var(--radius-xl);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--text-2xl);
+      color: #fff;
+      margin-bottom: var(--space-4);
+      flex-shrink: 0;
+    }
+
+    .bio-greeting {
+      font-size: var(--text-xl);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-1);
+      text-align: center;
+    }
+
+    .bio-subtitle {
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+      margin-bottom: var(--space-8);
+      text-align: center;
+    }
+
+    .bio-circle {
+      width: 96px;
+      height: 96px;
+      border-radius: 50%;
+      border: 3px solid var(--color-divider);
+      background: var(--color-bg-surface);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 48px;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      flex-shrink: 0;
+    }
+
+    .bio-circle:active,
+    .bio-circle.verifying {
+      border-color: var(--color-primary);
+      background: rgba(13, 101, 242, 0.08);
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50%       { transform: scale(1.08); opacity: 0.7; }
+    }
+
+    .bio-circle.verifying {
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+
+    .bio-hint {
+      font-size: var(--text-xs);
+      color: var(--color-text-tertiary);
+      margin-top: var(--space-3);
+      text-align: center;
+    }
+
+    .bio-error-banner {
+      width: 100%;
+      background: rgba(250, 173, 20, 0.1);
+      border: 1px solid rgba(250, 173, 20, 0.3);
+      border-radius: var(--radius-md);
+      padding: var(--space-3);
+      font-size: var(--text-sm);
+      color: #d48806;
+      margin-top: var(--space-4);
+      text-align: center;
+    }
+
+    .bio-error-fatal {
+      width: 100%;
+      background: rgba(255, 77, 79, 0.08);
+      border: 1px solid rgba(255, 77, 79, 0.2);
+      border-radius: var(--radius-md);
+      padding: var(--space-3);
+      font-size: var(--text-sm);
+      color: var(--color-loss);
+      margin-top: var(--space-4);
+      text-align: center;
+    }
+
+    .bio-switch-link {
+      font-size: var(--text-sm);
+      color: var(--color-primary);
+      cursor: pointer;
+      margin-top: auto;
+      padding: var(--space-2) 0;
+    }
+  </style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>📱 01-Auth — 生物识别登录</strong><br>
+  🔗 <a href="index.html">← 冷启动</a> | <a href="phone.html">手机号登录 →</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar">
+    <div class="status-bar-left"><span class="status-bar-time">9:41</span></div>
+    <div class="status-bar-right"><span>●●●</span><span>WiFi</span><span>100%</span></div>
+  </div>
+
+  <div class="nav-bar">
+    <div class="nav-bar-left"></div>
+    <div class="nav-bar-center">
+      <div class="nav-bar-title">快捷登录</div>
+    </div>
+    <div class="nav-bar-right"></div>
+  </div>
+
+  <div class="screen" style="padding: 0; background: var(--color-bg-default);">
+
+    <!-- [STATE: idle] 待验证 -->
+    <div data-state="idle" class="bio-login-screen">
+      <div class="bio-app-logo">📈</div>
+      <div class="bio-greeting">Hi，138****8888</div>
+      <div class="bio-subtitle">使用 Face ID 登录</div>
+
+      <div class="bio-circle" onclick="setState('verifying')">👁️</div>
+      <div class="bio-hint">点击图标触发 Face ID</div>
+
+      <div class="bio-switch-link" onclick="goto('phone.html')">使用手机号登录</div>
+    </div>
+
+    <!-- [STATE: verifying] 验证中 -->
+    <div data-state="verifying" class="bio-login-screen" style="display: none;">
+      <div class="bio-app-logo">📈</div>
+      <div class="bio-greeting">Hi，138****8888</div>
+      <div class="bio-subtitle">正在验证</div>
+
+      <div class="bio-circle verifying">👁️</div>
+      <div class="bio-hint">验证中，请稍候...</div>
+
+      <div class="bio-switch-link" onclick="goto('phone.html')">使用手机号登录</div>
+    </div>
+
+    <!-- [STATE: failed-1] 失败 1/3 -->
+    <div data-state="failed-1" class="bio-login-screen" style="display: none;">
+      <div class="bio-app-logo">📈</div>
+      <div class="bio-greeting">Hi，138****8888</div>
+      <div class="bio-subtitle">使用 Face ID 登录</div>
+
+      <div class="bio-circle" onclick="setState('verifying')">👁️</div>
+      <div class="bio-hint">点击重试</div>
+
+      <div class="bio-error-banner">识别失败（1/3），请重试</div>
+
+      <div class="bio-switch-link" onclick="goto('phone.html')">使用手机号登录</div>
+    </div>
+
+    <!-- [STATE: failed-2] 失败 2/3 -->
+    <div data-state="failed-2" class="bio-login-screen" style="display: none;">
+      <div class="bio-app-logo">📈</div>
+      <div class="bio-greeting">Hi，138****8888</div>
+      <div class="bio-subtitle">使用 Face ID 登录</div>
+
+      <div class="bio-circle" onclick="setState('verifying')">👁️</div>
+      <div class="bio-hint">点击重试</div>
+
+      <div class="bio-error-banner" style="font-weight: var(--font-weight-bold);">识别失败（2/3），再次失败将切换至验证码</div>
+
+      <div class="bio-switch-link" onclick="goto('phone.html')">使用手机号登录</div>
+    </div>
+
+    <!-- [STATE: failed-3] 失败 3/3 → 降级 -->
+    <div data-state="failed-3" class="bio-login-screen" style="display: none;">
+      <div class="bio-app-logo">📈</div>
+      <div class="bio-greeting">Hi，138****8888</div>
+      <div class="bio-subtitle" style="color: var(--color-loss);">Face ID 验证未通过</div>
+
+      <div class="bio-circle" style="border-color: var(--color-loss); opacity: 0.5;">👁️</div>
+      <div class="bio-hint">请使用手机号验证码登录</div>
+
+      <div class="bio-error-fatal">连续识别失败，正在切换至验证码登录...</div>
+
+      <div class="bio-switch-link" onclick="goto('phone.html')">立即切换</div>
+    </div>
+
+  </div>
+
+  <div class="tab-bar" style="display: none;"></div>
+</div>
+
+<div class="dev-toolbar">
+  <div class="dev-toolbar-title">🔧 State Preview</div>
+  <button class="dev-state-btn active" data-state="idle"     onclick="setState('idle')">待验证</button>
+  <button class="dev-state-btn"        data-state="verifying" onclick="setState('verifying')">验证中</button>
+  <button class="dev-state-btn"        data-state="failed-1"  onclick="setState('failed-1')">失败1次</button>
+  <button class="dev-state-btn"        data-state="failed-2"  onclick="setState('failed-2')">失败2次</button>
+  <button class="dev-state-btn"        data-state="failed-3"  onclick="setState('failed-3')">失败3次</button>
+</div>
+
+<script src="../../_shared/proto-router.js"></script>
+<script>
+  function setState(state) {
+    document.querySelectorAll('[data-state]').forEach(el => el.style.display = 'none');
+    document.querySelector(`[data-state="${state}"]`).style.display = 'flex';
+    document.querySelectorAll('.dev-state-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.state === state);
+    });
+
+    if (state === 'verifying') {
+      // Simulate: success → go to market
+      setTimeout(() => goto('../../03-market/hifi/index.html'), 1500);
+    }
+    if (state === 'failed-3') {
+      setTimeout(() => goto('phone.html'), 1800);
+    }
+  }
+</script>
+
+</body>
+</html>

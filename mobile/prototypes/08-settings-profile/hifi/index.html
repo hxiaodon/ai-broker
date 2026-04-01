@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>08-Settings-Profile — 我的</title>
+
+  <link rel="stylesheet" href="../../_design-system/tokens.css">
+  <link rel="stylesheet" href="../../_design-system/components.css">
+  <link rel="stylesheet" href="../../_design-system/proto-base.css">
+
+  <style>
+    .profile-header {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+      color: #fff;
+      padding: var(--space-6) var(--space-4);
+      display: flex;
+      gap: var(--space-4);
+      align-items: center;
+      margin-bottom: var(--space-4);
+    }
+
+    .profile-avatar {
+      width: 80px;
+      height: 80px;
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--text-4xl);
+      flex-shrink: 0;
+    }
+
+    .profile-info {
+      flex: 1;
+    }
+
+    .profile-name {
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-bold);
+      margin-bottom: var(--space-1);
+    }
+
+    .profile-status {
+      font-size: var(--text-sm);
+      opacity: 0.9;
+    }
+
+    .profile-status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      background: rgba(13, 197, 130, 0.3);
+      border-radius: var(--radius-full);
+      font-size: var(--text-xs);
+      font-weight: var(--font-weight-semibold);
+      margin-right: var(--space-1);
+    }
+
+    .menu-section {
+      margin-bottom: var(--space-4);
+    }
+
+    .menu-section-title {
+      font-size: var(--text-xs);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-secondary);
+      text-transform: uppercase;
+      padding: 0 var(--space-4);
+      margin-bottom: var(--space-2);
+    }
+
+    .menu-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-3) var(--space-4);
+      background: var(--color-bg-surface);
+      border-bottom: 1px solid var(--color-divider);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .menu-item:last-child {
+      border-bottom: none;
+    }
+
+    .menu-item:active {
+      background: var(--color-bg-elevated);
+    }
+
+    .menu-item-left {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      flex: 1;
+    }
+
+    .menu-item-icon {
+      width: 36px;
+      height: 36px;
+      background: var(--color-bg-elevated);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--text-lg);
+      flex-shrink: 0;
+    }
+
+    .menu-item-text {
+      flex: 1;
+    }
+
+    .menu-item-title {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+      margin-bottom: 2px;
+    }
+
+    .menu-item-subtitle {
+      font-size: var(--text-xs);
+      color: var(--color-text-secondary);
+    }
+
+    .menu-item-arrow {
+      color: var(--color-text-tertiary);
+      font-size: var(--text-lg);
+    }
+
+    .menu-item-value {
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+      margin-right: var(--space-2);
+    }
+
+    .danger-zone {
+      padding: var(--space-4);
+      margin-top: var(--space-6);
+    }
+
+    .danger-button {
+      width: 100%;
+      padding: var(--space-3);
+      background: rgba(255, 71, 71, 0.1);
+      border: 1px solid var(--color-loss);
+      border-radius: var(--radius-md);
+      color: var(--color-loss);
+      font-weight: var(--font-weight-semibold);
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>📱 08-Settings-Profile — 我的</strong><br>
+  🔗 <a href="profile.html">个人资料</a> | <a href="settings.html">设置</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar">
+    <div class="status-bar-left"><span class="status-bar-time">9:41</span></div>
+    <div class="status-bar-right"><span>●●●</span><span>WiFi</span><span>100%</span></div>
+  </div>
+
+  <div class="nav-bar">
+    <div class="nav-bar-left"></div>
+    <div class="nav-bar-center">
+      <div class="nav-bar-title">我的</div>
+    </div>
+    <div class="nav-bar-right">⚙️</div>
+  </div>
+
+  <div class="screen">
+
+    <!-- 用户信息头 -->
+    <div class="profile-header">
+      <div class="profile-avatar">👤</div>
+      <div class="profile-info">
+        <div class="profile-name">张三</div>
+        <div class="profile-status">
+          <span class="profile-status-badge">已认证</span>
+          <span style="opacity: 0.8;">ID: 12345</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 账户管理 -->
+    <div class="menu-section">
+      <div class="menu-section-title">账户</div>
+      <div class="menu-item" onclick="goto('profile.html')">
+        <div class="menu-item-left">
+          <div class="menu-item-icon">👤</div>
+          <div class="menu-item-text">
+            <div class="menu-item-title">个人资料</div>
+            <div class="menu-item-subtitle">编辑账户信息</div>
+          </div>
+        </div>
+        <div class="menu-item-arrow">›</div>
+      </div>
+
+      <div class="menu-item">
+        <div class="menu-item-left">
+          <div class="menu-item-icon">🔐</div>
+          <div class="menu-item-text">
+            <div class="menu-item-title">账户安全</div>
+            <div class="menu-item-subtitle">密码、生物识别、2FA</div>
+          </div>
+        </div>
+        <div class="menu-item-arrow">›</div>
+      </div>
+
+      <div class="menu-item">
+        <div class="menu-item-left">
+          <div class="menu-item-icon">📱</div>
+          <div class="menu-item-text">
+            <div class="menu-item-title">绑定设备</div>
+            <div class="menu-item-subtitle">管理已登录设备</div>
+          </div>
+        </div>
+        <div class="menu-item-arrow">›</div>
+      </div>
+    </div>
+
+    <!-- 资金管理 -->
+    <div class="menu-section">
+      <div class="menu-section-title">资金</div>
+      <div class="menu-item">
+        <div class="menu-item-left">
+          <div class="menu-item-icon">💳</div>
+          <div class="menu-item-text">
+            <div class="menu-item-title">银行卡</div>
+            <div class="menu-item-subtitle">管理绑定的银行卡</div>
+          </div>
+        </div>
+        <div class="menu-item-arrow">›</div>
+      </div>
+
+      <div class="menu-item">
+        <div class="menu-item-left">
+          <div class="menu-item-icon">📊</div>
+          <div class="menu-item-text">
+            <div class="menu-item-title">交易明细</div>
+            <div class="menu-item-subtitle">查看账户流水记录</div>
+          </div>
+        </div>
+        <div class="menu-item-arrow">›</div>
+      </div>
+    </div>
+
+    <!-- 通知和偏好 -->
+    <div class="menu-section">
+      <div class="menu-section-title">通知和偏好</div>
+      <div class="menu-item" onclick="goto('settings.html')">
+        <div class="menu-item-left">
+          <div class="menu-item-icon">🔔</div>
+          <div class="menu-item-text">
+            <div class="menu-item-title">通知设置</div>
+            <div class="menu-item-subtitle">邮件、推送、短信</div>
+          </div>
+        </div>
+        <div class="menu-item-arrow">›</div>
+      </div>
+
+      <div class="menu-item">
+        <div class="menu-item-left">
+          <div class="menu-item-icon">🌐</div>
+          <div class="menu-item-text">
+            <div class="menu-item-title">语言 &amp; 地区</div>
+            <div class="menu-item-subtitle">简体中文 | 东八区</div>
+          </div>
+        </div>
+        <div class="menu-item-arrow">›</div>
+      </div>
+    </div>
+
+    <!-- 帮助和关于 -->
+    <div class="menu-section">
+      <div class="menu-section-title">帮助</div>
+      <div class="menu-item">
+        <div class="menu-item-left">
+          <div class="menu-item-icon">❓</div>
+          <div class="menu-item-text">
+            <div class="menu-item-title">帮助中心</div>
+            <div class="menu-item-subtitle">常见问题和教程</div>
+          </div>
+        </div>
+        <div class="menu-item-arrow">›</div>
+      </div>
+
+      <div class="menu-item">
+        <div class="menu-item-left">
+          <div class="menu-item-icon">ℹ️</div>
+          <div class="menu-item-text">
+            <div class="menu-item-title">关于我们</div>
+            <div class="menu-item-subtitle">版本 1.0.0</div>
+          </div>
+        </div>
+        <div class="menu-item-arrow">›</div>
+      </div>
+    </div>
+
+    <!-- 危险区域 -->
+    <div class="danger-zone">
+      <button class="danger-button">退出登录</button>
+    </div>
+
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab-item" onclick="goto('../../03-market/hifi/index.html')"><div class="tab-item-icon">📈</div><span>行情</span></div>
+    <div class="tab-item" onclick="goto('../../04-trading/hifi/order-list.html')"><div class="tab-item-icon">📝</div><span>交易</span></div>
+    <div class="tab-item" onclick="goto('../../06-portfolio/hifi/index.html')"><div class="tab-item-icon">💼</div><span>持仓</span></div>
+    <div class="tab-item active"><div class="tab-item-icon">⚙️</div><span>我的</span></div>
+  </div>
+</div>
+
+<script src="../../_shared/proto-router.js"></script>
+
+</body>
+</html>

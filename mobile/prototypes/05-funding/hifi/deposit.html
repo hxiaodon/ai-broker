@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>05-Funding — 入金</title>
+
+  <link rel="stylesheet" href="../../_design-system/tokens.css">
+  <link rel="stylesheet" href="../../_design-system/components.css">
+  <link rel="stylesheet" href="../../_design-system/proto-base.css">
+
+  <style>
+    .deposit-step-indicator {
+      display: flex;
+      justify-content: space-between;
+      gap: var(--space-2);
+      margin-bottom: var(--space-6);
+    }
+
+    .step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      flex: 1;
+    }
+
+    .step-circle {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: var(--font-weight-bold);
+      margin-bottom: var(--space-2);
+      transition: all var(--transition-fast);
+    }
+
+    .step.active .step-circle {
+      background: var(--color-primary);
+      color: #fff;
+    }
+
+    .step.completed .step-circle {
+      background: var(--color-gain);
+      color: #fff;
+    }
+
+    .step.inactive .step-circle {
+      background: var(--color-bg-elevated);
+      color: var(--color-text-tertiary);
+    }
+
+    .step-label {
+      font-size: var(--text-xs);
+      text-align: center;
+      color: var(--color-text-secondary);
+    }
+
+    .step.active .step-label {
+      color: var(--color-text-primary);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .form-section {
+      background: var(--color-bg-surface);
+      border-radius: var(--radius-lg);
+      padding: var(--space-4);
+      margin-bottom: var(--space-4);
+    }
+
+    .form-label {
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-2);
+    }
+
+    .amount-input-group {
+      display: flex;
+      gap: var(--space-2);
+      margin-bottom: var(--space-3);
+    }
+
+    .amount-input {
+      flex: 1;
+      font-size: var(--text-3xl);
+      font-family: var(--font-mono);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+      padding: var(--space-2);
+      border: 2px solid var(--color-divider);
+      border-radius: var(--radius-md);
+      text-align: right;
+      outline: none;
+    }
+
+    .amount-currency {
+      display: flex;
+      align-items: center;
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+    }
+
+    .bank-selector {
+      padding: var(--space-3);
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-divider);
+      border-radius: var(--radius-md);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      margin-bottom: var(--space-3);
+    }
+
+    .bank-info {
+      flex: 1;
+    }
+
+    .bank-name {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+      margin-bottom: 2px;
+    }
+
+    .bank-account {
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+    }
+
+    .bank-selector-arrow {
+      color: var(--color-text-tertiary);
+      font-size: var(--text-lg);
+    }
+
+    .amount-suggestions {
+      display: flex;
+      gap: var(--space-2);
+      margin-bottom: var(--space-3);
+    }
+
+    .amount-btn {
+      flex: 1;
+      padding: var(--space-2) var(--space-3);
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-divider);
+      border-radius: var(--radius-md);
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .amount-btn:active {
+      background: var(--color-primary);
+      color: #fff;
+      border-color: var(--color-primary);
+    }
+
+    .info-card {
+      background: rgba(13, 197, 130, 0.1);
+      border-left: 3px solid var(--color-gain);
+      padding: var(--space-3);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-3);
+    }
+
+    .info-card-title {
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-gain);
+      margin-bottom: var(--space-1);
+    }
+
+    .info-card-message {
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+      line-height: 1.5;
+    }
+
+    .processing-indicator {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-3);
+      background: var(--color-bg-surface);
+      border-radius: var(--radius-md);
+    }
+
+    .processing-icon {
+      animation: spin 2s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>📱 05-Funding — 入金</strong><br>
+  🔗 <a href="index.html">← 返回</a> | <a href="withdraw.html">出金</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar">
+    <div class="status-bar-left"><span class="status-bar-time">9:41</span></div>
+    <div class="status-bar-right"><span>●●●</span><span>WiFi</span><span>100%</span></div>
+  </div>
+
+  <div class="nav-bar">
+    <div class="nav-bar-left">
+      <div class="nav-bar-back" onclick="history.back()">‹</div>
+    </div>
+    <div class="nav-bar-center">
+      <div class="nav-bar-title">入金</div>
+    </div>
+    <div class="nav-bar-right"></div>
+  </div>
+
+  <div class="screen">
+
+    <!-- [STATE: ENTRY] 输入阶段 -->
+    <div data-state="entry">
+      <!-- 步骤指示器 -->
+      <div class="deposit-step-indicator">
+        <div class="step active">
+          <div class="step-circle">1</div>
+          <div class="step-label">金额</div>
+        </div>
+        <div class="step inactive">
+          <div class="step-circle">2</div>
+          <div class="step-label">确认</div>
+        </div>
+        <div class="step inactive">
+          <div class="step-circle">3</div>
+          <div class="step-label">完成</div>
+        </div>
+      </div>
+
+      <!-- 快速提示 -->
+      <div class="info-card">
+        <div class="info-card-title">✓ 实时到账</div>
+        <div class="info-card-message">周一至周五 9:30-17:00 提交的入金请求，5 分钟内到账</div>
+      </div>
+
+      <!-- 金额输入 -->
+      <div class="form-section">
+        <div class="form-label">入金金额</div>
+        <div class="input-with-prefix">
+          <span class="input-prefix">$</span>
+          <input type="number" class="form-input" placeholder="0.00" value="1000.00" step="0.01">
+        </div>
+
+        <div class="form-label" style="margin-top: var(--space-4);">快速选择</div>
+        <div class="amount-suggestions">
+          <button class="amount-btn" onclick="setAmount(1000)">$1,000</button>
+          <button class="amount-btn" onclick="setAmount(5000)">$5,000</button>
+          <button class="amount-btn" onclick="setAmount(10000)">$10,000</button>
+        </div>
+      </div>
+
+      <!-- 银行卡选择 -->
+      <div class="form-section">
+        <div class="form-label">出账银行卡</div>
+        <div class="bank-selector">
+          <div class="bank-info">
+            <div class="bank-name">招商银行</div>
+            <div class="bank-account">****1234</div>
+          </div>
+          <div class="bank-selector-arrow">›</div>
+        </div>
+      </div>
+
+      <!-- 手续费说明 -->
+      <div class="form-section">
+        <div style="display: flex; justify-content: space-between; margin-bottom: var(--space-3);">
+          <span style="color: var(--color-text-secondary);">手续费</span>
+          <span style="font-family: var(--font-mono); font-weight: var(--font-weight-semibold);">$0.00</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: var(--color-text-secondary);">入账金额</span>
+          <span style="font-family: var(--font-mono); font-weight: var(--font-weight-bold); font-size: var(--text-lg); color: var(--color-gain);">$1,000.00</span>
+        </div>
+      </div>
+
+      <!-- 提交按钮 -->
+      <button class="btn btn-primary" style="width: 100%; margin-top: var(--space-4);" onclick="setState('confirm')">下一步</button>
+
+      <div class="proto-note">
+        💡 <strong>设计说明</strong><br>
+        • 入金金额必须 ≥ $100<br>
+        • 每日入金最多 5 笔交易<br>
+        • 银行卡需要激活 72 小时后才能用于入金<br>
+        • 支持跨币种入金，会实时换汇
+      </div>
+    </div>
+
+    <!-- [STATE: CONFIRM] 确认阶段 -->
+    <div data-state="confirm" style="display: none;">
+      <!-- 步骤指示器 -->
+      <div class="deposit-step-indicator">
+        <div class="step completed">
+          <div class="step-circle">✓</div>
+          <div class="step-label">金额</div>
+        </div>
+        <div class="step active">
+          <div class="step-circle">2</div>
+          <div class="step-label">确认</div>
+        </div>
+        <div class="step inactive">
+          <div class="step-circle">3</div>
+          <div class="step-label">完成</div>
+        </div>
+      </div>
+
+      <!-- 交易摘要 -->
+      <div class="form-section">
+        <div style="text-align: center; margin-bottom: var(--space-4);">
+          <div style="font-size: var(--text-sm); color: var(--color-text-secondary); margin-bottom: var(--space-1);">入金金额</div>
+          <div style="font-family: var(--font-mono); font-size: var(--text-4xl); font-weight: var(--font-weight-bold); color: var(--color-gain);">$1,000.00</div>
+        </div>
+
+        <div style="border-top: 1px solid var(--color-divider); padding-top: var(--space-3);">
+          <div style="display: flex; justify-content: space-between; padding: var(--space-2) 0;">
+            <span style="color: var(--color-text-secondary);">出账银行</span>
+            <span style="font-weight: var(--font-weight-semibold);">招商银行 ****1234</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding: var(--space-2) 0;">
+            <span style="color: var(--color-text-secondary);">入账方式</span>
+            <span style="font-weight: var(--font-weight-semibold);">银行转账</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding: var(--space-2) 0;">
+            <span style="color: var(--color-text-secondary);">到账时间</span>
+            <span style="font-weight: var(--font-weight-semibold); color: var(--color-gain);">5 分钟</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 风险提示 -->
+      <div class="alert alert-warning" style="margin-bottom: var(--space-4);">
+        <div class="alert-icon">⚠️</div>
+        <div class="alert-content">
+          <div class="alert-title">确保账户信息一致</div>
+          <div class="alert-message">转账银行卡必须与 KYC 认证时的账户名一致，否则交易可能被拒绝</div>
+        </div>
+      </div>
+
+      <!-- 确认按钮 -->
+      <button class="btn btn-primary" style="width: 100%;" onclick="setState('processing')">确认入金</button>
+      <button class="btn btn-ghost" style="width: 100%; margin-top: var(--space-2);" onclick="setState('entry')">返回修改</button>
+    </div>
+
+    <!-- [STATE: PROCESSING] 处理中 -->
+    <div data-state="processing" style="display: none;">
+      <!-- 步骤指示器 -->
+      <div class="deposit-step-indicator">
+        <div class="step completed">
+          <div class="step-circle">✓</div>
+          <div class="step-label">金额</div>
+        </div>
+        <div class="step completed">
+          <div class="step-circle">✓</div>
+          <div class="step-label">确认</div>
+        </div>
+        <div class="step active">
+          <div class="step-circle">3</div>
+          <div class="step-label">完成</div>
+        </div>
+      </div>
+
+      <div style="padding: var(--space-8) var(--space-4); text-align: center;">
+        <div class="processing-indicator" style="margin-bottom: var(--space-6); justify-content: center;">
+          <span class="processing-icon" style="font-size: var(--text-4xl);">⏳</span>
+        </div>
+        <div style="font-size: var(--text-lg); font-weight: var(--font-weight-bold); margin-bottom: var(--space-2);">处理中...</div>
+        <div style="color: var(--color-text-secondary); margin-bottom: var(--space-4);">请稍候，交易正在处理</div>
+
+        <div class="info-card">
+          <div class="info-card-title">📝 订单号</div>
+          <div style="font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-secondary);">DEP-20260330-001234</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- [STATE: SUCCESS] 成功 -->
+    <div data-state="success" style="display: none;">
+      <!-- 步骤指示器 -->
+      <div class="deposit-step-indicator">
+        <div class="step completed">
+          <div class="step-circle">✓</div>
+          <div class="step-label">金额</div>
+        </div>
+        <div class="step completed">
+          <div class="step-circle">✓</div>
+          <div class="step-label">确认</div>
+        </div>
+        <div class="step completed">
+          <div class="step-circle">✓</div>
+          <div class="step-label">完成</div>
+        </div>
+      </div>
+
+      <div style="padding: var(--space-8) var(--space-4); text-align: center;">
+        <div style="font-size: var(--text-6xl); margin-bottom: var(--space-4);">✓</div>
+        <div style="font-size: var(--text-lg); font-weight: var(--font-weight-bold); margin-bottom: var(--space-2);">入金成功</div>
+        <div style="color: var(--color-text-secondary); margin-bottom: var(--space-6);">$1,000.00 已入账</div>
+
+        <div class="form-section" style="text-align: left;">
+          <div style="display: flex; justify-content: space-between; padding: var(--space-2) 0;">
+            <span style="color: var(--color-text-secondary);">入金金额</span>
+            <span style="font-family: var(--font-mono); font-weight: var(--font-weight-semibold);">$1,000.00</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding: var(--space-2) 0; border-top: 1px solid var(--color-divider); margin-top: var(--space-2); padding-top: var(--space-2);">
+            <span style="color: var(--color-text-secondary);">入账时间</span>
+            <span style="font-weight: var(--font-weight-semibold);">2026-03-31 14:35</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; padding: var(--space-2) 0;">
+            <span style="color: var(--color-text-secondary);">订单号</span>
+            <span style="font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-text-secondary);">DEP-20260331-001234</span>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" style="width: 100%; margin-top: var(--space-6);" onclick="goto('index.html')">返回资金中心</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab-item" onclick="goto('../../03-market/hifi/index.html')"><div class="tab-item-icon">📈</div><span>行情</span></div>
+    <div class="tab-item" onclick="goto('../../04-trading/hifi/order-list.html')"><div class="tab-item-icon">📝</div><span>交易</span></div>
+    <div class="tab-item" onclick="goto('../../06-portfolio/hifi/index.html')"><div class="tab-item-icon">💼</div><span>持仓</span></div>
+    <div class="tab-item"><div class="tab-item-icon">⚙️</div><span>我的</span></div>
+  </div>
+</div>
+
+<div class="dev-toolbar">
+  <div class="dev-toolbar-title">🔧 State Preview</div>
+  <button class="dev-state-btn active" data-state="entry" onclick="setState('entry')">输入</button>
+  <button class="dev-state-btn" data-state="confirm" onclick="setState('confirm')">确认</button>
+  <button class="dev-state-btn" data-state="processing" onclick="setState('processing')">处理</button>
+  <button class="dev-state-btn" data-state="success" onclick="setState('success')">成功</button>
+</div>
+
+<script src="../../_shared/proto-router.js"></script>
+<script>
+  function setState(state) {
+    document.querySelectorAll('[data-state]').forEach(el => el.style.display = 'none');
+    document.querySelector(`[data-state="${state}"]`).style.display = 'block';
+    document.querySelectorAll('.dev-state-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.state === state);
+    });
+  }
+
+  function setAmount(amount) {
+    document.querySelector('.amount-input').value = amount.toLocaleString();
+  }
+</script>
+
+</body>
+</html>

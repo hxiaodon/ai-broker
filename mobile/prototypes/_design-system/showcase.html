@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Design System Showcase — 高保真原型</title>
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="components.css">
+  <link rel="stylesheet" href="proto-base.css">
+  <style>
+    /* 演示页面额外样式 */
+    .showcase-container {
+      width: var(--viewport-width);
+      margin-bottom: 20px;
+    }
+
+    .showcase-section {
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-divider);
+      border-radius: var(--radius-lg);
+      padding: var(--space-4);
+      margin-bottom: var(--space-4);
+    }
+
+    .showcase-section-title {
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-3);
+      padding-bottom: var(--space-3);
+      border-bottom: 1px solid var(--color-divider);
+    }
+
+    .showcase-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--space-3);
+      margin-bottom: var(--space-3);
+    }
+
+    .showcase-grid-item {
+      padding: var(--space-3);
+      background: var(--color-bg-surface);
+      border-radius: var(--radius-md);
+      text-align: center;
+    }
+
+    .showcase-color-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-3);
+    }
+
+    .color-swatch {
+      border-radius: var(--radius-md);
+      height: 60px;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding: var(--space-2);
+      font-size: var(--text-xs);
+      font-weight: var(--font-weight-semibold);
+      color: #fff;
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    }
+
+    .showcase-example {
+      margin-top: var(--space-3);
+      padding-top: var(--space-3);
+      border-top: 1px solid var(--color-divider-strong);
+    }
+
+    .example-label {
+      font-size: var(--text-xs);
+      color: var(--color-text-tertiary);
+      margin-bottom: var(--space-2);
+      font-weight: var(--font-weight-semibold);
+      text-transform: uppercase;
+    }
+  </style>
+</head>
+<body>
+
+<div class="showcase-container">
+  <div class="proto-nav" style="margin-top: 0;">
+    <strong>🎨 Design System Showcase</strong><br>
+    金融交易应用高保真原型设计系统 — 颜色、排版、组件、交互
+  </div>
+
+  <!-- 01 颜色系统 -->
+  <div class="showcase-section">
+    <div class="showcase-section-title">01 颜色系统</div>
+
+    <div class="showcase-subsection">
+      <div style="font-size: var(--text-sm); font-weight: var(--font-weight-semibold); margin-bottom: var(--space-2);">品牌色</div>
+      <div class="showcase-color-grid">
+        <div class="color-swatch" style="background: var(--color-primary);">Primary<br>#1A73E8</div>
+        <div class="color-swatch" style="background: var(--color-primary-dark);">Primary Dark<br>#1557B0</div>
+      </div>
+    </div>
+
+    <div class="showcase-example">
+      <div class="example-label">金融语义色（涨跌）</div>
+      <div class="showcase-color-grid">
+        <div class="color-swatch" style="background: var(--color-gain);">Gain (Up)<br>#0DC582</div>
+        <div class="color-swatch" style="background: var(--color-loss);">Loss (Down)<br>#FF4747</div>
+        <div class="color-swatch" style="background: var(--color-neutral);">Neutral<br>#8A8D9F</div>
+        <div class="color-swatch" style="background: var(--color-warning);">Warning<br>#F0B90B</div>
+      </div>
+    </div>
+
+    <div class="showcase-example">
+      <div class="example-label">背景层</div>
+      <div class="showcase-color-grid">
+        <div class="color-swatch" style="background: var(--color-bg-base); border: 1px solid var(--color-divider);">BG Base<br>#0F1120</div>
+        <div class="color-swatch" style="background: var(--color-bg-elevated);">BG Elevated<br>#1A1C2A</div>
+        <div class="color-swatch" style="background: var(--color-bg-surface);">BG Surface<br>#242638</div>
+        <div class="color-swatch" style="background: var(--color-bg-input);">BG Input<br>#1A1C2A</div>
+      </div>
+    </div>
+
+    <div class="showcase-example">
+      <div class="example-label">文字色</div>
+      <div class="showcase-color-grid">
+        <div style="padding: var(--space-3); background: var(--color-bg-surface); border-radius: var(--radius-md); color: var(--color-text-primary);">Primary<br>#F0F0F5</div>
+        <div style="padding: var(--space-3); background: var(--color-bg-surface); border-radius: var(--radius-md); color: var(--color-text-secondary);">Secondary<br>#B0B3C8</div>
+        <div style="padding: var(--space-3); background: var(--color-bg-surface); border-radius: var(--radius-md); color: var(--color-text-tertiary);">Tertiary<br>#8A8D9F</div>
+        <div style="padding: var(--space-3); background: var(--color-bg-surface); border-radius: var(--radius-md); color: var(--color-text-disabled);">Disabled<br>#5A5D6B</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 02 排版系统 -->
+  <div class="showcase-section">
+    <div class="showcase-section-title">02 排版系统</div>
+
+    <div class="showcase-example">
+      <div style="font-size: var(--text-4xl); font-weight: var(--font-weight-bold); margin-bottom: var(--space-2);">Heading 4xl (32px)</div>
+      <div style="font-size: var(--text-3xl); font-weight: var(--font-weight-bold); margin-bottom: var(--space-2);">Heading 3xl (28px)</div>
+      <div style="font-size: var(--text-2xl); font-weight: var(--font-weight-bold); margin-bottom: var(--space-2);">Heading 2xl (24px)</div>
+      <div style="font-size: var(--text-xl); font-weight: var(--font-weight-bold); margin-bottom: var(--space-2);">Heading xl (20px)</div>
+      <div style="font-size: var(--text-lg); font-weight: var(--font-weight-bold); margin-bottom: var(--space-2);">Heading lg (17px)</div>
+      <div style="font-size: var(--text-base); font-weight: var(--font-weight-medium); margin-bottom: var(--space-2);">Body text base (15px)</div>
+      <div style="font-size: var(--text-sm); color: var(--color-text-secondary);">Small text (13px)</div>
+      <div style="font-size: var(--text-xs); color: var(--color-text-tertiary);">Extra small text (11px)</div>
+    </div>
+
+    <div class="showcase-example">
+      <div class="example-label">等宽字体（数字）</div>
+      <div style="font-family: var(--font-mono); font-size: var(--text-xl); font-weight: var(--font-weight-bold); color: var(--color-text-primary);">$1,234.56 AAPL +2.14%</div>
+    </div>
+  </div>
+
+  <!-- 03 按钮组件 -->
+  <div class="showcase-section">
+    <div class="showcase-section-title">03 按钮 (Button)</div>
+
+    <button class="btn btn-primary" style="margin-bottom: var(--space-2);">Primary Button</button>
+    <button class="btn btn-secondary" style="margin-bottom: var(--space-2);">Secondary Button</button>
+    <button class="btn btn-ghost" style="margin-bottom: var(--space-2);">Ghost Button</button>
+    <button class="btn btn-success" style="margin-bottom: var(--space-2);">Success Button</button>
+    <button class="btn btn-danger" style="margin-bottom: var(--space-2);">Danger Button</button>
+
+    <div class="showcase-example">
+      <div class="example-label">尺寸变体</div>
+      <button class="btn btn-primary btn-sm" style="margin-bottom: var(--space-2);">Small</button>
+      <button class="btn btn-primary" style="margin-bottom: var(--space-2);">Regular</button>
+      <button class="btn btn-primary btn-lg" style="margin-bottom: var(--space-2);">Large</button>
+    </div>
+
+    <div class="showcase-example">
+      <div class="example-label">禁用状态</div>
+      <button class="btn btn-primary" disabled>Disabled Button</button>
+    </div>
+  </div>
+
+  <!-- 04 表单组件 -->
+  <div class="showcase-section">
+    <div class="showcase-section-title">04 表单 (Form)</div>
+
+    <div class="form-group">
+      <label class="form-label required">输入框</label>
+      <input type="text" class="form-input" placeholder="Enter text...">
+      <div class="form-hint">This is a hint text</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">数字输入（等宽）</label>
+      <input type="number" class="form-input num-input" placeholder="0.00" value="1234.56">
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">错误状态</label>
+      <input type="text" class="form-input error" placeholder="Invalid input">
+      <div class="form-error">Error message here</div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">禁用状态</label>
+      <input type="text" class="form-input" placeholder="Disabled" disabled>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">文本域</label>
+      <textarea class="form-textarea" placeholder="Enter multiple lines..."></textarea>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">选择框</label>
+      <select class="form-select">
+        <option>Option 1</option>
+        <option>Option 2</option>
+        <option>Option 3</option>
+      </select>
+    </div>
+
+    <div class="showcase-example">
+      <div class="example-label">复选框和单选框</div>
+      <div style="margin-bottom: var(--space-3); display: flex; align-items: center; gap: var(--space-2);">
+        <input type="checkbox" class="form-checkbox" checked>
+        <label>Checkbox (Checked)</label>
+      </div>
+      <div style="margin-bottom: var(--space-3); display: flex; align-items: center; gap: var(--space-2);">
+        <input type="checkbox" class="form-checkbox">
+        <label>Checkbox (Unchecked)</label>
+      </div>
+      <div style="margin-bottom: var(--space-3); display: flex; align-items: center; gap: var(--space-2);">
+        <input type="radio" class="form-radio" name="demo" checked>
+        <label>Radio (Checked)</label>
+      </div>
+      <div style="display: flex; align-items: center; gap: var(--space-2);">
+        <input type="radio" class="form-radio" name="demo">
+        <label>Radio (Unchecked)</label>
+      </div>
+    </div>
+
+    <div class="showcase-example">
+      <div class="example-label">开关 (Toggle)</div>
+      <div style="display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3);">
+        <input type="checkbox" class="form-toggle" checked>
+        <label>Toggle (Checked)</label>
+      </div>
+      <div style="display: flex; align-items: center; gap: var(--space-2);">
+        <input type="checkbox" class="form-toggle">
+        <label>Toggle (Unchecked)</label>
+      </div>
+    </div>
+  </div>
+
+  <!-- 05 卡片组件 -->
+  <div class="showcase-section">
+    <div class="showcase-section-title">05 卡片 (Card)</div>
+
+    <div class="card" style="margin-bottom: var(--space-3);">
+      <div class="card-title">Standard Card</div>
+      <div class="card-content">This is a standard card with content. Use for grouped information.</div>
+    </div>
+
+    <div class="card-financial" style="margin-bottom: var(--space-3);">
+      <div class="card-title">Financial Card</div>
+      <div style="font-family: var(--font-mono); font-size: var(--text-2xl); font-weight: var(--font-weight-bold); margin: var(--space-3) 0;">$12,450.00</div>
+      <div class="card-subtitle">Total Assets</div>
+    </div>
+  </div>
+
+  <!-- 06 徽章/标签 -->
+  <div class="showcase-section">
+    <div class="showcase-section-title">06 徽章 (Badge)</div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: var(--space-2);">
+      <span class="badge badge-default">Default</span>
+      <span class="badge badge-success">Success</span>
+      <span class="badge badge-error">Error</span>
+      <span class="badge badge-warning">Warning</span>
+      <span class="badge badge-info">Info</span>
+    </div>
+  </div>
+
+  <!-- 07 列表项 -->
+  <div class="showcase-section">
+    <div class="showcase-section-title">07 列表项 (ListItem)</div>
+
+    <div class="list-item">
+      <div class="list-item-icon">📈</div>
+      <div class="list-item-content">
+        <div class="list-item-title">AAPL</div>
+        <div class="list-item-subtitle">Apple Inc.</div>
+      </div>
+      <div class="list-item-value">$178.25</div>
+      <div class="list-item-arrow">›</div>
+    </div>
+
+    <div class="list-item">
+      <div class="list-item-icon">📊</div>
+      <div class="list-item-content">
+        <div class="list-item-title">TSLA</div>
+        <div class="list-item-subtitle">Tesla, Inc.</div>
+      </div>
+      <div class="list-item-value" style="color: var(--color-loss);">$242.38</div>
+      <div class="list-item-arrow">›</div>
+    </div>
+  </div>
+
+  <!-- 08 分段控制器 -->
+  <div class="showcase-section">
+    <div class="showcase-section-title">08 分段控制器 (Segmented)</div>
+
+    <div class="segmented" style="margin-bottom: var(--space-3);">
+      <div class="seg-item active">All</div>
+      <div class="seg-item">US</div>
+      <div class="seg-item">HK</div>
+    </div>
+  </div>
+
+  <!-- 09 提示/警告 -->
+  <div class="showcase-section">
+    <div class="showcase-section-title">09 提示/警告 (Alert)</div>
+
+    <div class="alert alert-success" style="margin-bottom: var(--space-3);">
+      <div class="alert-icon">✓</div>
+      <div class="alert-content">
+        <div class="alert-title">Success</div>
+        <div class="alert-message">Your order has been placed successfully.</div>
+      </div>
+    </div>
+
+    <div class="alert alert-error" style="margin-bottom: var(--space-3);">
+      <div class="alert-icon">!</div>
+      <div class="alert-content">
+        <div class="alert-title">Error</div>
+        <div class="alert-message">Insufficient balance. Please check your account.</div>
+      </div>
+    </div>
+
+    <div class="alert alert-warning" style="margin-bottom: var(--space-3);">
+      <div class="alert-icon">⚠</div>
+      <div class="alert-content">
+        <div class="alert-title">Warning</div>
+        <div class="alert-message">Pattern Day Trading rule triggered.</div>
+      </div>
+    </div>
+
+    <div class="alert alert-info">
+      <div class="alert-icon">ⓘ</div>
+      <div class="alert-content">
+        <div class="alert-title">Info</div>
+        <div class="alert-message">Market data is delayed by 15 minutes for guest users.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 10 空态 -->
+  <div class="showcase-section">
+    <div class="showcase-section-title">10 空态 (Empty State)</div>
+
+    <div class="empty-state">
+      <div class="empty-icon">⭐</div>
+      <div class="empty-title">No Watchlist</div>
+      <div class="empty-message">Start by adding your first stock to your watchlist</div>
+      <button class="btn btn-primary btn-sm" style="margin-top: var(--space-3); width: auto;">Add Stock</button>
+    </div>
+  </div>
+
+  <!-- 11 间距和圆角 -->
+  <div class="showcase-section">
+    <div class="showcase-section-title">11 间距和圆角</div>
+
+    <div class="showcase-example">
+      <div class="example-label">圆角 (Border Radius)</div>
+      <div class="showcase-grid">
+        <div style="width: 50px; height: 50px; background: var(--color-primary); border-radius: var(--radius-xs); display: flex; align-items: center; justify-content: center; font-size: var(--text-xs); color: #fff;">xs</div>
+        <div style="width: 50px; height: 50px; background: var(--color-primary); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: var(--text-xs); color: #fff;">sm</div>
+        <div style="width: 50px; height: 50px; background: var(--color-primary); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: var(--text-xs); color: #fff;">md</div>
+        <div style="width: 50px; height: 50px; background: var(--color-primary); border-radius: var(--radius-lg); display: flex; align-items: center; justify-content: center; font-size: var(--text-xs); color: #fff;">lg</div>
+        <div style="width: 50px; height: 50px; background: var(--color-primary); border-radius: var(--radius-full); display: flex; align-items: center; justify-content: center; font-size: var(--text-xs); color: #fff;">full</div>
+      </div>
+    </div>
+
+    <div class="showcase-example">
+      <div class="example-label">间距单位 (4px基准)</div>
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); font-size: var(--text-xs);">
+        <div style="background: var(--color-primary); height: 20px;"></div>
+        <div style="background: var(--color-primary); height: 40px;"></div>
+        <div style="background: var(--color-primary); height: 60px;"></div>
+        <div style="color: var(--color-text-tertiary); text-align: center;">space-1 (4px)</div>
+        <div style="color: var(--color-text-tertiary); text-align: center;">space-2 (8px)</div>
+        <div style="color: var(--color-text-tertiary); text-align: center;">space-3 (12px)</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

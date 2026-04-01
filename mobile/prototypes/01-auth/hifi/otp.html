@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>01-Auth — OTP 验证</title>
+
+  <link rel="stylesheet" href="../../_design-system/tokens.css">
+  <link rel="stylesheet" href="../../_design-system/components.css">
+  <link rel="stylesheet" href="../../_design-system/proto-base.css">
+
+  <style>
+    .auth-body {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      background: var(--color-bg-default);
+    }
+
+    .auth-content {
+      flex: 1;
+      padding: var(--space-6) var(--space-4) var(--space-4);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .auth-page-title {
+      font-size: var(--text-2xl);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-1);
+    }
+
+    .auth-page-subtitle {
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+      margin-bottom: var(--space-6);
+    }
+
+    /* ── OTP Boxes ── */
+    .otp-row {
+      display: flex;
+      gap: var(--space-2);
+      justify-content: center;
+      margin-bottom: var(--space-4);
+    }
+
+    .otp-box {
+      width: 44px;
+      height: 52px;
+      border: 2px solid var(--color-divider);
+      border-radius: var(--radius-md);
+      background: var(--color-bg-surface);
+      font-size: var(--text-xl);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+      font-family: var(--font-mono);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .otp-box.filled {
+      border-color: var(--color-text-secondary);
+    }
+
+    .otp-box.active {
+      border-color: var(--color-primary);
+      border-width: 2px;
+    }
+
+    .otp-box.error {
+      border-color: var(--color-loss);
+      background: rgba(255, 77, 79, 0.05);
+    }
+
+    /* ── Countdown row ── */
+    .otp-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--space-4);
+    }
+
+    .otp-countdown {
+      font-size: var(--text-sm);
+      color: var(--color-text-tertiary);
+    }
+
+    .otp-resend {
+      font-size: var(--text-sm);
+      color: var(--color-text-tertiary);
+      cursor: default;
+    }
+
+    .otp-resend.active {
+      color: var(--color-primary);
+      cursor: pointer;
+    }
+
+    /* ── Error alert ── */
+    .otp-error-banner {
+      background: rgba(250, 173, 20, 0.1);
+      border: 1px solid rgba(250, 173, 20, 0.3);
+      border-radius: var(--radius-md);
+      padding: var(--space-3);
+      font-size: var(--text-sm);
+      color: #d48806;
+      margin-bottom: var(--space-4);
+    }
+
+    /* ── Lockout state ── */
+    .lockout-icon {
+      font-size: var(--text-6xl);
+      text-align: center;
+      margin-bottom: var(--space-4);
+    }
+
+    .lockout-timer {
+      font-size: var(--text-2xl);
+      font-weight: var(--font-weight-bold);
+      font-family: var(--font-mono);
+      color: var(--color-primary);
+      text-align: center;
+      margin: var(--space-2) 0 var(--space-6);
+    }
+
+    /* ── Verifying state ── */
+    .verifying-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      flex: 1;
+      gap: var(--space-4);
+    }
+
+    .verifying-spinner {
+      font-size: var(--text-4xl);
+      animation: spin 1.5s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to   { transform: rotate(360deg); }
+    }
+
+    .auth-footer {
+      padding: var(--space-4);
+      padding-bottom: calc(var(--space-4) + 34px);
+    }
+  </style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>📱 01-Auth — OTP 验证</strong><br>
+  🔗 <a href="phone.html">← 手机号输入</a> | <a href="biometric-setup.html">生物识别设置 →</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar">
+    <div class="status-bar-left"><span class="status-bar-time">9:41</span></div>
+    <div class="status-bar-right"><span>●●●</span><span>WiFi</span><span>100%</span></div>
+  </div>
+
+  <div class="nav-bar">
+    <div class="nav-bar-left">
+      <div class="nav-bar-back" onclick="goto('phone.html')">‹ 修改号码</div>
+    </div>
+    <div class="nav-bar-center">
+      <div class="nav-bar-title">验证码</div>
+    </div>
+    <div class="nav-bar-right"></div>
+  </div>
+
+  <div class="screen" style="padding: 0; background: var(--color-bg-default);">
+
+    <!-- [STATE: filling] 填写验证码 -->
+    <div data-state="filling" class="auth-body">
+      <div class="auth-content">
+        <div class="auth-page-title">验证手机号</div>
+        <div class="auth-page-subtitle">已发送 6 位验证码至 +86 138****8888</div>
+
+        <div class="otp-row">
+          <div class="otp-box filled">1</div>
+          <div class="otp-box filled">2</div>
+          <div class="otp-box filled">3</div>
+          <div class="otp-box active">_</div>
+          <div class="otp-box"></div>
+          <div class="otp-box"></div>
+        </div>
+
+        <div class="otp-meta">
+          <span class="otp-countdown">59 秒后可重发</span>
+          <span class="otp-resend">重新发送</span>
+        </div>
+      </div>
+
+      <div class="auth-footer">
+        <button class="btn btn-primary" style="width: 100%;" onclick="setState('verifying')">验证</button>
+      </div>
+    </div>
+
+    <!-- [STATE: verifying] 验证中 -->
+    <div data-state="verifying" class="auth-body" style="display: none;">
+      <div class="verifying-wrap">
+        <div class="verifying-spinner">⏳</div>
+        <div style="text-align: center;">
+          <div style="font-size: var(--text-base); font-weight: var(--font-weight-semibold); color: var(--color-text-primary);">验证中</div>
+          <div style="font-size: var(--text-sm); color: var(--color-text-secondary); margin-top: var(--space-1);">请稍候...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- [STATE: error] 验证码错误 -->
+    <div data-state="error" class="auth-body" style="display: none;">
+      <div class="auth-content">
+        <div class="auth-page-title">验证手机号</div>
+        <div class="auth-page-subtitle">已发送 6 位验证码至 +86 138****8888</div>
+
+        <div class="otp-row">
+          <div class="otp-box error">1</div>
+          <div class="otp-box error">2</div>
+          <div class="otp-box error">3</div>
+          <div class="otp-box error">4</div>
+          <div class="otp-box error">5</div>
+          <div class="otp-box error">6</div>
+        </div>
+
+        <div class="otp-error-banner">
+          ⚠ 验证码不正确，还可重试 2 次
+        </div>
+
+        <div class="otp-meta">
+          <span class="otp-countdown">42 秒后可重发</span>
+          <span class="otp-resend">重新发送</span>
+        </div>
+      </div>
+
+      <div class="auth-footer">
+        <button class="btn btn-primary" style="width: 100%;" onclick="setState('filling')">重新输入</button>
+      </div>
+    </div>
+
+    <!-- [STATE: lockout] 已锁定 -->
+    <div data-state="lockout" class="auth-body" style="display: none;">
+      <div class="auth-content" style="align-items: center; text-align: center; padding-top: var(--space-8);">
+        <div class="lockout-icon">🔒</div>
+        <div style="font-size: var(--text-xl); font-weight: var(--font-weight-bold); color: var(--color-text-primary); margin-bottom: var(--space-2);">登录失败次数过多</div>
+        <div style="font-size: var(--text-sm); color: var(--color-text-secondary); margin-bottom: var(--space-2);">账号已暂时锁定，请等待后重试</div>
+        <div class="lockout-timer">28:43</div>
+        <div style="font-size: var(--text-xs); color: var(--color-text-tertiary);">锁定期间无法登录（防暴力破解）</div>
+      </div>
+
+      <div class="auth-footer">
+        <button class="btn btn-ghost" style="width: 100%;" onclick="goto('index.html')">返回首页</button>
+      </div>
+    </div>
+
+    <!-- [STATE: expired] 验证码过期 -->
+    <div data-state="expired" class="auth-body" style="display: none;">
+      <div class="auth-content">
+        <div class="auth-page-title">验证手机号</div>
+        <div class="auth-page-subtitle">已发送 6 位验证码至 +86 138****8888</div>
+
+        <div class="otp-row">
+          <div class="otp-box"></div>
+          <div class="otp-box"></div>
+          <div class="otp-box"></div>
+          <div class="otp-box"></div>
+          <div class="otp-box"></div>
+          <div class="otp-box"></div>
+        </div>
+
+        <div class="alert alert-warning" style="margin-bottom: var(--space-4);">
+          <div class="alert-icon">⏰</div>
+          <div class="alert-content">
+            <div class="alert-title">验证码已过期</div>
+            <div class="alert-message">OTP 有效期为 5 分钟，请重新获取</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="auth-footer">
+        <button class="btn btn-primary" style="width: 100%;" onclick="setState('filling')">重新获取验证码</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="tab-bar" style="display: none;"></div>
+</div>
+
+<div class="dev-toolbar">
+  <div class="dev-toolbar-title">🔧 State Preview</div>
+  <button class="dev-state-btn active" data-state="filling"   onclick="setState('filling')">填写中</button>
+  <button class="dev-state-btn"        data-state="verifying" onclick="setState('verifying')">验证中</button>
+  <button class="dev-state-btn"        data-state="error"     onclick="setState('error')">错误</button>
+  <button class="dev-state-btn"        data-state="lockout"   onclick="setState('lockout')">已锁定</button>
+  <button class="dev-state-btn"        data-state="expired"   onclick="setState('expired')">已过期</button>
+</div>
+
+<script src="../../_shared/proto-router.js"></script>
+<script>
+  function setState(state) {
+    document.querySelectorAll('[data-state]').forEach(el => el.style.display = 'none');
+    document.querySelector(`[data-state="${state}"]`).style.display = 'flex';
+    document.querySelectorAll('.dev-state-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.state === state);
+    });
+
+    if (state === 'verifying') {
+      setTimeout(() => goto('biometric-setup.html'), 1200);
+    }
+  }
+</script>
+
+</body>
+</html>

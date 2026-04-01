@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>02-KYC — Step 8 协议签署</title>
+
+  <link rel="stylesheet" href="../../_design-system/tokens.css">
+  <link rel="stylesheet" href="../../_design-system/components.css">
+  <link rel="stylesheet" href="../../_design-system/proto-base.css">
+
+  <style>
+    .kyc-header {
+      padding: var(--space-4) var(--space-4);
+      border-bottom: 1px solid var(--color-divider);
+      background: var(--color-bg-surface);
+    }
+
+    .kyc-progress {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      margin-bottom: var(--space-3);
+    }
+
+    .kyc-progress-bar {
+      flex: 1;
+      height: 6px;
+      background: var(--color-bg-elevated);
+      border-radius: var(--radius-full);
+      overflow: hidden;
+    }
+
+    .kyc-progress-fill {
+      height: 100%;
+      background: var(--color-primary);
+      border-radius: var(--radius-full);
+    }
+
+    .kyc-progress-text {
+      font-size: var(--text-xs);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-primary);
+      min-width: 50px;
+      text-align: right;
+    }
+
+    .kyc-title {
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-1);
+    }
+
+    .kyc-subtitle {
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+    }
+
+    .form-section {
+      background: var(--color-bg-surface);
+      border-radius: var(--radius-lg);
+      padding: var(--space-4);
+      margin-bottom: var(--space-4);
+    }
+
+    .form-label {
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-2);
+    }
+
+    .form-input {
+      width: 100%;
+      padding: var(--space-3);
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-divider);
+      border-radius: var(--radius-md);
+      font-size: var(--text-base);
+      color: var(--color-text-primary);
+      outline: none;
+      margin-bottom: var(--space-3);
+      transition: all var(--transition-fast);
+      font-family: var(--font-mono);
+    }
+
+    .form-input:focus {
+      border-color: var(--color-primary);
+    }
+
+    .signature-box {
+      display: none; /* replaced by canvas widget */
+    }
+
+    /* ── 手写签名控件 ── */
+    .sig-wrap {
+      position: relative;
+      width: 100%;
+      height: 130px;
+      border: 2px dashed var(--color-divider);
+      border-radius: var(--radius-md);
+      background: var(--color-bg-elevated);
+      overflow: hidden;
+      margin-bottom: var(--space-2);
+      cursor: crosshair;
+      touch-action: none;
+    }
+
+    .sig-wrap.signed {
+      border: 2px solid var(--color-gain);
+      background: rgba(13, 197, 130, 0.04);
+    }
+
+    .sig-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    .sig-baseline {
+      position: absolute;
+      bottom: 34px;
+      left: 16px;
+      right: 16px;
+      height: 1px;
+      background: var(--color-divider);
+      pointer-events: none;
+    }
+
+    .sig-clear {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      font-size: var(--text-xs);
+      color: var(--color-text-tertiary);
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-divider);
+      border-radius: var(--radius-sm);
+      padding: 3px 8px;
+      cursor: pointer;
+      line-height: 1.4;
+    }
+
+    .sig-hint {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--text-sm);
+      color: var(--color-text-tertiary);
+      pointer-events: none;
+      user-select: none;
+    }
+
+    .sig-done-badge {
+      display: none;
+      align-items: center;
+      gap: var(--space-1);
+      font-size: var(--text-xs);
+      color: var(--color-gain);
+      margin-bottom: var(--space-3);
+    }
+
+    .sig-done-badge.visible {
+      display: flex;
+    }
+
+    .checkbox-row {
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-2);
+      padding: var(--space-3);
+      background: var(--color-bg-elevated);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-3);
+    }
+
+    .checkbox-row input {
+      width: 20px;
+      height: 20px;
+      margin-top: 2px;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .form-checkbox-label {
+      flex: 1;
+      font-size: var(--text-sm);
+      color: var(--color-text-primary);
+      cursor: pointer;
+    }
+
+    .form-actions {
+      display: flex;
+      gap: var(--space-2);
+      padding: var(--space-4);
+      padding-bottom: calc(var(--space-4) + 34px);
+    }
+
+    .form-actions button {
+      flex: 1;
+    }
+
+    .success-section {
+      padding: var(--space-8) var(--space-4);
+      text-align: center;
+    }
+
+    .success-icon {
+      font-size: var(--text-6xl);
+      margin-bottom: var(--space-4);
+    }
+
+    .success-title {
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-2);
+    }
+
+    .success-message {
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+      margin-bottom: var(--space-6);
+    }
+
+    .success-detail {
+      background: var(--color-bg-surface);
+      border-radius: var(--radius-lg);
+      padding: var(--space-4);
+      text-align: left;
+      margin-bottom: var(--space-4);
+    }
+
+    .success-detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: var(--space-2) 0;
+      border-bottom: 1px solid var(--color-divider);
+    }
+
+    .success-detail-row:last-child {
+      border-bottom: none;
+    }
+
+    .success-detail-label {
+      color: var(--color-text-secondary);
+      font-size: var(--text-sm);
+    }
+
+    .success-detail-value {
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+    }
+  </style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>📱 02-KYC — Step 8 协议签署</strong><br>
+  🔗 <a href="step-7-disclosure.html">Step 7 风险披露</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar">
+    <div class="status-bar-left"><span class="status-bar-time">9:41</span></div>
+    <div class="status-bar-right"><span>●●●</span><span>WiFi</span><span>100%</span></div>
+  </div>
+
+  <div class="nav-bar">
+    <div class="nav-bar-left">
+      <div class="nav-bar-back" onclick="goto('step-7-disclosure.html')">‹</div>
+    </div>
+    <div class="nav-bar-center">
+      <div class="nav-bar-title">开户认证</div>
+    </div>
+    <div class="nav-bar-right"></div>
+  </div>
+
+  <div class="screen" style="padding: 0;">
+
+    <!-- [STATE: SIGN] 签署阶段 -->
+    <div data-state="sign">
+      <!-- 进度条 -->
+      <div class="kyc-header">
+        <div class="kyc-progress">
+          <div class="kyc-progress-bar">
+            <div class="kyc-progress-fill" style="width: 100%"></div>
+          </div>
+          <div class="kyc-progress-text">8/8</div>
+        </div>
+        <div class="kyc-title">协议签署</div>
+        <div class="kyc-subtitle">在下方签署，完成开户申请</div>
+      </div>
+
+      <div style="padding: var(--space-4);">
+        <div class="form-section">
+          <div class="form-label">手写签名</div>
+
+          <!-- 签名画布 -->
+          <div class="sig-wrap" id="sig-wrap">
+            <canvas id="sig-canvas" class="sig-canvas"></canvas>
+            <div class="sig-baseline"></div>
+            <button class="sig-clear" onclick="clearSignature()">清除</button>
+            <div class="sig-hint" id="sig-hint">请在此处手写您的签名</div>
+          </div>
+          <div class="sig-done-badge" id="sig-done-badge">✓ 签名已完成</div>
+          <div style="font-size: var(--text-xs); color: var(--color-text-tertiary); margin-bottom: var(--space-3);">
+            签名将加密存储，作为本次协议签署的法律凭证
+          </div>
+
+          <div class="form-label">签署日期</div>
+          <input type="date" class="form-input" value="2026-03-31">
+        </div>
+
+        <div class="form-section">
+          <div class="form-label">确认协议</div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="agree1" checked>
+            <label for="agree1" class="form-checkbox-label">
+              我确认已阅读并同意 MetaStock 服务条款
+            </label>
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="agree2" checked>
+            <label for="agree2" class="form-checkbox-label">
+              我确认已阅读并理解所有风险披露文件
+            </label>
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="agree3" checked>
+            <label for="agree3" class="form-checkbox-label">
+              我确认上述信息真实准确，并完全理解虚假信息的法律后果
+            </label>
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="agree5" checked>
+            <label for="agree5" class="form-checkbox-label">
+              我已阅读并签署 《W-8BEN 外国人税务声明》，确认本人非美国纳税居民
+              <a href="#" style="color: var(--color-primary); margin-left: 4px; text-decoration: none;">查看</a>
+            </label>
+          </div>
+        </div>
+
+        <div class="alert alert-info">
+          <div class="alert-icon">📝</div>
+          <div class="alert-content">
+            <div class="alert-title">下一步</div>
+            <div class="alert-message">提交后，我们将在 1-2 个工作日内审核您的申请。审核结果将通过邮件通知</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- [STATE: SUCCESS] 成功页面 -->
+    <div data-state="success" style="display: none;">
+      <div class="success-section">
+        <div class="success-icon">✓</div>
+        <div class="success-title">申请已提交</div>
+        <div class="success-message">感谢您选择 MetaStock，我们正在审核您的申请</div>
+
+        <div class="success-detail">
+          <div class="success-detail-row">
+            <span class="success-detail-label">申请编号</span>
+            <span class="success-detail-value" style="font-family: var(--font-mono);">KYC-20260331-001234</span>
+          </div>
+          <div class="success-detail-row">
+            <span class="success-detail-label">提交时间</span>
+            <span class="success-detail-value">2026-03-31 14:35:22</span>
+          </div>
+          <div class="success-detail-row">
+            <span class="success-detail-label">预计审批时间</span>
+            <span class="success-detail-value">1-2 个工作日</span>
+          </div>
+          <div class="success-detail-row">
+            <span class="success-detail-label">账户状态</span>
+            <span class="success-detail-value" style="color: var(--color-primary);">审核中</span>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" style="width: 100%;" onclick="goto('kyc-review-status.html')">返回首页</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 操作按钮 -->
+  <div class="form-actions" id="sign-actions">
+    <button class="btn btn-ghost" onclick="goto('step-7-disclosure.html')">上一步</button>
+    <button class="btn btn-primary" onclick="setState('success')">提交申请</button>
+  </div>
+
+  <div class="tab-bar" style="display: none;"></div>
+</div>
+
+<div class="dev-toolbar">
+  <div class="dev-toolbar-title">🔧 State Preview</div>
+  <button class="dev-state-btn active" data-state="sign" onclick="setState('sign')">签署</button>
+  <button class="dev-state-btn" data-state="success" onclick="setState('success')">成功</button>
+</div>
+
+<script src="../../_shared/proto-router.js"></script>
+<script>
+  /* ── 签名画布 ── */
+  const canvas = document.getElementById('sig-canvas');
+  const ctx    = canvas.getContext('2d');
+  const wrap   = document.getElementById('sig-wrap');
+  const hint   = document.getElementById('sig-hint');
+  const badge  = document.getElementById('sig-done-badge');
+  let isDrawing = false;
+  let hasSigned = false;
+  const DPR = window.devicePixelRatio || 1;
+
+  function initCanvas() {
+    const w = wrap.offsetWidth;
+    const h = wrap.offsetHeight;
+    canvas.width  = w * DPR;
+    canvas.height = h * DPR;
+    canvas.style.width  = w + 'px';
+    canvas.style.height = h + 'px';
+    ctx.scale(DPR, DPR);
+    ctx.strokeStyle = getComputedStyle(document.documentElement)
+                        .getPropertyValue('--color-text-primary').trim() || '#1a1d2e';
+    ctx.lineWidth = 2;
+    ctx.lineCap   = 'round';
+    ctx.lineJoin  = 'round';
+  }
+
+  function getPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const src  = e.touches ? e.touches[0] : e;
+    return {
+      x: src.clientX - rect.left,
+      y: src.clientY - rect.top
+    };
+  }
+
+  function onStart(e) {
+    e.preventDefault();
+    isDrawing = true;
+    const p = getPos(e);
+    ctx.beginPath();
+    ctx.moveTo(p.x, p.y);
+  }
+
+  function onMove(e) {
+    if (!isDrawing) return;
+    e.preventDefault();
+    const p = getPos(e);
+    ctx.lineTo(p.x, p.y);
+    ctx.stroke();
+    if (!hasSigned) {
+      hasSigned = true;
+      wrap.classList.add('signed');
+      hint.style.display  = 'none';
+      badge.classList.add('visible');
+    }
+  }
+
+  function onEnd(e) { isDrawing = false; }
+
+  function clearSignature() {
+    ctx.clearRect(0, 0, canvas.width / DPR, canvas.height / DPR);
+    hasSigned = false;
+    wrap.classList.remove('signed');
+    hint.style.display = 'flex';
+    badge.classList.remove('visible');
+  }
+
+  canvas.addEventListener('mousedown',  onStart);
+  canvas.addEventListener('mousemove',  onMove);
+  canvas.addEventListener('mouseup',    onEnd);
+  canvas.addEventListener('mouseleave', onEnd);
+  canvas.addEventListener('touchstart', onStart, { passive: false });
+  canvas.addEventListener('touchmove',  onMove,  { passive: false });
+  canvas.addEventListener('touchend',   onEnd);
+
+  window.addEventListener('load', initCanvas);
+
+  /* ── State switcher ── */
+  function setState(state) {
+    document.querySelectorAll('[data-state]').forEach(el => el.style.display = 'none');
+    document.querySelector(`[data-state="${state}"]`).style.display = 'block';
+
+    const signActions = document.getElementById('sign-actions');
+    signActions.style.display = state === 'sign' ? 'flex' : 'none';
+
+    document.querySelectorAll('.dev-state-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.state === state);
+    });
+  }
+</script>
+
+</body>
+</html>

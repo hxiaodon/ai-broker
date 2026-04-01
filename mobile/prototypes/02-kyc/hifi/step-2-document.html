@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>02-KYC — Step 2 证件上传</title>
+
+  <link rel="stylesheet" href="../../_design-system/tokens.css">
+  <link rel="stylesheet" href="../../_design-system/components.css">
+  <link rel="stylesheet" href="../../_design-system/proto-base.css">
+
+  <style>
+    .kyc-header {
+      padding: var(--space-4) var(--space-4);
+      border-bottom: 1px solid var(--color-divider);
+      background: var(--color-bg-surface);
+    }
+
+    .kyc-progress {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      margin-bottom: var(--space-3);
+    }
+
+    .kyc-progress-bar {
+      flex: 1;
+      height: 6px;
+      background: var(--color-bg-elevated);
+      border-radius: var(--radius-full);
+      overflow: hidden;
+    }
+
+    .kyc-progress-fill {
+      height: 100%;
+      background: var(--color-primary);
+      border-radius: var(--radius-full);
+    }
+
+    .kyc-progress-text {
+      font-size: var(--text-xs);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-primary);
+      min-width: 50px;
+      text-align: right;
+    }
+
+    .kyc-title {
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-1);
+    }
+
+    .kyc-subtitle {
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+    }
+
+    .form-section {
+      background: var(--color-bg-surface);
+      border-radius: var(--radius-lg);
+      padding: var(--space-4);
+      margin-bottom: var(--space-4);
+    }
+
+    .form-label {
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-2);
+    }
+
+    .form-input {
+      width: 100%;
+      padding: var(--space-3);
+      background: var(--color-bg-elevated);
+      border: 1px solid var(--color-divider);
+      border-radius: var(--radius-md);
+      font-size: var(--text-base);
+      color: var(--color-text-primary);
+      outline: none;
+      margin-bottom: var(--space-3);
+      transition: all var(--transition-fast);
+    }
+
+    .form-input:focus {
+      border-color: var(--color-primary);
+    }
+
+    select.form-input {
+      appearance: none;
+      -webkit-appearance: none;
+    }
+
+    .upload-area {
+      border: 2px dashed var(--color-divider);
+      border-radius: var(--radius-lg);
+      padding: var(--space-6) var(--space-4);
+      text-align: center;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      background: var(--color-bg-elevated);
+      margin-bottom: var(--space-3);
+    }
+
+    .upload-area:hover {
+      border-color: var(--color-primary);
+      background: rgba(13, 101, 242, 0.05);
+    }
+
+    .upload-icon {
+      font-size: var(--text-3xl);
+      margin-bottom: var(--space-2);
+    }
+
+    .upload-text {
+      font-size: var(--text-sm);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-1);
+      font-weight: var(--font-weight-semibold);
+    }
+
+    .upload-hint {
+      font-size: var(--text-xs);
+      color: var(--color-text-secondary);
+    }
+
+    .document-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-3);
+      background: var(--color-bg-elevated);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-2);
+    }
+
+    .document-item-icon {
+      width: 40px;
+      height: 40px;
+      background: rgba(13, 197, 130, 0.15);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-gain);
+      font-weight: var(--font-weight-bold);
+      flex-shrink: 0;
+    }
+
+    .document-item-info {
+      flex: 1;
+    }
+
+    .document-item-name {
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+    }
+
+    .document-item-status {
+      font-size: var(--text-xs);
+      color: var(--color-gain);
+      margin-top: 2px;
+    }
+
+    .document-item-action {
+      font-size: var(--text-lg);
+      color: var(--color-text-tertiary);
+      cursor: pointer;
+    }
+
+    .ocr-result {
+      background: rgba(13, 197, 130, 0.1);
+      border-left: 3px solid var(--color-gain);
+      padding: var(--space-3);
+      border-radius: var(--radius-md);
+      margin-top: var(--space-3);
+    }
+
+    .ocr-result-title {
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-gain);
+      margin-bottom: var(--space-2);
+    }
+
+    .ocr-result-item {
+      display: flex;
+      justify-content: space-between;
+      padding: var(--space-1) 0;
+      font-size: var(--text-sm);
+    }
+
+    .ocr-result-label {
+      color: var(--color-text-secondary);
+    }
+
+    .ocr-result-value {
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+    }
+
+    .form-actions {
+      display: flex;
+      gap: var(--space-2);
+      padding: var(--space-4);
+    }
+
+    .form-actions button {
+      flex: 1;
+    }
+
+    .quality-tips {
+      background: rgba(13, 101, 242, 0.1);
+      border-left: 3px solid var(--color-primary);
+      padding: var(--space-3);
+      border-radius: var(--radius-md);
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>📱 02-KYC — Step 2 证件上传</strong><br>
+  🔗 <a href="step-1-personal.html">Step 1</a> | <a href="step-3-address.html">Step 3</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar">
+    <div class="status-bar-left"><span class="status-bar-time">9:41</span></div>
+    <div class="status-bar-right"><span>●●●</span><span>WiFi</span><span>100%</span></div>
+  </div>
+
+  <div class="nav-bar">
+    <div class="nav-bar-left">
+      <div class="nav-bar-back" onclick="goto('step-1-personal.html')">‹</div>
+    </div>
+    <div class="nav-bar-center">
+      <div class="nav-bar-title">开户认证</div>
+    </div>
+    <div class="nav-bar-right"></div>
+  </div>
+
+  <div class="screen" style="padding: 0;">
+
+    <!-- [STATE: UPLOAD] 上传阶段 -->
+    <div data-state="upload">
+      <!-- 进度条 -->
+      <div class="kyc-header">
+        <div class="kyc-progress">
+          <div class="kyc-progress-bar">
+            <div class="kyc-progress-fill" style="width: 25%"></div>
+          </div>
+          <div class="kyc-progress-text">2/8</div>
+        </div>
+        <div class="kyc-title">证件上传</div>
+        <div class="kyc-subtitle">上传身份证/护照，我们会自动识别您的信息</div>
+      </div>
+
+      <div style="padding: var(--space-4);">
+        <div class="form-section">
+          <div class="form-label">选择证件类型</div>
+          <select class="form-input" style="margin-bottom: var(--space-4);">
+            <option selected>身份证（正面 + 背面）</option>
+            <option>护照</option>
+            <option>港澳通行证</option>
+            <option>HKID</option>
+          </select>
+
+          <div class="form-label">上传证件正面</div>
+          <div class="upload-area">
+            <div class="upload-icon">📸</div>
+            <div class="upload-text">点击上传或拖拽文件</div>
+            <div class="upload-hint">支持 JPG、PNG，≤ 10MB</div>
+          </div>
+
+          <div class="form-label">上传证件背面</div>
+          <div class="upload-area">
+            <div class="upload-icon">📸</div>
+            <div class="upload-text">点击上传或拖拽文件</div>
+            <div class="upload-hint">支持 JPG、PNG，≤ 10MB</div>
+          </div>
+
+          <div class="quality-tips">
+            📸 <strong>拍摄要求：</strong> 四角完整 · 光线均匀 · 无反光 · 清晰可读
+          </div>
+        </div>
+
+        <!-- 已上传文件 -->
+        <div class="form-section">
+          <div class="form-label">已上传文件</div>
+          <div class="document-item">
+            <div class="document-item-icon">✓</div>
+            <div class="document-item-info">
+              <div class="document-item-name">身份证正面</div>
+              <div class="document-item-status">OCR 识别成功</div>
+            </div>
+            <div class="document-item-action" onclick="setState('verify')">›</div>
+          </div>
+
+          <div class="document-item">
+            <div class="document-item-icon">✓</div>
+            <div class="document-item-info">
+              <div class="document-item-name">身份证背面</div>
+              <div class="document-item-status">OCR 识别成功</div>
+            </div>
+            <div class="document-item-action">›</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- [STATE: VERIFY] 验证阶段 -->
+    <div data-state="verify" style="display: none;">
+      <!-- 进度条 -->
+      <div class="kyc-header">
+        <div class="kyc-progress">
+          <div class="kyc-progress-bar">
+            <div class="kyc-progress-fill" style="width: 25%"></div>
+          </div>
+          <div class="kyc-progress-text">2/8</div>
+        </div>
+        <div class="kyc-title">确认识别结果</div>
+        <div class="kyc-subtitle">请核对系统识别的信息，确认无误后继续</div>
+      </div>
+
+      <div style="padding: var(--space-4);">
+        <div class="form-section">
+          <div class="ocr-result">
+            <div class="ocr-result-title">✓ OCR 识别结果</div>
+            <div class="ocr-result-item">
+              <span class="ocr-result-label">证件号码：</span>
+              <span class="ocr-result-value">110101199001011234</span>
+            </div>
+            <div class="ocr-result-item">
+              <span class="ocr-result-label">姓名：</span>
+              <span class="ocr-result-value">张三</span>
+            </div>
+            <div class="ocr-result-item">
+              <span class="ocr-result-label">性别：</span>
+              <span class="ocr-result-value">男</span>
+            </div>
+            <div class="ocr-result-item">
+              <span class="ocr-result-label">出生日期：</span>
+              <span class="ocr-result-value">1990-01-15</span>
+            </div>
+            <div class="ocr-result-item">
+              <span class="ocr-result-label">有效期至：</span>
+              <span class="ocr-result-value">2030-01-15</span>
+            </div>
+          </div>
+
+          <div class="alert alert-info" style="margin-top: var(--space-3);">
+            <div class="alert-icon">ℹ️</div>
+            <div class="alert-content">
+              <div class="alert-title">识别结果说明</div>
+              <div class="alert-message">系统识别结果已回填至 Step 1 个人信息，如有不符请返回修改</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- 操作按钮 -->
+  <div class="form-actions">
+    <button class="btn btn-ghost" onclick="goto('step-1-personal.html')">上一步</button>
+    <button class="btn btn-primary" onclick="goto('step-3-address.html')">下一步</button>
+  </div>
+
+  <div class="tab-bar" style="display: none;"></div>
+</div>
+
+<div class="dev-toolbar">
+  <div class="dev-toolbar-title">🔧 State Preview</div>
+  <button class="dev-state-btn active" data-state="upload" onclick="setState('upload')">上传</button>
+  <button class="dev-state-btn" data-state="verify" onclick="setState('verify')">验证</button>
+</div>
+
+<script src="../../_shared/proto-router.js"></script>
+<script>
+  function setState(state) {
+    document.querySelectorAll('[data-state]').forEach(el => el.style.display = 'none');
+    document.querySelector(`[data-state="${state}"]`).style.display = 'block';
+    document.querySelectorAll('.dev-state-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.state === state);
+    });
+  }
+</script>
+
+</body>
+</html>

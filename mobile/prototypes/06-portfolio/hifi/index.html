@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>06-Portfolio — 资产总览</title>
+
+  <link rel="stylesheet" href="../../_design-system/tokens.css">
+  <link rel="stylesheet" href="../../_design-system/components.css">
+  <link rel="stylesheet" href="../../_design-system/proto-base.css">
+
+  <style>
+    .asset-card {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+      color: #fff;
+      border-radius: var(--radius-lg);
+      padding: var(--space-5);
+      margin-bottom: var(--space-4);
+    }
+
+    .asset-label {
+      font-size: var(--text-xs);
+      opacity: 0.9;
+      margin-bottom: var(--space-2);
+    }
+
+    .asset-main {
+      font-family: var(--font-mono);
+      font-size: var(--text-3xl);
+      font-weight: var(--font-weight-bold);
+      margin-bottom: var(--space-3);
+    }
+
+    .asset-breakdown {
+      display: flex;
+      gap: var(--space-4);
+    }
+
+    .asset-item {
+      flex: 1;
+    }
+
+    .asset-item-label {
+      font-size: var(--text-xs);
+      opacity: 0.9;
+      margin-bottom: var(--space-1);
+    }
+
+    .asset-item-value {
+      font-family: var(--font-mono);
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-bold);
+    }
+
+    .portfolio-section {
+      margin-bottom: var(--space-4);
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--space-3);
+    }
+
+    .section-title {
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+    }
+
+    .position-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-3);
+      background: var(--color-bg-surface);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-2);
+      cursor: pointer;
+    }
+
+    .position-badge {
+      width: 44px;
+      height: 44px;
+      background: var(--color-bg-elevated);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-primary);
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-bold);
+      flex-shrink: 0;
+    }
+
+    .position-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .position-symbol {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+      margin-bottom: 2px;
+    }
+
+    .position-detail {
+      font-size: var(--text-xs);
+      color: var(--color-text-secondary);
+    }
+
+    .position-value {
+      text-align: right;
+    }
+
+    .position-market-value {
+      font-family: var(--font-mono);
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+    }
+
+    .position-pnl {
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-semibold);
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+      margin-top: 2px;
+    }
+
+    .position-pnl.positive {
+      background: rgba(13, 197, 130, 0.15);
+      color: var(--color-gain);
+    }
+
+    .position-pnl.negative {
+      background: rgba(255, 71, 71, 0.15);
+      color: var(--color-loss);
+    }
+
+    /* 持仓分析 Tab Navigation */
+    .portfolio-tab-nav {
+      display: flex;
+      gap: 0;
+      overflow-x: auto;
+      padding: var(--space-3) var(--space-4);
+      margin-bottom: var(--space-3);
+      border-bottom: 1px solid var(--color-divider);
+    }
+
+    .portfolio-tab {
+      padding: var(--space-2) var(--space-3);
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: all var(--transition-fast);
+    }
+
+    .portfolio-tab.active {
+      color: var(--color-primary);
+      border-bottom-color: var(--color-primary);
+    }
+
+    .portfolio-panel {
+      display: none;
+    }
+
+    .portfolio-panel.active {
+      display: block;
+    }
+
+    /* 板块分布条形图 */
+    .sector-item {
+      margin-bottom: var(--space-4);
+    }
+
+    .sector-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--space-1);
+    }
+
+    .sector-label {
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+    }
+
+    .sector-percent {
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+    }
+
+    .sector-bar {
+      height: 6px;
+      background: var(--color-bg-elevated);
+      border-radius: var(--radius-full);
+      overflow: hidden;
+    }
+
+    .sector-fill {
+      height: 100%;
+      border-radius: var(--radius-full);
+      transition: width var(--transition-fast);
+    }
+
+    .sector-fill.tech {
+      background: var(--color-primary);
+    }
+
+    .sector-fill.energy {
+      background: var(--color-primary-light);
+    }
+
+    .sector-fill.chip {
+      background: var(--color-primary-lighter);
+    }
+
+    .sector-fill.cash {
+      background: var(--color-bg-disabled);
+    }
+
+    /* 持仓盈亏排名 */
+    .pnl-ranking {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .pnl-rank-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: var(--space-2) 0;
+    }
+
+    .pnl-rank-left {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+
+    .pnl-rank-number {
+      font-size: var(--text-xs);
+      color: var(--color-text-tertiary);
+      min-width: 20px;
+    }
+
+    .pnl-rank-ticker {
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+    }
+  </style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>📱 06-Portfolio — 资产总览</strong><br>
+  🔗 <a href="position-detail.html">持仓详情</a> | <a href="../../05-funding/hifi/index.html">资金</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar">
+    <div class="status-bar-left"><span class="status-bar-time">9:41</span></div>
+    <div class="status-bar-right"><span>●●●</span><span>WiFi</span><span>100%</span></div>
+  </div>
+
+  <div class="nav-bar">
+    <div class="nav-bar-left"></div>
+    <div class="nav-bar-center">
+      <div class="nav-bar-title">资产</div>
+    </div>
+    <div class="nav-bar-right"></div>
+  </div>
+
+  <div class="screen">
+
+    <!-- [STATE: NORMAL] 有持仓 -->
+    <div data-state="normal">
+      <!-- 资产总览卡 -->
+      <!-- [DESIGN] 总资产 = 现金余额 + 持仓市值
+                   显示持仓盈亏（绿=正，红=负）
+                   所有数字等宽显示，精确到分
+                   Flutter: 实时计算，涉及 Decimal 类 -->
+      <div class="asset-card">
+        <div class="asset-label">总资产</div>
+        <div class="asset-main">$28,567.89</div>
+        <div class="asset-breakdown">
+          <div class="asset-item">
+            <div class="asset-item-label">现金</div>
+            <div class="asset-item-value">$12,450.00</div>
+          </div>
+          <div class="asset-item">
+            <div class="asset-item-label">持仓市值</div>
+            <div class="asset-item-value">$16,117.89</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 导航 -->
+      <div class="portfolio-tab-nav">
+        <div class="portfolio-tab active" onclick="switchPortfolioTab('positions', this)">持仓</div>
+        <div class="portfolio-tab" onclick="switchPortfolioTab('analysis', this)">分析</div>
+        <div class="portfolio-tab" onclick="switchPortfolioTab('cash', this)">资金明细</div>
+      </div>
+
+      <!-- 持仓面板 -->
+      <div id="panel-positions" class="portfolio-panel active">
+        <div class="portfolio-section">
+          <div class="section-header">
+            <div class="section-title">持仓</div>
+            <div style="font-size: var(--text-xs); color: var(--color-text-secondary);">3 只</div>
+          </div>
+
+          <div class="position-row" onclick="goto('position-detail.html')">
+            <div class="position-badge">AAPL</div>
+            <div class="position-info">
+              <div class="position-symbol">AAPL</div>
+              <div class="position-detail">50 股 @ $165.50</div>
+            </div>
+            <div class="position-value">
+              <div class="position-market-value">$8,912.50</div>
+              <div class="position-pnl positive">+$637.50 (+7.15%)</div>
+            </div>
+          </div>
+
+          <div class="position-row" onclick="goto('position-detail.html')">
+            <div class="position-badge" style="color: var(--color-loss);">TSLA</div>
+            <div class="position-info">
+              <div class="position-symbol">TSLA</div>
+              <div class="position-detail">25 股 @ $250.00</div>
+            </div>
+            <div class="position-value">
+              <div class="position-market-value">$6,059.50</div>
+              <div class="position-pnl negative">-$94.50 (-1.53%)</div>
+            </div>
+          </div>
+
+          <div class="position-row" onclick="goto('position-detail.html')">
+            <div class="position-badge" style="color: #0DC582;">MSFT</div>
+            <div class="position-info">
+              <div class="position-symbol">MSFT</div>
+              <div class="position-detail">15 股 @ $400.00</div>
+            </div>
+            <div class="position-value">
+              <div class="position-market-value">$6,235.80</div>
+              <div class="position-pnl positive">+$235.80 (+3.93%)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 分析面板 -->
+      <div id="panel-analysis" class="portfolio-panel">
+        <div class="portfolio-section">
+          <div class="section-title">板块分布</div>
+          <div style="margin-top: var(--space-3);">
+            <div class="sector-item">
+              <div class="sector-header">
+                <span class="sector-label">科技</span>
+                <span class="sector-percent">63%</span>
+              </div>
+              <div class="sector-bar">
+                <div class="sector-fill tech" style="width: 63%;"></div>
+              </div>
+            </div>
+            <div class="sector-item">
+              <div class="sector-header">
+                <span class="sector-label">新能源汽车</span>
+                <span class="sector-percent">6%</span>
+              </div>
+              <div class="sector-bar">
+                <div class="sector-fill energy" style="width: 6%;"></div>
+              </div>
+            </div>
+            <div class="sector-item">
+              <div class="sector-header">
+                <span class="sector-label">半导体</span>
+                <span class="sector-percent">1%</span>
+              </div>
+              <div class="sector-bar">
+                <div class="sector-fill chip" style="width: 1%;"></div>
+              </div>
+            </div>
+            <div class="sector-item">
+              <div class="sector-header">
+                <span class="sector-label">现金</span>
+                <span class="sector-percent">30%</span>
+              </div>
+              <div class="sector-bar">
+                <div class="sector-fill cash" style="width: 30%;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="portfolio-section">
+          <div class="section-title">持仓盈亏排名</div>
+          <div class="pnl-ranking">
+            <div class="pnl-rank-item">
+              <div class="pnl-rank-left">
+                <span class="pnl-rank-number">#1</span>
+                <span class="pnl-rank-ticker">AAPL</span>
+              </div>
+              <div class="position-pnl positive">+$637.50 (+7.15%)</div>
+            </div>
+            <div class="pnl-rank-item">
+              <div class="pnl-rank-left">
+                <span class="pnl-rank-number">#2</span>
+                <span class="pnl-rank-ticker">MSFT</span>
+              </div>
+              <div class="position-pnl positive">+$235.80 (+3.93%)</div>
+            </div>
+            <div class="pnl-rank-item">
+              <div class="pnl-rank-left">
+                <span class="pnl-rank-number">#3</span>
+                <span class="pnl-rank-ticker">TSLA</span>
+              </div>
+              <div class="position-pnl negative">-$94.50 (-1.53%)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 资金明细面板 -->
+      <div id="panel-cash" class="portfolio-panel">
+        <div class="portfolio-section">
+          <div class="section-header">
+            <div class="section-title">资金明细</div>
+          </div>
+          <div class="position-row" style="cursor: default;">
+            <div style="flex: 1;">
+              <div class="position-symbol">现金余额</div>
+              <div class="position-detail">可用于交易和提现</div>
+            </div>
+            <div class="position-value">
+              <div class="position-market-value">$12,450.00</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="proto-note">
+        💡 <strong>设计说明</strong><br>
+        • 总资产实时更新，基于最新行情价格<br>
+        • 点击单只持仓进入详情页查看成本基础、Wash Sale 规则<br>
+        • 现金余额 = 已入金 - 已提现 - 已冻结<br>
+        • 所有盈亏都采用公允价值计算法
+      </div>
+    </div>
+
+    <!-- [STATE: EMPTY] 无持仓 -->
+    <div data-state="empty" style="display: none;">
+      <div class="asset-card">
+        <div class="asset-label">总资产</div>
+        <div class="asset-main">$12,450.00</div>
+        <div class="asset-breakdown">
+          <div class="asset-item">
+            <div class="asset-item-label">现金</div>
+            <div class="asset-item-value">$12,450.00</div>
+          </div>
+          <div class="asset-item">
+            <div class="asset-item-label">持仓市值</div>
+            <div class="asset-item-value">$0.00</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="empty-state" style="padding: var(--space-8) var(--space-4);">
+        <div class="empty-icon">📭</div>
+        <div class="empty-title">暂无持仓</div>
+        <div class="empty-message">开始交易，建立您的投资组合</div>
+        <button class="btn btn-primary btn-sm" style="margin-top: var(--space-4); width: auto;" onclick="goto('../../03-market/hifi/index.html')">
+          去逛逛行情
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab-item" onclick="goto('../../03-market/hifi/index.html')"><div class="tab-item-icon">📈</div><span>行情</span></div>
+    <div class="tab-item" onclick="goto('../../04-trading/hifi/order-list.html')"><div class="tab-item-icon">📝</div><span>交易</span></div>
+    <div class="tab-item active"><div class="tab-item-icon">💼</div><span>持仓</span></div>
+    <div class="tab-item"><div class="tab-item-icon">⚙️</div><span>我的</span></div>
+  </div>
+</div>
+
+<div class="dev-toolbar">
+  <div class="dev-toolbar-title">🔧 State Preview</div>
+  <button class="dev-state-btn active" data-state="normal" onclick="setState('normal')">有持仓</button>
+  <button class="dev-state-btn" data-state="empty" onclick="setState('empty')">空态</button>
+</div>
+
+<script src="../../_shared/proto-router.js"></script>
+<script>
+  function setState(state) {
+    document.querySelectorAll('[data-state]').forEach(el => el.style.display = 'none');
+    document.querySelector(`[data-state="${state}"]`).style.display = 'block';
+    document.querySelectorAll('.dev-state-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.state === state);
+    });
+  }
+
+  function switchPortfolioTab(tab, el) {
+    document.querySelectorAll('.portfolio-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    document.querySelectorAll('.portfolio-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-' + tab).classList.add('active');
+  }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>07-Cross-Module — 通知中心</title>
+
+  <link rel="stylesheet" href="../../_design-system/tokens.css">
+  <link rel="stylesheet" href="../../_design-system/components.css">
+  <link rel="stylesheet" href="../../_design-system/proto-base.css">
+
+  <style>
+    .notification-tabs {
+      display: flex;
+      gap: var(--space-2);
+      padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid var(--color-divider);
+      overflow-x: auto;
+    }
+
+    .notification-tab {
+      padding: var(--space-2) var(--space-3);
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      white-space: nowrap;
+    }
+
+    .notification-tab.active {
+      border-bottom-color: var(--color-primary);
+      color: var(--color-primary);
+    }
+
+    .notification-list {
+      padding: 0;
+    }
+
+    .notification-item {
+      display: flex;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid var(--color-divider);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .notification-item:active {
+      background: var(--color-bg-elevated);
+    }
+
+    .notification-item.unread {
+      background: rgba(13, 101, 242, 0.05);
+    }
+
+    .notification-icon {
+      width: 44px;
+      height: 44px;
+      background: var(--color-bg-elevated);
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--text-2xl);
+      flex-shrink: 0;
+      position: relative;
+    }
+
+    .notification-badge {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      width: 20px;
+      height: 20px;
+      background: var(--color-primary);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: var(--text-xs);
+      color: #fff;
+      font-weight: var(--font-weight-bold);
+    }
+
+    .notification-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .notification-title {
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+      margin-bottom: 2px;
+    }
+
+    .notification-message {
+      font-size: var(--text-xs);
+      color: var(--color-text-secondary);
+      line-height: 1.4;
+      margin-bottom: 4px;
+    }
+
+    .notification-time {
+      font-size: var(--text-xs);
+      color: var(--color-text-tertiary);
+    }
+
+    .notification-action {
+      color: var(--color-text-tertiary);
+      font-size: var(--text-lg);
+    }
+
+    .empty-state-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-8) var(--space-4);
+      text-align: center;
+    }
+
+    .empty-icon {
+      font-size: var(--text-6xl);
+      margin-bottom: var(--space-3);
+    }
+
+    .empty-title {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-1);
+    }
+
+    .empty-message {
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+    }
+
+    .notification-type-order {
+      color: var(--color-primary);
+    }
+
+    .notification-type-price {
+      color: var(--color-gain);
+    }
+
+    .notification-type-warning {
+      color: #FFC107;
+    }
+
+    .notification-type-error {
+      color: var(--color-loss);
+    }
+
+    .error-state-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-8) var(--space-4);
+      text-align: center;
+      height: 100%;
+    }
+
+    .error-icon {
+      font-size: var(--text-7xl);
+      margin-bottom: var(--space-4);
+    }
+
+    .error-title {
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+      margin-bottom: var(--space-2);
+    }
+
+    .error-message {
+      font-size: var(--text-sm);
+      color: var(--color-text-secondary);
+      margin-bottom: var(--space-4);
+      line-height: 1.5;
+    }
+
+    .error-actions {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+      width: 100%;
+      max-width: 300px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>📱 07-Cross-Module — 通知中心</strong><br>
+  🔗 <a href="../../03-market/hifi/index.html">← 返回首页</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar">
+    <div class="status-bar-left"><span class="status-bar-time">9:41</span></div>
+    <div class="status-bar-right"><span>●●●</span><span>WiFi</span><span>100%</span></div>
+  </div>
+
+  <div class="nav-bar">
+    <div class="nav-bar-left"></div>
+    <div class="nav-bar-center">
+      <div class="nav-bar-title">通知</div>
+    </div>
+    <div class="nav-bar-right">🔔</div>
+  </div>
+
+  <div class="screen" style="padding: 0;">
+
+    <!-- 标签页 -->
+    <div class="notification-tabs">
+      <button class="notification-tab active" onclick="switchTab(this, 'all')">全部 <span style="font-size: 10px; margin-left: 4px; color: var(--color-primary); font-weight: bold;">3</span></button>
+      <button class="notification-tab" onclick="switchTab(this, 'order')">交易</button>
+      <button class="notification-tab" onclick="switchTab(this, 'fund')">资金</button>
+      <button class="notification-tab" onclick="switchTab(this, 'system')">系统</button>
+    </div>
+
+    <!-- [STATE: ALL] 全部通知 -->
+    <div data-state="all" class="notification-list">
+      <!-- 未读订单通知 -->
+      <div class="notification-item unread">
+        <div class="notification-icon notification-type-order">
+          📝
+          <div class="notification-badge">1</div>
+        </div>
+        <div class="notification-content">
+          <div class="notification-title">订单已成交</div>
+          <div class="notification-message">您的限价买单 AAPL 100 股已成交，成交价 $178.25</div>
+          <div class="notification-time">刚刚</div>
+        </div>
+        <div class="notification-action">›</div>
+      </div>
+
+      <!-- 价格提醒 -->
+      <div class="notification-item">
+        <div class="notification-icon notification-type-price">
+          📈
+        </div>
+        <div class="notification-content">
+          <div class="notification-title">价格提醒</div>
+          <div class="notification-message">TSLA 跌破 $240 目标价，现价 $238.50</div>
+          <div class="notification-time">5 分钟前</div>
+        </div>
+        <div class="notification-action">›</div>
+      </div>
+
+      <!-- 提现通知 -->
+      <div class="notification-item">
+        <div class="notification-icon notification-type-order">
+          💰
+        </div>
+        <div class="notification-content">
+          <div class="notification-title">提现已完成</div>
+          <div class="notification-message">$5,000 已转账至招商银行，预计 1-3 个工作日到账</div>
+          <div class="notification-time">今天 14:35</div>
+        </div>
+        <div class="notification-action">›</div>
+      </div>
+
+      <!-- 风险警告 -->
+      <div class="notification-item">
+        <div class="notification-icon notification-type-warning">
+          ⚠️
+        </div>
+        <div class="notification-content">
+          <div class="notification-title">风险提示</div>
+          <div class="notification-message">您的可用保证金不足，如继续下跌可能触发强制平仓</div>
+          <div class="notification-time">昨天 09:30</div>
+        </div>
+        <div class="notification-action">›</div>
+      </div>
+    </div>
+
+    <!-- [STATE: EMPTY] 空态 -->
+    <div data-state="empty" style="display: none;">
+      <div class="empty-state-container">
+        <div class="empty-icon">🔔</div>
+        <div class="empty-title">暂无通知</div>
+        <div class="empty-message">一切正常，继续享受交易吧</div>
+      </div>
+    </div>
+
+    <!-- [STATE: NETWORK_ERROR] 网络断开 -->
+    <div data-state="network-error" style="display: none;">
+      <div class="error-state-container">
+        <div class="error-icon">📡</div>
+        <div class="error-title">网络连接失败</div>
+        <div class="error-message">无法连接到服务器，请检查网络设置后重试</div>
+        <div class="error-actions">
+          <button class="btn btn-primary" onclick="retryConnection()">重新连接</button>
+          <button class="btn btn-ghost" onclick="history.back()">返回</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- [STATE: SESSION_EXPIRED] 会话过期 -->
+    <div data-state="session-expired" style="display: none;">
+      <div class="error-state-container">
+        <div class="error-icon">🔐</div>
+        <div class="error-title">会话已过期</div>
+        <div class="error-message">您的登录状态已失效，请重新登录</div>
+        <div class="error-actions">
+          <button class="btn btn-primary" onclick="goto('../../01-auth/hifi/login.html')">重新登录</button>
+          <button class="btn btn-ghost" onclick="history.back()">返回</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- [STATE: SERVER_ERROR] 服务异常 -->
+    <div data-state="server-error" style="display: none;">
+      <div class="error-state-container">
+        <div class="error-icon">⚠️</div>
+        <div class="error-title">服务异常</div>
+        <div class="error-message">服务器暂时无法处理您的请求，我们正在修复中</div>
+        <div class="error-actions">
+          <button class="btn btn-primary" onclick="retryConnection()">重新加载</button>
+          <button class="btn btn-ghost" onclick="history.back()">返回</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- [STATE: PERMISSION_DENIED] 权限限制 -->
+    <div data-state="permission-denied" style="display: none;">
+      <div class="error-state-container">
+        <div class="error-icon">🚫</div>
+        <div class="error-title">权限限制</div>
+        <div class="error-message">您需要完成身份认证后才能查看通知</div>
+        <div class="error-actions">
+          <button class="btn btn-primary" onclick="goto('../../02-kyc/hifi/index.html')">完成认证</button>
+          <button class="btn btn-ghost" onclick="history.back()">返回</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab-item" onclick="goto('../../03-market/hifi/index.html')"><div class="tab-item-icon">📈</div><span>行情</span></div>
+    <div class="tab-item" onclick="goto('../../04-trading/hifi/order-list.html')"><div class="tab-item-icon">📝</div><span>交易</span></div>
+    <div class="tab-item" onclick="goto('../../06-portfolio/hifi/index.html')"><div class="tab-item-icon">💼</div><span>持仓</span></div>
+    <div class="tab-item"><div class="tab-item-icon">⚙️</div><span>我的</span></div>
+  </div>
+</div>
+
+<div class="dev-toolbar">
+  <div class="dev-toolbar-title">🔧 State Preview</div>
+  <button class="dev-state-btn active" data-state="all" onclick="setState('all')">通知</button>
+  <button class="dev-state-btn" data-state="empty" onclick="setState('empty')">空态</button>
+  <button class="dev-state-btn" data-state="network-error" onclick="setState('network-error')">网络错误</button>
+  <button class="dev-state-btn" data-state="session-expired" onclick="setState('session-expired')">会话过期</button>
+  <button class="dev-state-btn" data-state="server-error" onclick="setState('server-error')">服务异常</button>
+  <button class="dev-state-btn" data-state="permission-denied" onclick="setState('permission-denied')">权限限制</button>
+</div>
+
+<script src="../../_shared/proto-router.js"></script>
+<script>
+  function setState(state) {
+    document.querySelectorAll('[data-state]').forEach(el => el.style.display = 'none');
+    document.querySelector(`[data-state="${state}"]`).style.display = 'block';
+    document.querySelectorAll('.dev-state-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.state === state);
+    });
+  }
+
+  function switchTab(element, tab) {
+    document.querySelectorAll('.notification-tab').forEach(t => {
+      t.classList.remove('active');
+    });
+    element.classList.add('active');
+
+    // 简单示例：切换标签时显示空态
+    if (tab !== 'all') {
+      setState('empty');
+    } else {
+      setState('all');
+    }
+  }
+
+  function retryConnection() {
+    // Simulate retry - show loading state and reset to main state
+    setState('all');
+  }
+</script>
+
+</body>
+</html>

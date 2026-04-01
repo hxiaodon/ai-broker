@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>03-Market — 行情首页</title>
+
+  <link rel="stylesheet" href="../../_design-system/tokens.css">
+  <link rel="stylesheet" href="../../_design-system/components.css">
+  <link rel="stylesheet" href="../../_design-system/proto-base.css">
+
+  <style>
+    .search-bar {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-divider);
+      border-radius: var(--radius-md);
+      padding: var(--space-3) var(--space-3);
+      margin-bottom: var(--space-4);
+      cursor: pointer;
+    }
+
+    .search-bar-icon {
+      color: var(--color-text-secondary);
+      font-size: var(--text-lg);
+    }
+
+    .search-bar-text {
+      color: var(--color-text-tertiary);
+      font-size: var(--text-base);
+    }
+
+    .market-banner {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+      border-radius: var(--radius-lg);
+      padding: var(--space-4);
+      margin-bottom: var(--space-4);
+      color: #fff;
+    }
+
+    .market-index-title {
+      font-size: var(--text-xs);
+      font-weight: var(--font-weight-semibold);
+      opacity: 0.9;
+      margin-bottom: var(--space-2);
+    }
+
+    .market-indexes {
+      display: flex;
+      gap: var(--space-2);
+      overflow-x: auto;
+      padding-bottom: var(--space-2);
+    }
+
+    .index-card {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: var(--radius-md);
+      padding: var(--space-3);
+      flex-shrink: 0;
+      min-width: 100px;
+      text-align: center;
+    }
+
+    .index-symbol {
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-bold);
+      margin-bottom: var(--space-1);
+    }
+
+    .index-price {
+      font-family: var(--font-mono);
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-semibold);
+      margin-bottom: var(--space-1);
+    }
+
+    .index-change {
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      opacity: 0.9;
+    }
+
+    .watchlist-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: var(--space-3);
+    }
+
+    .watchlist-title {
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-primary);
+    }
+
+    .watchlist-edit {
+      font-size: var(--text-xs);
+      color: var(--color-primary);
+      cursor: pointer;
+    }
+
+    .watchlist-tabs {
+      display: flex;
+      gap: var(--space-2);
+      margin-bottom: var(--space-3);
+      overflow-x: auto;
+      padding-bottom: var(--space-2);
+    }
+
+    .watchlist-tab {
+      padding: var(--space-2) var(--space-3);
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-divider);
+      border-radius: var(--radius-full);
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      white-space: nowrap;
+    }
+
+    .watchlist-tab.active {
+      background: var(--color-primary);
+      color: #fff;
+      border-color: var(--color-primary);
+    }
+
+    .stock-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-3) 0;
+      border-bottom: 1px solid var(--color-divider);
+      cursor: pointer;
+    }
+
+    .stock-row:last-child {
+      border-bottom: none;
+    }
+
+    .stock-badge {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-bold);
+      flex-shrink: 0;
+    }
+
+    .stock-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .stock-symbol {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+      margin-bottom: 2px;
+    }
+
+    .stock-name {
+      font-size: var(--text-xs);
+      color: var(--color-text-secondary);
+    }
+
+    .stock-price {
+      text-align: right;
+    }
+
+    .stock-price-main {
+      font-family: var(--font-mono);
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+    }
+
+    .stock-change {
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-semibold);
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+      margin-top: 2px;
+    }
+
+    .stock-change.up {
+      background: rgba(13, 197, 130, 0.15);
+      color: var(--color-gain);
+    }
+
+    .stock-change.down {
+      background: rgba(255, 71, 71, 0.15);
+      color: var(--color-loss);
+    }
+
+    .hot-stocks-section {
+      margin-top: var(--space-6);
+    }
+
+    .section-divider {
+      height: 1px;
+      background: var(--color-divider-strong);
+      margin: var(--space-4) 0;
+    }
+
+    /* ── Market Tab Navigation ── */
+    .market-tab-nav {
+      display: flex;
+      gap: 0;
+      overflow-x: auto;
+      padding-bottom: var(--space-2);
+      margin-bottom: var(--space-3);
+      border-bottom: 1px solid var(--color-divider);
+    }
+
+    .market-tab {
+      padding: var(--space-3) var(--space-4);
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-secondary);
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: all var(--transition-fast);
+    }
+
+    .market-tab:hover {
+      color: var(--color-text-primary);
+    }
+
+    .market-tab.active {
+      color: var(--color-primary);
+      border-bottom-color: var(--color-primary);
+    }
+
+    /* Market panels */
+    .market-panel {
+      display: none;
+    }
+
+    .market-panel.active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>📱 03-Market — 行情首页</strong><br>
+  🔗 <a href="stock-detail.html">股票详情</a> | <a href="search.html">搜索</a> | <a href="../../_design-system/showcase.html">Design System</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar">
+    <div class="status-bar-left"><span class="status-bar-time">9:41</span></div>
+    <div class="status-bar-right"><span>●●●</span><span>WiFi</span><span>100%</span></div>
+  </div>
+
+  <div class="nav-bar">
+    <div class="nav-bar-left"></div>
+    <div class="nav-bar-center">
+      <div class="nav-bar-title">行情</div>
+    </div>
+    <div class="nav-bar-right"></div>
+  </div>
+
+  <div class="screen">
+
+    <!-- [STATE: NORMAL] 正常状态 -->
+    <div data-state="normal">
+      <!-- 搜索栏 -->
+      <div class="search-bar" onclick="goto('search.html')">
+        <span class="search-bar-icon">🔍</span>
+        <span class="search-bar-text">搜索股票、ETF…</span>
+      </div>
+
+      <!-- 大盘指数 (ETF 代理) -->
+      <!-- [DESIGN] 显示 SPY/QQQ/DIA 三个主流指数（实际通过 ETF 追踪）
+                   点击进入股票详情页查看 K 线
+                   Flutter: 可滑动卡片，点击导航到 stock-detail -->
+      <div class="market-banner">
+        <div class="market-index-title">大盘指数 (ETF 代理)</div>
+        <div class="market-indexes">
+          <div class="index-card">
+            <div class="index-symbol">SPY</div>
+            <div class="index-price">$521.44</div>
+            <div class="index-change">+0.82%</div>
+          </div>
+          <div class="index-card">
+            <div class="index-symbol">QQQ</div>
+            <div class="index-price">$438.72</div>
+            <div class="index-change">-0.34%</div>
+          </div>
+          <div class="index-card">
+            <div class="index-symbol">DIA</div>
+            <div class="index-price">$387.15</div>
+            <div class="index-change">+0.12%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 行情 Tab 导航 -->
+      <div class="market-tab-nav">
+        <div class="market-tab active" onclick="switchMktTab('watchlist', this)">自选</div>
+        <div class="market-tab" onclick="switchMktTab('hot', this)">热门</div>
+        <div class="market-tab" onclick="switchMktTab('gainers', this)">涨幅榜</div>
+        <div class="market-tab" onclick="switchMktTab('losers', this)">跌幅榜</div>
+        <div class="market-tab" onclick="switchMktTab('hk', this)">港股</div>
+      </div>
+
+      <!-- [PANEL: WATCHLIST] 自选 -->
+      <div id="panel-watchlist" class="market-panel active">
+        <div class="watchlist-header">
+          <div class="watchlist-title">自选股</div>
+          <div class="watchlist-edit">编辑</div>
+        </div>
+
+        <div class="watchlist-tabs">
+          <div class="watchlist-tab active" onclick="switchWatchlist('all')">全部</div>
+          <div class="watchlist-tab" onclick="switchWatchlist('us')">美股</div>
+          <div class="watchlist-tab" onclick="switchWatchlist('etf')">ETF</div>
+          <div class="watchlist-tab" onclick="switchWatchlist('hk')">港股</div>
+        </div>
+
+        <!-- 自选股列表 -->
+      <div class="stock-row" onclick="goto('stock-detail.html')">
+        <div class="stock-badge">AAPL</div>
+        <div class="stock-info">
+          <div class="stock-symbol">AAPL</div>
+          <div class="stock-name">Apple Inc. · NASDAQ</div>
+        </div>
+        <div class="stock-price">
+          <div class="stock-price-main">$178.25</div>
+          <div class="stock-change up">+2.14%</div>
+        </div>
+      </div>
+
+      <div class="stock-row" onclick="goto('stock-detail.html')">
+        <div class="stock-badge" style="background: linear-gradient(135deg, #FF4747, #CC3333);">TSLA</div>
+        <div class="stock-info">
+          <div class="stock-symbol">TSLA</div>
+          <div class="stock-name">Tesla Inc. · NASDAQ</div>
+        </div>
+        <div class="stock-price">
+          <div class="stock-price-main">$242.38</div>
+          <div class="stock-change down">-3.76%</div>
+        </div>
+      </div>
+
+      <div class="stock-row" onclick="goto('stock-detail.html')">
+        <div class="stock-badge" style="background: linear-gradient(135deg, #0DC582, #0A9E66);">NVDA</div>
+        <div class="stock-info">
+          <div class="stock-symbol">NVDA</div>
+          <div class="stock-name">NVIDIA Corp. · NASDAQ</div>
+        </div>
+        <div class="stock-price">
+          <div class="stock-price-main">$884.50</div>
+          <div class="stock-change up">+5.21%</div>
+        </div>
+      </div>
+
+      <div class="stock-row" onclick="goto('stock-detail.html')">
+        <div class="stock-badge" style="background: linear-gradient(135deg, #4169E1, #1E40AF);">MSFT</div>
+        <div class="stock-info">
+          <div class="stock-symbol">MSFT</div>
+          <div class="stock-name">Microsoft Corp. · NASDAQ</div>
+        </div>
+        <div class="stock-price">
+          <div class="stock-price-main">$415.72</div>
+          <div class="stock-change up">+0.88%</div>
+        </div>
+      </div>
+      </div>
+
+      <!-- [PANEL: HOT] 热门 -->
+      <div id="panel-hot" class="market-panel">
+        <div style="margin-bottom: var(--space-3);">
+          <div class="stock-row" onclick="goto('stock-detail.html')">
+            <div style="width: 44px; font-size: var(--text-sm); color: var(--color-text-secondary); text-align: center; font-weight: var(--font-weight-bold);">#1</div>
+            <div class="stock-info">
+              <div class="stock-symbol">AAPL</div>
+              <div class="stock-name">成交量 89.2M</div>
+            </div>
+            <div class="stock-change up">+2.14%</div>
+          </div>
+
+          <div class="stock-row" onclick="goto('stock-detail.html')">
+            <div style="width: 44px; font-size: var(--text-sm); color: var(--color-text-secondary); text-align: center; font-weight: var(--font-weight-bold);">#2</div>
+            <div class="stock-info">
+              <div class="stock-symbol">NVDA</div>
+              <div class="stock-name">成交量 42.7M</div>
+            </div>
+            <div class="stock-change up">+5.21%</div>
+          </div>
+
+          <div class="stock-row" onclick="goto('stock-detail.html')">
+            <div style="width: 44px; font-size: var(--text-sm); color: var(--color-text-secondary); text-align: center; font-weight: var(--font-weight-bold);">#3</div>
+            <div class="stock-info">
+              <div class="stock-symbol">TSLA</div>
+              <div class="stock-name">成交量 38.1M</div>
+            </div>
+            <div class="stock-change down">-3.76%</div>
+          </div>
+
+          <div class="stock-row" onclick="goto('stock-detail.html')">
+            <div style="width: 44px; font-size: var(--text-sm); color: var(--color-text-secondary); text-align: center; font-weight: var(--font-weight-bold);">#4</div>
+            <div class="stock-info">
+              <div class="stock-symbol">MSFT</div>
+              <div class="stock-name">成交量 21.4M</div>
+            </div>
+            <div class="stock-change up">+0.88%</div>
+          </div>
+
+          <div class="stock-row" onclick="goto('stock-detail.html')">
+            <div style="width: 44px; font-size: var(--text-sm); color: var(--color-text-secondary); text-align: center; font-weight: var(--font-weight-bold);">#5</div>
+            <div class="stock-info">
+              <div class="stock-symbol">AMD</div>
+              <div class="stock-name">成交量 18.9M</div>
+            </div>
+            <div class="stock-change up">+3.45%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- [PANEL: GAINERS] 涨幅榜 -->
+      <div id="panel-gainers" class="market-panel">
+        <div style="margin-bottom: var(--space-3);">
+          <div class="stock-row" onclick="goto('stock-detail.html')">
+            <div style="width: 44px; font-size: var(--text-sm); color: var(--color-text-secondary); text-align: center; font-weight: var(--font-weight-bold);">#1</div>
+            <div class="stock-info">
+              <div class="stock-symbol">NVDA</div>
+              <div class="stock-name">NVIDIA Corp.</div>
+            </div>
+            <div class="stock-change up">+5.21%</div>
+          </div>
+
+          <div class="stock-row" onclick="goto('stock-detail.html')">
+            <div style="width: 44px; font-size: var(--text-sm); color: var(--color-text-secondary); text-align: center; font-weight: var(--font-weight-bold);">#2</div>
+            <div class="stock-info">
+              <div class="stock-symbol">AMD</div>
+              <div class="stock-name">Advanced Micro Devices</div>
+            </div>
+            <div class="stock-change up">+3.45%</div>
+          </div>
+
+          <div class="stock-row" onclick="goto('stock-detail.html')">
+            <div style="width: 44px; font-size: var(--text-sm); color: var(--color-text-secondary); text-align: center; font-weight: var(--font-weight-bold);">#3</div>
+            <div class="stock-info">
+              <div class="stock-symbol">AAPL</div>
+              <div class="stock-name">Apple Inc.</div>
+            </div>
+            <div class="stock-change up">+2.14%</div>
+          </div>
+
+          <div class="stock-row" onclick="goto('stock-detail.html')">
+            <div style="width: 44px; font-size: var(--text-sm); color: var(--color-text-secondary); text-align: center; font-weight: var(--font-weight-bold);">#4</div>
+            <div class="stock-info">
+              <div class="stock-symbol">GOOGL</div>
+              <div class="stock-name">Alphabet Inc.</div>
+            </div>
+            <div class="stock-change up">+1.96%</div>
+          </div>
+
+          <div class="stock-row" onclick="goto('stock-detail.html')">
+            <div style="width: 44px; font-size: var(--text-sm); color: var(--color-text-secondary); text-align: center; font-weight: var(--font-weight-bold);">#5</div>
+            <div class="stock-info">
+              <div class="stock-symbol">MSFT</div>
+              <div class="stock-name">Microsoft Corp.</div>
+            </div>
+            <div class="stock-change up">+0.88%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- [PANEL: LOSERS] 跌幅榜 -->
+      <div id="panel-losers" class="market-panel">
+        <div style="margin-bottom: var(--space-3);">
+          <div class="stock-row" onclick="goto('stock-detail.html')">
+            <div style="width: 44px; font-size: var(--text-sm); color: var(--color-text-secondary); text-align: center; font-weight: var(--font-weight-bold);">#1</div>
+            <div class="stock-info">
+              <div class="stock-symbol">TSLA</div>
+              <div class="stock-name">Tesla Inc.</div>
+            </div>
+            <div class="stock-change down">-3.76%</div>
+          </div>
+
+          <div class="stock-row" onclick="goto('stock-detail.html')">
+            <div style="width: 44px; font-size: var(--text-sm); color: var(--color-text-secondary); text-align: center; font-weight: var(--font-weight-bold);">#2</div>
+            <div class="stock-info">
+              <div class="stock-symbol">NFLX</div>
+              <div class="stock-name">Netflix, Inc.</div>
+            </div>
+            <div class="stock-change down">-2.31%</div>
+          </div>
+
+          <div class="stock-row" onclick="goto('stock-detail.html')">
+            <div style="width: 44px; font-size: var(--text-sm); color: var(--color-text-secondary); text-align: center; font-weight: var(--font-weight-bold);">#3</div>
+            <div class="stock-info">
+              <div class="stock-symbol">QQQ</div>
+              <div class="stock-name">Invesco QQQ Trust</div>
+            </div>
+            <div class="stock-change down">-0.34%</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- [PANEL: HK] 港股 -->
+      <div id="panel-hk" class="market-panel">
+        <div style="text-align: center; padding: var(--space-8) var(--space-4);">
+          <div style="font-size: var(--text-4xl); margin-bottom: var(--space-3);">🇭🇰</div>
+          <div style="font-size: var(--text-lg); font-weight: var(--font-weight-bold); color: var(--color-text-primary); margin-bottom: var(--space-2);">港股交易即将开放</div>
+          <div style="font-size: var(--text-sm); color: var(--color-text-secondary);">敬请期待，港股功能将在下一版本推出</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- [STATE: LOADING] 加载中 -->
+    <div data-state="loading" style="display: none;">
+      <div class="skeleton" style="height: 48px; border-radius: var(--radius-md); margin-bottom: var(--space-4);"></div>
+      <div class="skeleton" style="height: 140px; border-radius: var(--radius-lg); margin-bottom: var(--space-4);"></div>
+      <div class="skeleton" style="height: 60px; border-radius: var(--radius-md); margin-bottom: var(--space-2);"></div>
+      <div class="skeleton" style="height: 60px; border-radius: var(--radius-md); margin-bottom: var(--space-2);"></div>
+      <div class="skeleton" style="height: 60px; border-radius: var(--radius-md);"></div>
+    </div>
+
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab-item active"><div class="tab-item-icon">📈</div><span>行情</span></div>
+    <div class="tab-item" onclick="goto('../../04-trading/hifi/order-list.html')"><div class="tab-item-icon">📝</div><span>交易</span></div>
+    <div class="tab-item" onclick="goto('../../06-portfolio/hifi/index.html')"><div class="tab-item-icon">💼</div><span>持仓</span></div>
+    <div class="tab-item"><div class="tab-item-icon">⚙️</div><span>我的</span></div>
+  </div>
+</div>
+
+<div class="dev-toolbar">
+  <div class="dev-toolbar-title">🔧 State Preview</div>
+  <button class="dev-state-btn active" data-state="normal" onclick="setState('normal')">正常</button>
+  <button class="dev-state-btn" data-state="loading" onclick="setState('loading')">加载</button>
+</div>
+
+<script src="../../_shared/proto-router.js"></script>
+<script>
+  function setState(state) {
+    document.querySelectorAll('[data-state]').forEach(el => el.style.display = 'none');
+    document.querySelector(`[data-state="${state}"]`).style.display = 'block';
+    document.querySelectorAll('.dev-state-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.state === state);
+    });
+  }
+
+  function switchWatchlist(tab) {
+    document.querySelectorAll('.watchlist-tab').forEach(t => t.classList.remove('active'));
+    event.target.closest('.watchlist-tab').classList.add('active');
+  }
+
+  function switchMktTab(tab, el) {
+    document.querySelectorAll('.market-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    document.querySelectorAll('.market-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-' + tab).classList.add('active');
+  }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>03-Market — 搜索</title>
+
+  <link rel="stylesheet" href="../../_design-system/tokens.css">
+  <link rel="stylesheet" href="../../_design-system/components.css">
+  <link rel="stylesheet" href="../../_design-system/proto-base.css">
+
+  <style>
+    .search-input-wrapper {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      background: var(--color-bg-surface);
+      border: 1px solid var(--color-divider);
+      border-radius: var(--radius-md);
+      padding: var(--space-3) var(--space-3);
+      margin-bottom: var(--space-4);
+    }
+
+    .search-input {
+      flex: 1;
+      background: none;
+      border: none;
+      color: var(--color-text-primary);
+      font-size: var(--text-base);
+      outline: none;
+    }
+
+    .search-input::placeholder {
+      color: var(--color-text-tertiary);
+    }
+
+    .search-clear {
+      cursor: pointer;
+      color: var(--color-text-secondary);
+      font-size: var(--text-lg);
+    }
+
+    .search-results {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+
+    .search-result-item {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      padding: var(--space-3);
+      background: var(--color-bg-surface);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+    }
+
+    .search-result-item:hover {
+      background: var(--color-bg-elevated);
+    }
+
+    .search-result-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-bold);
+      flex-shrink: 0;
+    }
+
+    .search-result-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .search-result-symbol {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+      margin-bottom: 2px;
+    }
+
+    .search-result-name {
+      font-size: var(--text-xs);
+      color: var(--color-text-secondary);
+    }
+
+    .search-result-price {
+      text-align: right;
+    }
+
+    .search-result-price-main {
+      font-family: var(--font-mono);
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-semibold);
+      color: var(--color-text-primary);
+    }
+
+    .search-result-change {
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      padding: 2px 4px;
+      border-radius: 2px;
+      margin-top: 2px;
+    }
+
+    .section-title {
+      font-size: var(--text-sm);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-text-secondary);
+      text-transform: uppercase;
+      margin-bottom: var(--space-2);
+      margin-top: var(--space-4);
+    }
+
+    .section-title:first-child {
+      margin-top: 0;
+    }
+  </style>
+</head>
+<body>
+
+<div class="proto-nav">
+  <strong>📱 03-Market — 搜索</strong><br>
+  🔗 <a href="index.html">← 返回</a>
+</div>
+
+<div class="phone">
+  <div class="status-bar">
+    <div class="status-bar-left"><span class="status-bar-time">9:41</span></div>
+    <div class="status-bar-right"><span>●●●</span><span>WiFi</span><span>100%</span></div>
+  </div>
+
+  <div class="nav-bar">
+    <div class="nav-bar-left">
+      <div class="nav-bar-back" onclick="history.back()">‹</div>
+    </div>
+    <div class="nav-bar-center">
+      <div class="nav-bar-title">搜索</div>
+    </div>
+    <div class="nav-bar-right"></div>
+  </div>
+
+  <div class="screen">
+
+    <!-- [STATE: EMPTY] 空态 - 输入前 -->
+    <div data-state="empty">
+      <div class="search-input-wrapper">
+        <span style="color: var(--color-text-secondary);">🔍</span>
+        <input type="text" class="search-input" placeholder="输入股票代码或名称..." id="search-input" onkeyup="onSearchInput(event)">
+      </div>
+
+      <div class="section-title">历史搜索</div>
+      <div class="search-results">
+        <div class="search-result-item" onclick="goto('stock-detail.html')">
+          <div class="search-result-icon">AAPL</div>
+          <div class="search-result-content">
+            <div class="search-result-symbol">AAPL</div>
+            <div class="search-result-name">Apple Inc.</div>
+          </div>
+        </div>
+        <div class="search-result-item" onclick="goto('stock-detail.html')">
+          <div class="search-result-icon" style="background: linear-gradient(135deg, #FF4747, #CC3333);">TSLA</div>
+          <div class="search-result-content">
+            <div class="search-result-symbol">TSLA</div>
+            <div class="search-result-name">Tesla, Inc.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-title">热门搜索</div>
+      <div class="search-results">
+        <div class="search-result-item" onclick="goto('stock-detail.html')">
+          <div class="search-result-icon" style="background: linear-gradient(135deg, #0DC582, #0A9E66);">NVDA</div>
+          <div class="search-result-content">
+            <div class="search-result-symbol">NVDA</div>
+            <div class="search-result-name">NVIDIA Corp.</div>
+          </div>
+          <div class="search-result-price">
+            <div class="search-result-price-main">$884.50</div>
+            <div class="search-result-change" style="color: var(--color-gain); background: rgba(13, 197, 130, 0.15);">+5.21%</div>
+          </div>
+        </div>
+        <div class="search-result-item" onclick="goto('stock-detail.html')">
+          <div class="search-result-icon" style="background: linear-gradient(135deg, #4169E1, #1E40AF);">MSFT</div>
+          <div class="search-result-content">
+            <div class="search-result-symbol">MSFT</div>
+            <div class="search-result-name">Microsoft Corp.</div>
+          </div>
+          <div class="search-result-price">
+            <div class="search-result-price-main">$415.72</div>
+            <div class="search-result-change" style="color: var(--color-gain); background: rgba(13, 197, 130, 0.15);">+0.88%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- [STATE: RESULTS] 搜索结果 -->
+    <div data-state="results" style="display: none;">
+      <div class="search-input-wrapper">
+        <span style="color: var(--color-text-secondary);">🔍</span>
+        <input type="text" class="search-input" placeholder="输入股票代码或名称..." id="search-input-2" value="AAPL" onkeyup="onSearchInput(event)">
+        <span class="search-clear" onclick="clearSearch()">✕</span>
+      </div>
+
+      <div class="search-results">
+        <div class="search-result-item" onclick="goto('stock-detail.html')">
+          <div class="search-result-icon">AAPL</div>
+          <div class="search-result-content">
+            <div class="search-result-symbol">AAPL</div>
+            <div class="search-result-name">Apple Inc. · NASDAQ</div>
+          </div>
+          <div class="search-result-price">
+            <div class="search-result-price-main">$178.25</div>
+            <div class="search-result-change" style="color: var(--color-gain); background: rgba(13, 197, 130, 0.15);">+2.14%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- [STATE: EMPTY_RESULT] 无结果 -->
+    <div data-state="empty-result" style="display: none;">
+      <div class="search-input-wrapper">
+        <span style="color: var(--color-text-secondary);">🔍</span>
+        <input type="text" class="search-input" placeholder="输入股票代码或名称..." id="search-input-3" value="UNKN" onkeyup="onSearchInput(event)">
+        <span class="search-clear" onclick="clearSearch()">✕</span>
+      </div>
+
+      <div class="empty-state" style="padding: var(--space-8) var(--space-4); text-align: center;">
+        <div class="empty-icon">🔍</div>
+        <div class="empty-title">无搜索结果</div>
+        <div class="empty-message">未找到与 "UNKN" 相关的股票</div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab-item active" onclick="goto('index.html')"><div class="tab-item-icon">📈</div><span>行情</span></div>
+    <div class="tab-item"><div class="tab-item-icon">📝</div><span>交易</span></div>
+    <div class="tab-item"><div class="tab-item-icon">💼</div><span>持仓</span></div>
+    <div class="tab-item"><div class="tab-item-icon">⚙️</div><span>我的</span></div>
+  </div>
+</div>
+
+<div class="dev-toolbar">
+  <div class="dev-toolbar-title">🔧 State Preview</div>
+  <button class="dev-state-btn active" data-state="empty" onclick="setState('empty')">空态</button>
+  <button class="dev-state-btn" data-state="results" onclick="setState('results')">结果</button>
+  <button class="dev-state-btn" data-state="empty-result" onclick="setState('empty-result')">无结果</button>
+</div>
+
+<script src="../../_shared/proto-router.js"></script>
+<script>
+  function setState(state) {
+    document.querySelectorAll('[data-state]').forEach(el => el.style.display = 'none');
+    document.querySelector(`[data-state="${state}"]`).style.display = 'block';
+    document.querySelectorAll('.dev-state-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.state === state);
+    });
+  }
+
+  function onSearchInput(e) {
+    const input = e.target.value.trim();
+    if (!input) {
+      setState('empty');
+    } else if (input === 'AAPL') {
+      setState('results');
+    } else {
+      setState('empty-result');
+    }
+  }
+
+  function clearSearch() {
+    document.querySelectorAll('.search-input').forEach(inp => inp.value = '');
+    setState('empty');
+  }
+</script>
+
+</body>
+</html>
