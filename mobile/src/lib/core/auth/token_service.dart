@@ -66,7 +66,7 @@ class TokenService {
 }
 
 @Riverpod(keepAlive: true)
-TokenService tokenService(TokenServiceRef ref) {
+TokenService tokenService(Ref ref) {
   final storage = ref.watch(secureStorageServiceProvider);
   return TokenService(storage);
 }

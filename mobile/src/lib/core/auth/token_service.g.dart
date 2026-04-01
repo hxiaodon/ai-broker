@@ -6,21 +6,46 @@ part of 'token_service.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$tokenServiceHash() => r'23e1dd394934017113ee4b32619c00f5e57ef221';
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint, type=warning
 
-/// See also [tokenService].
 @ProviderFor(tokenService)
-final tokenServiceProvider = Provider<TokenService>.internal(
-  tokenService,
-  name: r'tokenServiceProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product') ? null : _$tokenServiceHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
+const tokenServiceProvider = TokenServiceProvider._();
 
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef TokenServiceRef = ProviderRef<TokenService>;
-// ignore_for_file: type=lint
-// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
+final class TokenServiceProvider
+    extends $FunctionalProvider<TokenService, TokenService, TokenService>
+    with $Provider<TokenService> {
+  const TokenServiceProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'tokenServiceProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$tokenServiceHash();
+
+  @$internal
+  @override
+  $ProviderElement<TokenService> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  TokenService create(Ref ref) {
+    return tokenService(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(TokenService value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<TokenService>(value),
+    );
+  }
+}
+
+String _$tokenServiceHash() => r'e5ada7721a1d42a1e70c401b98beec726ee36dda';

@@ -105,7 +105,7 @@ class DeviceInfoService {
 }
 
 @Riverpod(keepAlive: true)
-DeviceInfoService deviceInfoService(DeviceInfoServiceRef ref) {
+DeviceInfoService deviceInfoService(Ref ref) {
   return DeviceInfoService(
     DeviceInfoPlugin(),
     const FlutterSecureStorage(

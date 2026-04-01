@@ -6,24 +6,53 @@ part of 'connectivity_service.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$connectivityServiceHash() =>
-    r'2f9983c37bbf51a1f3e29b5afbd7d1274bc60efc';
+// GENERATED CODE - DO NOT MODIFY BY HAND
+// ignore_for_file: type=lint, type=warning
 
-/// See also [connectivityService].
 @ProviderFor(connectivityService)
-final connectivityServiceProvider = Provider<ConnectivityService>.internal(
-  connectivityService,
-  name: r'connectivityServiceProvider',
-  debugGetCreateSourceHash:
-      const bool.fromEnvironment('dart.vm.product')
-          ? null
-          : _$connectivityServiceHash,
-  dependencies: null,
-  allTransitiveDependencies: null,
-);
+const connectivityServiceProvider = ConnectivityServiceProvider._();
 
-@Deprecated('Will be removed in 3.0. Use Ref instead')
-// ignore: unused_element
-typedef ConnectivityServiceRef = ProviderRef<ConnectivityService>;
-// ignore_for_file: type=lint
-// ignore_for_file: subtype_of_sealed_class, invalid_use_of_internal_member, invalid_use_of_visible_for_testing_member, deprecated_member_use_from_same_package
+final class ConnectivityServiceProvider
+    extends
+        $FunctionalProvider<
+          ConnectivityService,
+          ConnectivityService,
+          ConnectivityService
+        >
+    with $Provider<ConnectivityService> {
+  const ConnectivityServiceProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'connectivityServiceProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$connectivityServiceHash();
+
+  @$internal
+  @override
+  $ProviderElement<ConnectivityService> $createElement(
+    $ProviderPointer pointer,
+  ) => $ProviderElement(pointer);
+
+  @override
+  ConnectivityService create(Ref ref) {
+    return connectivityService(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(ConnectivityService value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<ConnectivityService>(value),
+    );
+  }
+}
+
+String _$connectivityServiceHash() =>
+    r'f5011d64c85c6e8678d7a662de689047430c5290';

@@ -56,7 +56,7 @@ class SecureStorageService {
 }
 
 @Riverpod(keepAlive: true)
-SecureStorageService secureStorageService(SecureStorageServiceRef ref) {
+SecureStorageService secureStorageService(Ref ref) {
   const storage = FlutterSecureStorage(
     // unlocked_this_device: only accessible while device is actively unlocked.
     // Stronger than first_unlock_this_device — prevents background reads on

@@ -23,6 +23,6 @@ class ConnectivityService {
 }
 
 @Riverpod(keepAlive: true)
-ConnectivityService connectivityService(ConnectivityServiceRef ref) {
+ConnectivityService connectivityService(Ref ref) {
   return ConnectivityService(Connectivity());
 }

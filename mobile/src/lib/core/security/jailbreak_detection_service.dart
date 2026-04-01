@@ -91,7 +91,7 @@ class JailbreakDetectionService {
 
 @Riverpod(keepAlive: true)
 JailbreakDetectionService jailbreakDetectionService(
-  JailbreakDetectionServiceRef ref,
+  Ref ref,
 ) {
   return JailbreakDetectionService();
 }

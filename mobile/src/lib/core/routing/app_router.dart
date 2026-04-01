@@ -21,8 +21,7 @@ part 'app_router.g.dart';
 ///     /portfolio       → PortfolioScreen (placeholder)
 ///     /settings        → SettingsScreen (placeholder)
 @riverpod
-GoRouter appRouter(AppRouterRef ref) {
-  return GoRouter(
+GoRouter appRouter(Ref ref) => GoRouter(
     initialLocation: RouteNames.market,
     debugLogDiagnostics: true,
     // Phase 1: no redirect — always navigate directly to tab shell.
@@ -129,7 +128,6 @@ GoRouter appRouter(AppRouterRef ref) {
     ],
     errorBuilder: (_, state) => _ErrorPage(state.error),
   );
-}
 
 // ---------------------------------------------------------------------------
 // Internal placeholder widget (used only during scaffolding phase)
