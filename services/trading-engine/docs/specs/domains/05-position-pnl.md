@@ -123,7 +123,8 @@
 
 - 年终必须向 IRS 申报所有已实现盈亏。
 - 必须记录每笔交易的 **cost basis**（成本基准）。
-- 默认使用 **FIFO** 方法计算 cost basis。
+- **系统实现使用加权平均成本法（Weighted Average Cost）** 用于实时展示和用户报表，简化实现，符合税务合规（IRS 允许）。
+- FIFO 方法仅用于特殊税务调整场景（Phase 3+ 支持，预计 20-25 人天）。
 - Wash Sale Rule：30 天内买回实质相同证券，不能确认亏损。
 
 ### 2.2 香港市场（SFC / HKEX）
@@ -157,7 +158,7 @@
 | 合规要求 | 系统设计影响 |
 |---------|------------|
 | 持仓记录 7 年保留 | 使用 Event Sourcing，所有变更 append-only |
-| FIFO cost basis 追踪 | 需要维护每笔买入的 lot 级别记录 |
+| 加权平均成本法（Phase 1+2）| 实时展示和 P&L 计算采用加权平均成本法；FIFO 支持为后期升级（Phase 3+，可选） |
 | Wash Sale 检测 | 需要 30 天滑动窗口，追踪同一证券的买卖模式 |
 | 已结算/未结算分离 | positions 表分开存储 settled_qty 和 unsettled_qty |
 | 大额持仓披露 | 持仓变更时检查是否触及 5% 阈值 |
@@ -452,6 +453,36 @@ func calcDayPnL(pos *Position, marketPrice, prevClose decimal.Decimal, dayRealiz
 组合净值 = 现金余额 + SUM(持仓数量 * 当前市价)
          = CashBalance + TotalMarketValue
 ```
+
+#### 4.2.6 成本基础维护逻辑（Cost Basis Maintenance）
+
+**采用加权平均成本法（Weighted Average Cost）处理所有持仓成本：**
+
+**买入成交时：**
+```
+新平均成本 = (旧数量 * 旧平均成本 + 新成交数量 * 新成交价格 + 买入手续费) / (旧数量 + 新成交数量)
+```
+
+示例：
+- 首次买入：100股 @ $50，手续费 $5 → 成本 = (100 * $50 + $5) / 100 = $50.05
+- 追加买入：50股 @ $55，手续费 $3 → 新成本 = (100 * $50.05 + 50 * $55 + $3) / 150 = $51.70
+
+**卖出成交时：**
+- 持仓平均成本**保持不变**，不按卖出价格调整
+- 已实现盈亏 = (卖出价格 - 平均成本) × 卖出数量 - 卖出手续费
+
+**企业行动处理（Phase 1 + Phase 2）：**
+- **现金分红**：不改变 avg_cost_basis，分红直接进入现金余额
+- **股票分红**：增加持仓数量，重新计算平均成本（分红股票成本 = 0）
+- **股票拆分**：按比例调整持仓数量和平均成本
+  - 例如 2:1 拆分：100股 @ $50 → 200股 @ $25
+- **股票合并**：按反比例调整
+  - 例如 1:2 合并：100股 @ $50 → 50股 @ $100
+
+本策略统一 Phase 1（美股）和 Phase 2（港股）实现，简化代码维护。
+
+**FIFO 作为后期可选升级（Phase 3+）：**
+如未来需要支持 FIFO（例如用户税务特殊需求），需要额外维护 `tax_lots` 表追踪每笔买入批次，预计工作量 20-25 人天。
 
 ### 4.3 成交处理流程（核心写入路径）
 
@@ -886,6 +917,99 @@ Ex-Date 到达
           ├── 现金部分: 同现金合并
           └── 股票部分: 同股票合并
 ```
+
+#### 4.8.5 Phase 1 手工企业行动处理流程
+
+Phase 1（上线初期，自动化程度低）采用**人工操作** + **数据库更新**的流程处理企业行动：
+
+**支持的企业行动类型**（Phase 1）：
+- ✅ 现金分红（Cash Dividend）
+- ✅ 股票分红（Stock Dividend）
+- ✅ 股票拆分（Stock Split）
+- ❌ 配股（Rights Issue）— 预留架构，Phase 2+ 实现
+- ❌ 合并/收购（Merger）— 预留架构，Phase 2+ 实现
+- ❌ 反向拆分（Reverse Split）— Phase 2+ 实现
+
+**操作流程**（Compliance → PM → Admin → 系统记录 → 用户通知）：
+
+```
+1. Compliance 部门监控市场公告
+   │
+   ├── 确认企业行动信息（公司代码、类型、比例、日期、金额）
+   ├── 编制处理清单（受影响的账户列表）
+   └── 提交给 PM 审批
+   │
+   ▼
+2. PM 审批企业行动方案
+   │
+   ├── 检查数据准确性
+   ├── 确认对用户的影响
+   └── 批准处理
+   │
+   ▼
+3. Admin Panel 执行数据更新
+   │
+   ├── 登录 Admin Panel
+   ├── 选择企业行动类型和证券
+   ├── 输入处理参数（分红金额、拆分比例等）
+   ├── 系统生成 SQL 语句供审核
+   ├── 二次确认执行
+   └── 系统执行 UPDATE 操作
+       └─ 如果是现金分红，增加 cash_balance
+       └─ 如果是股票拆分，调整 quantity 和 avg_cost_basis
+   │
+   ▼
+4. 系统审计记录
+   │
+   ├── 记录企业行动处理日志 (corporate_action_log 表)
+   ├── 完整的变更前后快照
+   ├── 操作人员、操作时间、参数等
+   └── WORM 存储（7年 SEC 合规）
+   │
+   ▼
+5. 用户通知
+   │
+   ├── 生成 Kafka 事件 (corporate_action.processed)
+   ├── 发送 Mobile Push Notification
+   └── 在 Portfolio 页面显示企业行动详情
+```
+
+**数据库修改示例**（现金分红）：
+
+```sql
+-- 1. 查询受影响的持仓
+SELECT account_id, quantity, symbol
+FROM positions
+WHERE symbol = 'AAPL' AND market = 'US' AND quantity > 0
+  AND account_id IN (SELECT account_id FROM ...)  -- Record Date 的持仓快照
+
+-- 2. 计算分红总额
+-- Assume: $0.25 per share, 10000 股持仓
+-- Total dividend: $2500
+
+-- 3. 更新现金余额 (via Fund Transfer Service)
+UPDATE fund_transfer.cash_balance
+SET balance = balance + 0.25 * quantity
+WHERE symbol = 'AAPL' AND market = 'US'
+
+-- 4. 记录审计日志
+INSERT INTO corporate_action_log (
+  symbol, market, action_type,
+  affected_accounts, total_amount,
+  executed_by, executed_at,
+  approval_status, remarks
+) VALUES (
+  'AAPL', 'US', 'CASH_DIVIDEND',
+  10000, 2500.00,
+  'admin-username', NOW(),
+  'APPROVED', 'Q2 2026 Dividend Distribution'
+)
+```
+
+**Phase 2+ 升级**：
+- 自动化企业行动数据源接入（使用 FactSet / Bloomberg 企业行动 API）
+- 自动计算和执行（无需手工确认）
+- 支持配股、合并、权利问题等复杂企业行动
 
 ---
 

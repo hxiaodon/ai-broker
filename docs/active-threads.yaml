@@ -1,34 +1,50 @@
 # Active Threads Index
 # 维护者: 自动维护或手动更新
-# 最后更新: 2026-03-29T15:00+08:00
+# 最后更新: 2026-03-30T18:00+08:00
 
 threads:
-  - id: trading-domain-prd-missing
-    title: 交易域 Domain PRD 缺失 + Surface PRD 混入 Domain 内容
-    priority: P0
-    status: OPEN
-    location: services/trading-engine/docs/threads/2026-03-domain-prd-missing/
-    opened_date: 2026-03-27
-    affects: ["mobile/docs/prd/04-trading.md", "mobile/docs/prd/06-portfolio.md", "trading-engine Domain PRD"]
-    requires_input_from: ["product-manager"]
-
-  - id: position-pnl-cost-basis-method
-    title: 持仓成本基础方法：FIFO vs 加权均价 — 澄清需求
-    priority: P1
-    status: OPEN
-    location: services/trading-engine/docs/threads/2026-03-position-cost-basis/
-    opened_date: 2026-03-27
-    affects: ["mobile/docs/prd/06-portfolio.md §六.1", "services/trading-engine/docs/specs/domains/05-position-pnl.md"]
-    requires_input_from: ["product-manager"]
-
   - id: trading-mobile-contract-gaps
     title: Trading → Mobile 契约 Gap：SLA 缺失 + WebSocket 频道不足
     priority: P1
-    status: OPEN
+    status: IN_PROGRESS
     location: services/trading-engine/docs/threads/2026-03-trading-mobile-contract-gaps/
     opened_date: 2026-03-27
     affects: ["docs/contracts/trading-to-mobile.md", "docs/contracts/ams-to-trading.md"]
-    requires_input_from: ["mobile-engineer", "ams-engineer"]
+    requires_input_from: []
+    note: |
+      进度（2026-03-31）：
+      ✅ Phase 1 契约协商完成（trading-to-mobile.md v1, ams-to-trading.md v1.1）
+      ✅ Phase 2 AMS 实现完成（迁移文件 + Protobuf v1.1，提前 1 天）
+      ⏳ Phase 3 Trading Engine 5 条件实现（4/1-5/11，路线图已定）
+      目标上线：2026-05-11
+
+resolved_threads:
+  - id: trading-domain-prd-missing
+    title: 交易域 Domain PRD 缺失 + Surface PRD 混入 Domain 内容
+    priority: P0
+    status: RESOLVED
+    location: services/trading-engine/docs/threads/2026-03-domain-prd-missing/
+    opened_date: 2026-03-27
+    resolved_date: 2026-03-30T18:00+08:00
+    affects: ["mobile/docs/prd/04-trading.md (v2.2)", "mobile/docs/prd/06-portfolio.md (v2.2)", "services/trading-engine/docs/prd/[4 files]"]
+    resolution: |
+      ✅ Domain PRD 4 文件创建完成 + PM 澄清项全确认
+      - order-lifecycle.md (订单状态、幂等性、审计)
+      - risk-rules.md (PDT、Collar、购买力、集中度)
+      - settlement.md (T+1/T+2、已结算/未结算、Free-Riding、Phase 1 公司行动)
+      - position-pnl.md (成本基础确认加权均价、P&L、Wash Sale)
+      ✅ Surface PRD 同步更新 (脚注、frontmatter、澄清)
+      ✅ PM 澄清: 成本基础法、公司行动处理、GTC 规则确认
+
+  - id: position-pnl-cost-basis-method
+    title: 持仓成本基础方法：FIFO vs 加权均价
+    priority: P1
+    status: RESOLVED
+    location: services/trading-engine/docs/threads/2026-03-position-cost-basis/
+    opened_date: 2026-03-27
+    resolved_date: 2026-03-30T18:00+08:00
+    affects: ["mobile/docs/prd/06-portfolio.md §6.1", "services/trading-engine/docs/prd/position-pnl.md §1"]
+    resolution: "✅ PM 确认加权均价法（Phase 1+2），4 点业务依据文档化，代码无改动需求"
 
   - id: funding-prd-structure-gaps
     title: 出入金（Funding）PRD 结构问题：Domain PRD 缺失 + Surface 混入 Domain 内容 + 合规规则同步

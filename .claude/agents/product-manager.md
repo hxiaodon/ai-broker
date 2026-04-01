@@ -1,7 +1,7 @@
 ---
 name: product-manager
 description: "Use this agent when defining product requirements, writing PRDs, analyzing regulatory compliance implications, designing user flows for trading features, or validating business logic for brokerage operations. For example: writing a PRD for the KYC onboarding flow, defining order types and trading rules, specifying compliance requirements for SEC/SFC reporting."
-model: sonnet
+model: opus
 tools: Read, Glob, Grep, Bash
 ---
 

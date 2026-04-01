@@ -51,6 +51,12 @@
     background: var(--gray-200); padding: 6px 12px; text-align: center;
     font-size: var(--font-size-xs); color: var(--gray-600);
   }
+  .mkt-tab {
+    padding: 10px 14px; white-space: nowrap; font-size: var(--font-size-sm);
+    color: var(--gray-500); cursor: pointer; border-bottom: 2px solid transparent;
+    flex-shrink: 0;
+  }
+  .mkt-tab.active { color: var(--gray-900); border-bottom-color: var(--gray-800); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -122,108 +128,167 @@
       </div>
     </div>
 
-    <!-- Watchlist 分组 -->
-    <div style="padding: 12px 16px 8px; margin-top: 8px;">
-      <div class="flex justify-between items-center">
-        <div class="section-title" style="margin:0;">自选股</div>
-        <span class="text-xs text-muted" style="cursor:pointer;" onclick="showToast('进入编辑模式')">编辑</span>
-      </div>
-      <div class="watchlist-tab" style="margin-top: 8px;">
-        <div class="wl-tag active" id="wl-tab-all" onclick="switchWL('all')">全部</div>
-        <div class="wl-tag" id="wl-tab-us" onclick="switchWL('us')">美股</div>
-        <div class="wl-tag" id="wl-tab-etf" onclick="switchWL('etf')">ETF</div>
-        <div class="wl-tag" id="wl-tab-hk" onclick="switchWL('hk')">港股 <span class="badge badge-pending" style="font-size:9px; margin-left:2px;">即将</span></div>
-        <div class="wl-tag" onclick="showToast('创建分组')">+ 分组</div>
+    <!-- 行情 Tab 导航栏 -->
+    <div style="padding: 0 16px; background: var(--gray-50); border-bottom: var(--border); margin-top: 8px;">
+      <div style="display:flex; gap:0; overflow-x:auto;">
+        <div class="mkt-tab active" id="mtab-watchlist" onclick="switchMktTab('watchlist', this)">自选</div>
+        <div class="mkt-tab" id="mtab-hot" onclick="switchMktTab('hot', this)">热门</div>
+        <div class="mkt-tab" id="mtab-gainers" onclick="switchMktTab('gainers', this)">涨幅榜</div>
+        <div class="mkt-tab" id="mtab-losers" onclick="switchMktTab('losers', this)">跌幅榜</div>
+        <div class="mkt-tab" id="mtab-hk" onclick="switchMktTab('hk', this)">港股</div>
       </div>
     </div>
 
-    <!-- 股票列表 -->
-    <div style="padding: 0 16px 8px;" id="stock-list">
-      <div class="quote-row" onclick="goto('stock-detail.html')">
-        <div class="ticker-badge">AAPL</div>
-        <div style="flex:1;">
-          <div class="font-semi">Apple Inc.</div>
-          <div class="text-xs text-muted">NASDAQ · 美股</div>
-        </div>
-        <div style="text-align:right;">
-          <div class="font-semi">$178.25</div>
-          <div class="price-change price-up">+2.14%</div>
-        </div>
-      </div>
-      <div class="quote-row" onclick="goto('stock-detail.html')">
-        <div class="ticker-badge" style="background: var(--gray-600);">TSLA</div>
-        <div style="flex:1;">
-          <div class="font-semi">Tesla, Inc.</div>
-          <div class="text-xs text-muted">NASDAQ · 美股</div>
-        </div>
-        <div style="text-align:right;">
-          <div class="font-semi">$242.38</div>
-          <div class="price-change price-down">-3.76%</div>
+    <!-- 自选 Tab 内容 -->
+    <div id="mpanel-watchlist">
+      <div style="padding: 10px 16px 6px;">
+        <div class="flex justify-between items-center">
+          <div class="watchlist-tab">
+            <div class="wl-tag active" id="wl-tab-all" onclick="switchWL('all')">全部</div>
+            <div class="wl-tag" id="wl-tab-us" onclick="switchWL('us')">美股</div>
+            <div class="wl-tag" id="wl-tab-etf" onclick="switchWL('etf')">ETF</div>
+            <div class="wl-tag" id="wl-tab-hk2" onclick="switchWL('hk')">港股 <span class="badge badge-pending" style="font-size:9px; margin-left:2px;">即将</span></div>
+            <div class="wl-tag" onclick="showToast('创建分组')">+ 分组</div>
+          </div>
+          <span class="text-xs text-muted" style="cursor:pointer; flex-shrink:0; margin-left:8px;" onclick="showToast('进入编辑模式')">编辑</span>
         </div>
       </div>
-      <div class="quote-row" onclick="goto('stock-detail.html')">
-        <div class="ticker-badge" style="background: var(--gray-500);">NVDA</div>
-        <div style="flex:1;">
-          <div class="font-semi">NVIDIA Corp.</div>
-          <div class="text-xs text-muted">NASDAQ · 美股</div>
+      <div style="padding: 0 16px 8px;" id="stock-list">
+        <div class="quote-row" onclick="goto('stock-detail.html')">
+          <div class="ticker-badge">AAPL</div>
+          <div style="flex:1;"><div class="font-semi">Apple Inc.</div><div class="text-xs text-muted">NASDAQ · 美股</div></div>
+          <div style="text-align:right;"><div class="font-semi">$178.25</div><div class="price-change price-up">+2.14%</div></div>
         </div>
-        <div style="text-align:right;">
-          <div class="font-semi">$884.50</div>
-          <div class="price-change price-up">+5.21%</div>
+        <div class="quote-row" onclick="goto('stock-detail.html')">
+          <div class="ticker-badge" style="background: var(--gray-600);">TSLA</div>
+          <div style="flex:1;"><div class="font-semi">Tesla, Inc.</div><div class="text-xs text-muted">NASDAQ · 美股</div></div>
+          <div style="text-align:right;"><div class="font-semi">$242.38</div><div class="price-change price-down">-3.76%</div></div>
         </div>
-      </div>
-      <div class="quote-row" onclick="goto('stock-detail.html')">
-        <div class="ticker-badge" style="background: var(--gray-700);">MSFT</div>
-        <div style="flex:1;">
-          <div class="font-semi">Microsoft Corp.</div>
-          <div class="text-xs text-muted">NASDAQ · 美股</div>
+        <div class="quote-row" onclick="goto('stock-detail.html')">
+          <div class="ticker-badge" style="background: var(--gray-500);">NVDA</div>
+          <div style="flex:1;"><div class="font-semi">NVIDIA Corp.</div><div class="text-xs text-muted">NASDAQ · 美股</div></div>
+          <div style="text-align:right;"><div class="font-semi">$884.50</div><div class="price-change price-up">+5.21%</div></div>
         </div>
-        <div style="text-align:right;">
-          <div class="font-semi">$415.72</div>
-          <div class="price-change price-up">+0.88%</div>
+        <div class="quote-row" onclick="goto('stock-detail.html')">
+          <div class="ticker-badge" style="background: var(--gray-700);">MSFT</div>
+          <div style="flex:1;"><div class="font-semi">Microsoft Corp.</div><div class="text-xs text-muted">NASDAQ · 美股</div></div>
+          <div style="text-align:right;"><div class="font-semi">$415.72</div><div class="price-change price-up">+0.88%</div></div>
         </div>
-      </div>
-      <div class="quote-row" onclick="goto('stock-detail.html')">
-        <div class="ticker-badge">SPY</div>
-        <div style="flex:1;">
-          <div class="font-semi">SPDR S&P 500 ETF</div>
-          <div class="text-xs text-muted">NYSE · ETF</div>
+        <div class="quote-row" onclick="goto('stock-detail.html')">
+          <div class="ticker-badge">SPY</div>
+          <div style="flex:1;"><div class="font-semi">SPDR S&P 500 ETF</div><div class="text-xs text-muted">NYSE · ETF</div></div>
+          <div style="text-align:right;"><div class="font-semi">$521.44</div><div class="price-change price-up">+0.82%</div></div>
         </div>
-        <div style="text-align:right;">
-          <div class="font-semi">$521.44</div>
-          <div class="price-change price-up">+0.82%</div>
-        </div>
-      </div>
-
-      <!-- 空态（自选股为空时） -->
-      <div id="empty-watchlist" style="display:none;">
-        <div class="empty-state">
-          <div class="empty-icon">⭐</div>
-          <div class="empty-title">暂无自选股</div>
-          <div class="empty-sub">搜索并添加您感兴趣的股票</div>
-          <button class="btn btn-secondary btn-sm" onclick="goto('search.html')">搜索股票</button>
+        <div id="empty-watchlist" style="display:none;">
+          <div class="empty-state">
+            <div class="empty-icon">⭐</div>
+            <div class="empty-title">暂无自选股</div>
+            <div class="empty-sub">搜索并添加您感兴趣的股票</div>
+            <button class="btn btn-secondary btn-sm" onclick="goto('search.html')">搜索股票</button>
+          </div>
         </div>
       </div>
     </div>
 
-    <!-- 热门股排行 -->
-    <div style="padding: 12px 16px; border-top: var(--border); margin-top: 8px;">
-      <div class="section-title">热门美股</div>
+    <!-- 热门 Tab 内容 -->
+    <div id="mpanel-hot" style="display:none; padding: 0 16px 8px;">
+      <div class="proto-note" style="margin: 10px 0 6px;">按当日成交量排序，仅显示成交量 &gt; 100 万股标的</div>
       <div class="quote-row" onclick="goto('stock-detail.html')">
-        <div class="text-sm text-muted" style="width:20px;">#1</div>
+        <div class="text-sm text-muted" style="width:22px;">#1</div>
         <div class="ticker-badge" style="width:36px;height:36px;font-size:10px;">AAPL</div>
-        <div style="flex:1;">
-          <div class="font-semi text-sm">Apple Inc.</div>
-        </div>
+        <div style="flex:1;"><div class="font-semi text-sm">Apple Inc.</div><div class="text-xs text-muted">成交量 89.2M</div></div>
         <div class="price-change price-up">+2.14%</div>
       </div>
       <div class="quote-row" onclick="goto('stock-detail.html')">
-        <div class="text-sm text-muted" style="width:20px;">#2</div>
+        <div class="text-sm text-muted" style="width:22px;">#2</div>
         <div class="ticker-badge" style="width:36px;height:36px;font-size:10px;background:var(--gray-500);">NVDA</div>
-        <div style="flex:1;">
-          <div class="font-semi text-sm">NVIDIA Corp.</div>
-        </div>
+        <div style="flex:1;"><div class="font-semi text-sm">NVIDIA Corp.</div><div class="text-xs text-muted">成交量 42.7M</div></div>
         <div class="price-change price-up">+5.21%</div>
+      </div>
+      <div class="quote-row" onclick="goto('stock-detail.html')">
+        <div class="text-sm text-muted" style="width:22px;">#3</div>
+        <div class="ticker-badge" style="width:36px;height:36px;font-size:10px;background:var(--gray-600);">TSLA</div>
+        <div style="flex:1;"><div class="font-semi text-sm">Tesla, Inc.</div><div class="text-xs text-muted">成交量 38.1M</div></div>
+        <div class="price-change price-down">-3.76%</div>
+      </div>
+      <div class="quote-row" onclick="goto('stock-detail.html')">
+        <div class="text-sm text-muted" style="width:22px;">#4</div>
+        <div class="ticker-badge" style="width:36px;height:36px;font-size:10px;background:var(--gray-700);">MSFT</div>
+        <div style="flex:1;"><div class="font-semi text-sm">Microsoft Corp.</div><div class="text-xs text-muted">成交量 21.4M</div></div>
+        <div class="price-change price-up">+0.88%</div>
+      </div>
+      <div class="quote-row" onclick="goto('stock-detail.html')">
+        <div class="text-sm text-muted" style="width:22px;">#5</div>
+        <div class="ticker-badge" style="width:36px;height:36px;font-size:10px;">AMD</div>
+        <div style="flex:1;"><div class="font-semi text-sm">Advanced Micro Devices</div><div class="text-xs text-muted">成交量 18.9M</div></div>
+        <div class="price-change price-up">+3.45%</div>
+      </div>
+    </div>
+
+    <!-- 涨幅榜 Tab 内容 -->
+    <div id="mpanel-gainers" style="display:none; padding: 0 16px 8px;">
+      <div class="proto-note" style="margin: 10px 0 6px;">按当日涨跌幅实时排序，仅显示成交量 &gt; 100 万股标的</div>
+      <div class="quote-row" onclick="goto('stock-detail.html')">
+        <div class="text-sm text-muted" style="width:22px;">#1</div>
+        <div class="ticker-badge" style="width:36px;height:36px;font-size:10px;background:var(--gray-500);">NVDA</div>
+        <div style="flex:1;"><div class="font-semi text-sm">NVIDIA Corp.</div><div class="text-xs text-muted">$884.50</div></div>
+        <div class="price-change price-up">+5.21%</div>
+      </div>
+      <div class="quote-row" onclick="goto('stock-detail.html')">
+        <div class="text-sm text-muted" style="width:22px;">#2</div>
+        <div class="ticker-badge" style="width:36px;height:36px;font-size:10px;">META</div>
+        <div style="flex:1;"><div class="font-semi text-sm">Meta Platforms</div><div class="text-xs text-muted">$502.18</div></div>
+        <div class="price-change price-up">+4.83%</div>
+      </div>
+      <div class="quote-row" onclick="goto('stock-detail.html')">
+        <div class="text-sm text-muted" style="width:22px;">#3</div>
+        <div class="ticker-badge" style="width:36px;height:36px;font-size:10px;">AAPL</div>
+        <div style="flex:1;"><div class="font-semi text-sm">Apple Inc.</div><div class="text-xs text-muted">$178.25</div></div>
+        <div class="price-change price-up">+2.14%</div>
+      </div>
+      <div class="quote-row" onclick="goto('stock-detail.html')">
+        <div class="text-sm text-muted" style="width:22px;">#4</div>
+        <div class="ticker-badge" style="width:36px;height:36px;font-size:10px;">GOOGL</div>
+        <div style="flex:1;"><div class="font-semi text-sm">Alphabet Inc.</div><div class="text-xs text-muted">$171.42</div></div>
+        <div class="price-change price-up">+1.96%</div>
+      </div>
+      <div class="quote-row" onclick="goto('stock-detail.html')">
+        <div class="text-sm text-muted" style="width:22px;">#5</div>
+        <div class="ticker-badge" style="width:36px;height:36px;font-size:10px;background:var(--gray-700);">MSFT</div>
+        <div style="flex:1;"><div class="font-semi text-sm">Microsoft Corp.</div><div class="text-xs text-muted">$415.72</div></div>
+        <div class="price-change price-up">+0.88%</div>
+      </div>
+    </div>
+
+    <!-- 跌幅榜 Tab 内容 -->
+    <div id="mpanel-losers" style="display:none; padding: 0 16px 8px;">
+      <div class="proto-note" style="margin: 10px 0 6px;">按当日跌幅实时排序，仅显示成交量 &gt; 100 万股标的</div>
+      <div class="quote-row" onclick="goto('stock-detail.html')">
+        <div class="text-sm text-muted" style="width:22px;">#1</div>
+        <div class="ticker-badge" style="width:36px;height:36px;font-size:10px;background:var(--gray-600);">TSLA</div>
+        <div style="flex:1;"><div class="font-semi text-sm">Tesla, Inc.</div><div class="text-xs text-muted">$242.38</div></div>
+        <div class="price-change price-down">-3.76%</div>
+      </div>
+      <div class="quote-row" onclick="goto('stock-detail.html')">
+        <div class="text-sm text-muted" style="width:22px;">#2</div>
+        <div class="ticker-badge" style="width:36px;height:36px;font-size:10px;">NFLX</div>
+        <div style="flex:1;"><div class="font-semi text-sm">Netflix, Inc.</div><div class="text-xs text-muted">$628.45</div></div>
+        <div class="price-change price-down">-2.31%</div>
+      </div>
+      <div class="quote-row" onclick="goto('stock-detail.html')">
+        <div class="text-sm text-muted" style="width:22px;">#3</div>
+        <div class="ticker-badge" style="width:36px;height:36px;font-size:10px;">QQQ</div>
+        <div style="flex:1;"><div class="font-semi text-sm">Invesco QQQ Trust</div><div class="text-xs text-muted">$438.72</div></div>
+        <div class="price-change price-down">-0.34%</div>
+      </div>
+    </div>
+
+    <!-- 港股 Tab 内容（敬请期待） -->
+    <div id="mpanel-hk" style="display:none;">
+      <div class="empty-state" style="padding: 60px 24px;">
+        <div class="empty-icon">🇭🇰</div>
+        <div class="empty-title">港股交易即将开放</div>
+        <div class="empty-sub">敬请期待，港股功能将在下一版本推出</div>
       </div>
     </div>
 
@@ -252,14 +317,24 @@
 
 <script src="../_shared/proto-router.js"></script>
 <script>
-  function showPanel(id) { /* 当前页只有行情 */ }
+  const MKT_TABS = ['watchlist','hot','gainers','losers','hk'];
+
+  function switchMktTab(tab, el) {
+    document.querySelectorAll('.mkt-tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+    MKT_TABS.forEach(t => {
+      const p = document.getElementById('mpanel-' + t);
+      if (p) p.style.display = 'none';
+    });
+    const target = document.getElementById('mpanel-' + tab);
+    if (target) target.style.display = '';
+    if (tab === 'hk') showToast('港股功能敬请期待');
+  }
 
   function switchWL(tab) {
     document.querySelectorAll('.wl-tag').forEach(t => t.classList.remove('active'));
-    document.getElementById('wl-tab-' + tab)?.classList.add('active');
-    if (tab === 'hk') {
-      showToast('港股功能敬请期待');
-    }
+    document.getElementById('wl-tab-' + (tab === 'hk' ? 'hk2' : tab))?.classList.add('active');
+    if (tab === 'hk') showToast('港股功能敬请期待');
   }
 </script>
 </body>

@@ -367,16 +367,222 @@ Position Ratio = Position Market Value / Total Position Value
 
 ---
 
-## 6. 与其他 Domain PRD 的关系
+## 6. REST API 响应定义
+
+所有持仓相关 API 端点的返回格式在本章定义。**所有金额字段使用 string decimal；所有时间戳使用 ISO 8601 UTC。**
+
+### 6.1 GET /api/v1/positions — 200 OK
+
+列表查询所有持仓，按市值从大到小排序。
+
+**响应 200 OK**：
+```json
+{
+  "positions": [
+    {
+      // 基本信息
+      "symbol": "AAPL",
+      "market": "US",                    // US | HK
+      "company_name": "Apple Inc.",      // 公司名称
+
+      // 持仓数量（来自 settlement.md §2）
+      "quantity": 200,                   // 总持仓 = settled_qty + unsettled_qty
+      "settled_qty": 100,                // 已结算数量（可卖出）
+      "unsettled_qty": 100,              // 未结算数量（不可卖出）
+      "settlement_date": "2026-04-01T00:00:00Z",  // 未结算部分的结算日期
+
+      // 成本基础（来自 position-pnl.md §1 — 加权均价法）
+      "avg_cost": "148.3200",            // 加权均价（string decimal）
+      "cost_basis": "29664.00",          // 总成本 = quantity × avg_cost
+
+      // 实时市价（来自 Market Data 的行情）
+      "current_price": "150.2500",       // 最新市价（string decimal）
+      "market_value": "30045.00",        // 持仓市值 = quantity × current_price
+
+      // P&L（来自 position-pnl.md §2）
+      "unrealized_pnl": "381.00",        // 未实现盈亏 = market_value - cost_basis
+      "unrealized_pnl_pct": "1.29",      // 未实现盈亏率（百分比，已乘以 100）
+      "today_pnl": "125.30",             // 当日浮动盈亏（仅当日变化）
+      "today_pnl_pct": "0.42",           // 当日盈亏率（百分比）
+
+      // 风险指标
+      "account_ratio": "0.2134",         // 占账户总资产比例（用于集中度预警 > 30%）
+
+      // 时间戳
+      "first_buy_date": "2026-03-15T00:00:00Z",  // 首次买入日期
+      "updated_at": "2026-03-31T09:45:00.000Z"   // 最后更新时间（行情变动时）
+    },
+    {
+      "symbol": "MSFT",
+      "market": "US",
+      "company_name": "Microsoft Corporation",
+      "quantity": 150,
+      "settled_qty": 150,
+      "unsettled_qty": 0,
+      "settlement_date": null,
+      "avg_cost": "380.5000",
+      "cost_basis": "57075.00",
+      "current_price": "418.7500",
+      "market_value": "62812.50",
+      "unrealized_pnl": "5737.50",
+      "unrealized_pnl_pct": "10.05",
+      "today_pnl": "456.25",
+      "today_pnl_pct": "0.73",
+      "account_ratio": "0.3215",
+      "first_buy_date": "2026-02-10T00:00:00Z",
+      "updated_at": "2026-03-31T09:45:00.000Z"
+    }
+  ],
+
+  // 整体汇总
+  "summary": {
+    "total_market_value": "92857.50",    // 全部持仓市值
+    "total_cost_basis": "86739.00",      // 全部持仓成本
+    "total_unrealized_pnl": "6118.50",   // 全部持仓未实现盈亏
+    "total_unrealized_pnl_pct": "7.05",  // 全部持仓盈亏率
+    "updated_at": "2026-03-31T09:45:00.000Z"
+  }
+}
+```
+
+---
+
+### 6.2 GET /api/v1/positions/:symbol — 200 OK
+
+单只持仓详情，包含完整成交历史和已实现盈亏。
+
+**响应 200 OK**：
+```json
+{
+  // 持仓基本信息（与列表相同的字段）
+  "symbol": "AAPL",
+  "market": "US",
+  "company_name": "Apple Inc.",
+  "quantity": 200,
+  "settled_qty": 100,
+  "unsettled_qty": 100,
+  "settlement_date": "2026-04-01T00:00:00Z",
+  "avg_cost": "148.3200",
+  "cost_basis": "29664.00",
+  "current_price": "150.2500",
+  "market_value": "30045.00",
+  "unrealized_pnl": "381.00",
+  "unrealized_pnl_pct": "1.29",
+  "today_pnl": "125.30",
+  "today_pnl_pct": "0.42",
+  "first_buy_date": "2026-03-15T00:00:00Z",
+  "updated_at": "2026-03-31T09:45:00.000Z",
+
+  // 成交历史（按日期排序）
+  "trades": [
+    {
+      "trade_id": "trade-001",
+      "trade_date": "2026-03-15T00:00:00Z",
+      "side": "BUY",
+      "quantity": 100,
+      "price": "147.5000",               // string decimal
+      "gross_amount": "14750.00",        // 成交额（数量 × 价格）
+      "fees": "0.30",                    // 总费用
+      "net_amount": "14750.30",          // 净成本（成交额 + 费用）
+      "venue": "NASDAQ",
+      "status": "SETTLED",               // SETTLED | UNSETTLED
+      "settlement_date": "2026-03-16T00:00:00Z"
+    },
+    {
+      "trade_id": "trade-002",
+      "trade_date": "2026-03-20T00:00:00Z",
+      "side": "BUY",
+      "quantity": 100,
+      "price": "149.1400",
+      "gross_amount": "14914.00",
+      "fees": "0.30",
+      "net_amount": "14914.30",
+      "venue": "NYSE",
+      "status": "SETTLED",
+      "settlement_date": "2026-03-21T00:00:00Z"
+    }
+  ],
+
+  // 已实现盈亏（仅卖出才会产生）
+  "realized_trades": [
+    {
+      "sell_trade_id": "trade-003",
+      "sell_date": "2026-03-25T00:00:00Z",
+      "sell_price": "155.0000",
+      "sell_qty": 50,
+      "cost_basis": "7416.00",           // 对应买入的成本（加权均价 × 数量）
+      "gross_proceeds": "7750.00",       // 卖出金额
+      "fees": "2.45",                    // 卖出费用（交易所、SEC、FINRA）
+      "realized_pnl": "333.55",          // 已实现盈亏（卖出 - 成本 - 费用）
+      "realized_pnl_pct": "4.50",        // 已实现盈亏率
+      "venue": "NASDAQ",
+      "status": "SETTLED",
+      "settlement_date": "2026-03-26T00:00:00Z",
+      "wash_sale_flag": false,           // 是否涉及 Wash Sale（见§4）
+      "wash_sale_note": null             // Wash Sale 说明（如有）
+    }
+  ],
+
+  // 累计统计
+  "cumulative": {
+    "total_cost_basis": "29664.00",     // 全部买入的总成本
+    "total_realized_pnl": "333.55",     // 已卖出部分的累计已实现盈亏
+    "total_unrealized_pnl": "381.00",   // 当前持仓的未实现盈亏
+    "total_pnl": "714.55"               // 累计总盈亏（已实现 + 未实现）
+  }
+}
+```
+
+---
+
+### 6.3 WebSocket position.updated 消息
+
+推送时机：该持仓的市价变动时（通常每秒或行情更新时）。
+
+**消息格式**：
+```json
+{
+  "channel": "position.updated",
+  "data": {
+    // 基本信息
+    "symbol": "AAPL",
+    "market": "US",
+
+    // 数量信息（来自 settlement.md §2）
+    "quantity": 200,
+    "settled_qty": 100,
+    "unsettled_qty": 100,
+    "settlement_date": "2026-04-01T00:00:00Z",
+
+    // 成本（来自 position-pnl.md §1）
+    "avg_cost": "148.3200",
+    "cost_basis": "29664.00",
+
+    // 市价和 P&L（来自 position-pnl.md §2）
+    "current_price": "150.2500",
+    "market_value": "30045.00",
+    "unrealized_pnl": "381.00",
+    "unrealized_pnl_pct": "1.29",
+
+    // 时间戳
+    "updated_at": "2026-03-31T09:45:00.123Z"
+  }
+}
+```
+
+---
+
+## 7. 与其他 Domain PRD 的关系
 
 - **order-lifecycle.md**：成交（FILLED）后触发持仓更新
-- **settlement.md**：已结算数量和未结算数量的分离
-- **risk-rules.md**：持仓市值用于集中度检查和保证金计算
+- **settlement.md**：已结算数量和未结算数量的分离（见§2）
+- **risk-rules.md**：持仓市值用于集中度检查（见 §1 第 5 项）和保证金计算
+- **type-definitions.md**：decimal、timestamp 的序列化规则
 - **mobile/docs/prd/06-portfolio.md**：前端展示持仓均价、未实现/已实现 P&L
 
 ---
 
-## 7. 实现清单
+## 8. 实现清单
 
 ### Domain PRD 完成标志
 

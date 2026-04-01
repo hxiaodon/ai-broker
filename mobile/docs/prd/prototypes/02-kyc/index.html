@@ -50,7 +50,7 @@
 <body>
 
 <div class="proto-nav">
-  <strong>02-KYC 低保真原型</strong> — 7步开户流程 |
+  <strong>02-KYC 低保真原型</strong> — 8步开户流程 |
   <a href="../01-auth/index.html">← 登录页</a> |
   <a href="../03-market/index.html">开户完成 →</a>
   <br>步骤：
@@ -60,8 +60,9 @@
   <a href="#" onclick="gotoStep(4);return false;">4-财务背景</a> |
   <a href="#" onclick="gotoStep(5);return false;">5-投资经验</a> |
   <a href="#" onclick="gotoStep(6);return false;">6-税务申报</a> |
-  <a href="#" onclick="gotoStep(7);return false;">7-协议签署</a> |
-  <a href="#" onclick="gotoStep(8);return false;">审核状态</a>
+  <a href="#" onclick="gotoStep(7);return false;">7-风险披露</a> |
+  <a href="#" onclick="gotoStep(8);return false;">8-协议签署</a> |
+  <a href="#" onclick="gotoStep(9);return false;">审核状态</a>
   <br><span style="color:#666; font-size:12px;">📌 完整业务规则见 Domain PRD：<a href="../../../services/ams/docs/prd/kyc-flow.md" target="_blank">KYC 流程</a> · <a href="../../../services/ams/docs/prd/aml-compliance.md" target="_blank">AML 合规</a></span>
 </div>
 
@@ -74,7 +75,7 @@
   <div style="background: var(--gray-50); border-bottom: var(--border); padding: 12px 16px 0;">
     <div class="flex justify-between items-center mb-8" id="kyc-header">
       <button class="nav-back" id="kyc-back-btn" onclick="prevStep()">← 返回</button>
-      <span class="text-sm text-muted" id="kyc-step-label">步骤 1 / 7</span>
+      <span class="text-sm text-muted" id="kyc-step-label">步骤 4 / 8</span>
       <button class="nav-back" onclick="showToast('草稿已保存')">保存草稿</button>
     </div>
     <div class="steps" id="kyc-steps">
@@ -84,7 +85,8 @@
       <div class="step active"><div class="step-dot">4</div><div class="step-label">财务</div></div>
       <div class="step"><div class="step-dot">5</div><div class="step-label">经验</div></div>
       <div class="step"><div class="step-dot">6</div><div class="step-label">税务</div></div>
-      <div class="step"><div class="step-dot">7</div><div class="step-label">签署</div></div>
+      <div class="step"><div class="step-dot">7</div><div class="step-label">披露</div></div>
+      <div class="step"><div class="step-dot">8</div><div class="step-label">签署</div></div>
     </div>
   </div>
 
@@ -118,31 +120,45 @@
           <span>广东省 · 深圳市</span><span>▾</span>
         </div>
       </div>
-      <div class="proto-note">美国公民/绿卡持有者需额外填写 SSN，并触发 W-9 表格。</div>
+      <div class="form-group">
+        <div class="form-label">证件类型</div>
+        <div class="radio-group">
+          <div class="radio-item selected" onclick="selectRadio(this)"><div class="radio-dot"></div><div>中国居民身份证</div></div>
+          <div class="radio-item" onclick="selectRadio(this)"><div class="radio-dot"></div><div>护照</div></div>
+          <div class="radio-item" onclick="selectRadio(this)"><div class="radio-dot"></div><div>港澳通行证</div></div>
+          <div class="radio-item" onclick="selectRadio(this)"><div class="radio-dot"></div><div>香港身份证（HKID）</div></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="form-label">就业状况</div>
+        <div class="form-input" style="display:flex; align-items:center; justify-content:space-between;">
+          <span>在职</span><span>▾</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="form-label">职业 / 雇主</div>
+        <input class="form-input" placeholder="职业（如：Software Engineer）">
+        <input class="form-input mt-8" placeholder="雇主名称（如：Tech Company Inc.）">
+      </div>
+      <div class="form-group">
+        <div class="form-label">特殊身份声明</div>
+        <div class="list-item" style="border:var(--border); border-radius:var(--radius-md); padding:12px; margin-bottom:8px;">
+          <input type="checkbox" id="pep-check" style="width:18px; height:18px; flex-shrink:0;">
+          <div class="text-sm">我是政治敏感人士（PEP）或其关联人</div>
+        </div>
+        <div class="list-item" style="border:var(--border); border-radius:var(--radius-md); padding:12px;">
+          <input type="checkbox" id="insider-check" style="width:18px; height:18px; flex-shrink:0;">
+          <div class="text-sm">我在证券公司或其关联机构工作</div>
+        </div>
+        <div class="form-hint">勾选后须人工审核，审核时间延长至 2–3 个工作日</div>
+      </div>
+      <div class="proto-note">美国公民/绿卡持有者需额外填写 SSN，并触发 W-9 表格。PEP/内部人员勾选后强制进入人工合规审核。</div>
       <button class="btn btn-primary" onclick="nextStep()">下一步</button>
     </div>
 
     <!-- Step 2: 身份证件 -->
     <div id="step-2" class="kyc-step-content">
       <div class="font-semi text-lg">身份证件上传</div>
-      <div class="form-group">
-        <div class="form-label">证件类型</div>
-        <div class="radio-group">
-          <div class="radio-item selected" onclick="selectRadio(this)">
-            <div class="radio-dot"></div>
-            <div>中国居民身份证（推荐）</div>
-          </div>
-          <div class="radio-item" onclick="selectRadio(this)">
-            <div class="radio-dot"></div>
-            <div>香港身份证（HKID）</div>
-          </div>
-          <div class="radio-item" onclick="selectRadio(this)">
-            <div class="radio-dot"></div>
-            <div>护照</div>
-          </div>
-        </div>
-      </div>
-
       <div class="form-group">
         <div class="form-label">证件正面</div>
         <div class="upload-box" onclick="simulateOCR('front')">
@@ -152,7 +168,7 @@
         </div>
       </div>
       <div class="form-group">
-        <div class="form-label">证件背面</div>
+        <div class="form-label">证件背面 <span class="text-xs text-muted">（护照不需要）</span></div>
         <div class="upload-box" onclick="showToast('相机已调起（模拟）')">
           <div class="upload-icon">📷</div>
           <div>拍照 / 上传背面</div>
@@ -217,6 +233,15 @@
         </div>
       </div>
       <div class="form-group">
+        <div class="form-label">流动净资产（USD，不超过总净资产）</div>
+        <div class="radio-group">
+          <div class="radio-item" onclick="selectRadio(this)"><div class="radio-dot"></div><div>&lt; $50,000</div></div>
+          <div class="radio-item selected" onclick="selectRadio(this)"><div class="radio-dot"></div><div>$50,000 – $200,000</div></div>
+          <div class="radio-item" onclick="selectRadio(this)"><div class="radio-dot"></div><div>$200,000 – $1,000,000</div></div>
+          <div class="radio-item" onclick="selectRadio(this)"><div class="radio-dot"></div><div>&gt; $1,000,000</div></div>
+        </div>
+      </div>
+      <div class="form-group">
         <div class="form-label">资金来源（可多选）</div>
         <div style="display:flex; flex-wrap:wrap; gap:8px;">
           <div class="badge badge-success" style="cursor:pointer; padding:8px 12px;">薪资收入 ✓</div>
@@ -248,6 +273,26 @@
           <div class="radio-item" onclick="selectRadio(this)"><div class="radio-dot"></div><div>极少（&lt; 10次/年）</div></div>
           <div class="radio-item selected" onclick="selectRadio(this)"><div class="radio-dot"></div><div>一般（10–50次/年）</div></div>
           <div class="radio-item" onclick="selectRadio(this)"><div class="radio-dot"></div><div>频繁（&gt; 50次/年）</div></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="form-label">了解的投资产品（可多选）</div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+          <div class="badge badge-success" style="cursor:pointer; padding:8px 12px;">股票 ✓</div>
+          <div class="badge badge-success" style="cursor:pointer; padding:8px 12px;">ETF ✓</div>
+          <div class="badge badge-pending" style="cursor:pointer; padding:8px 12px;">债券</div>
+          <div class="badge badge-pending" style="cursor:pointer; padding:8px 12px;">期权</div>
+          <div class="badge badge-pending" style="cursor:pointer; padding:8px 12px;">期货</div>
+          <div class="badge badge-pending" style="cursor:pointer; padding:8px 12px;">外汇</div>
+        </div>
+      </div>
+      <div class="form-group">
+        <div class="form-label">投资目标</div>
+        <div class="radio-group">
+          <div class="radio-item" onclick="selectRadio(this)"><div class="radio-dot"></div><div>资本保全</div></div>
+          <div class="radio-item" onclick="selectRadio(this)"><div class="radio-dot"></div><div>稳定收益</div></div>
+          <div class="radio-item selected" onclick="selectRadio(this)"><div class="radio-dot"></div><div>资本增值</div></div>
+          <div class="radio-item" onclick="selectRadio(this)"><div class="radio-dot"></div><div>高风险高回报</div></div>
         </div>
       </div>
       <div class="form-group">
@@ -285,48 +330,96 @@
           <div class="radio-item" onclick="selectRadio(this)"><div class="radio-dot"></div><div>是（需改签 W-9 表格）</div></div>
         </div>
       </div>
-      <div class="sign-area" onclick="showToast('电子签名板已调起（模拟）')">
-        点击此处手写签名
+      <div class="form-group">
+        <div class="form-label">电子确认签署</div>
+        <input class="form-input" placeholder="输入英文法定姓名以确认 W-8BEN（如：ZHANG SAN）">
+        <div class="form-hint">姓名须与 Step 1 填写的英文姓名一致。W-8BEN 有效期 3 年。</div>
       </div>
-      <div class="proto-note">W-8BEN 有效期 3 年。FATCA 合规要求：美国纳税居民须填 W-9 + SSN。</div>
+      <div class="proto-note">W-8BEN 有效期 3 年。FATCA 合规要求：美国纳税居民须填 W-9 + SSN。Phase 1 采用文字签名，Phase 2 升级电子签名 SDK。</div>
       <button class="btn btn-primary" onclick="nextStep()">下一步</button>
     </div>
 
-    <!-- Step 7: 协议签署 -->
+    <!-- Step 7: 风险披露 -->
     <div id="step-7" class="kyc-step-content">
+      <div class="font-semi text-lg">风险披露确认</div>
+      <div class="text-sm text-muted" style="margin-bottom:4px;">请阅读以下 5 份文件，点击"阅读"后方可勾选确认。全部勾选后"下一步"才可点击。</div>
+      <div class="card">
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div class="list-item">
+            <input type="checkbox" id="risk-1" style="width:18px; height:18px; flex-shrink:0;" disabled>
+            <div class="text-sm"><strong>①</strong> 证券风险声明书</div>
+            <span class="nav-action" onclick="markRead('risk-1', this)">阅读</span>
+          </div>
+          <div class="list-item">
+            <input type="checkbox" id="risk-2" style="width:18px; height:18px; flex-shrink:0;" disabled>
+            <div class="text-sm"><strong>②</strong> 美国市场风险说明（NYSE/NASDAQ）</div>
+            <span class="nav-action" onclick="markRead('risk-2', this)">阅读</span>
+          </div>
+          <div class="list-item">
+            <input type="checkbox" id="risk-3" style="width:18px; height:18px; flex-shrink:0;" disabled>
+            <div class="text-sm"><strong>③</strong> 香港市场风险说明 <span class="badge badge-pending" style="font-size:11px;">Phase 2</span></div>
+            <span class="nav-action" onclick="markRead('risk-3', this)">阅读</span>
+          </div>
+          <div class="list-item">
+            <input type="checkbox" id="risk-4" style="width:18px; height:18px; flex-shrink:0;" disabled>
+            <div class="text-sm"><strong>④</strong> PDT 规则说明（$25K 最低权益要求）</div>
+            <span class="nav-action" onclick="markRead('risk-4', this)">阅读</span>
+          </div>
+          <div class="list-item" style="border-bottom:none;">
+            <input type="checkbox" id="risk-5" style="width:18px; height:18px; flex-shrink:0;" disabled>
+            <div class="text-sm"><strong>⑤</strong> 最优执行说明（订单路由原则）</div>
+            <span class="nav-action" onclick="markRead('risk-5', this)">阅读</span>
+          </div>
+        </div>
+      </div>
+      <div class="form-hint">所有文件阅读确认后，"下一步"按钮才可点击。</div>
+      <div class="proto-note">SEC Regulation BI 要求；服务端校验 5 份文件均已确认阅读。文件支持中英文切换。</div>
+      <button class="btn btn-primary" id="risk-next-btn" onclick="nextStep()" disabled style="opacity:0.5; cursor:not-allowed;">下一步（请先阅读全部文件）</button>
+    </div>
+
+    <!-- Step 8: 协议签署 -->
+    <div id="step-8" class="kyc-step-content">
       <div class="font-semi text-lg">协议签署确认</div>
       <div class="card">
         <div style="display:flex; flex-direction:column; gap:12px;">
           <div class="list-item">
             <input type="checkbox" checked style="width:18px; height:18px; flex-shrink:0;">
-            <div class="text-sm">《客户协议书》</div>
+            <div class="text-sm">《客户协议》</div>
             <span class="nav-action">查看</span>
           </div>
           <div class="list-item">
             <input type="checkbox" checked style="width:18px; height:18px; flex-shrink:0;">
-            <div class="text-sm">《风险披露声明》</div>
+            <div class="text-sm">《隐私政策》</div>
             <span class="nav-action">查看</span>
           </div>
           <div class="list-item">
             <input type="checkbox" checked style="width:18px; height:18px; flex-shrink:0;">
-            <div class="text-sm">《W-8BEN 外国人声明》</div>
+            <div class="text-sm">《电子通讯协议》— 授权以电子方式接收文件</div>
+            <span class="nav-action">查看</span>
+          </div>
+          <div class="list-item">
+            <input type="checkbox" checked style="width:18px; height:18px; flex-shrink:0;">
+            <div class="text-sm">《交易所数据协议》— 非专业投资者声明</div>
             <span class="nav-action">查看</span>
           </div>
           <div class="list-item" style="border-bottom:none;">
-            <input type="checkbox" style="width:18px; height:18px; flex-shrink:0;">
-            <div class="text-sm">《隐私政策》（可选，用于营销通知）</div>
+            <input type="checkbox" checked style="width:18px; height:18px; flex-shrink:0;">
+            <div class="text-sm">《反洗钱声明》</div>
+            <span class="nav-action">查看</span>
           </div>
         </div>
       </div>
-      <div class="sign-area" onclick="showToast('请在此处签名（模拟）')">
-        电子签名（用于开户协议）
+      <div class="form-group">
+        <div class="form-label">在下方输入英文法定姓名完成签署</div>
+        <input class="form-input" placeholder="e.g. ZHANG SAN（须与 Step 1 一致）">
+        <div class="form-hint">系统将比对签名与 Step 1 英文姓名，不一致则提示错误。</div>
       </div>
-      <div class="proto-note">所有必选协议勾选后，提交按钮才可点击。签名图片加密存储，7年保留。</div>
+      <div class="proto-note">所有必选协议勾选且签名匹配后，提交按钮才可点击。签名时间戳、IP 地址记录至审计日志（ESIGN Act）。Phase 2 升级电子签名 SDK。</div>
       <button class="btn btn-primary" onclick="submitKYC()">提交开户申请</button>
     </div>
 
-    <!-- 审核状态页 (step 8) -->
-    <div id="step-8" class="kyc-step-content">
+    <!-- 审核状态页 (step 9) -->
+    <div id="step-9" class="kyc-step-content">
       <div class="status-card">
         <div class="status-icon" id="review-icon">⏳</div>
         <div class="font-semi text-lg" id="review-title">审核中</div>
@@ -389,7 +482,7 @@
   }
 
   function nextStep() {
-    if (currentStep < 7) gotoStep(currentStep + 1);
+    if (currentStep < 8) gotoStep(currentStep + 1);
   }
 
   function prevStep() {
@@ -401,8 +494,8 @@
     const label = document.getElementById('kyc-step-label');
     const header = document.getElementById('kyc-header');
     const steps = document.querySelector('.steps');
-    if (currentStep <= 7) {
-      if (label) label.textContent = '步骤 ' + currentStep + ' / 7';
+    if (currentStep <= 8) {
+      if (label) label.textContent = '步骤 ' + currentStep + ' / 8';
       if (header) header.style.display = 'flex';
       if (steps) steps.style.display = 'flex';
     } else {
@@ -413,7 +506,7 @@
 
   function submitKYC() {
     showToast('提交中...');
-    setTimeout(() => gotoStep(8), 1000);
+    setTimeout(() => gotoStep(9), 1000);
   }
 
   function setReviewStatus(status) {
@@ -442,6 +535,22 @@
       document.getElementById('ocr-result').style.display = 'block';
       showToast('OCR 识别完成，请核对信息');
     }, 1200);
+  }
+
+  function markRead(checkboxId, linkEl) {
+    const cb = document.getElementById(checkboxId);
+    if (cb) { cb.disabled = false; cb.checked = true; }
+    if (linkEl) linkEl.textContent = '已读';
+    // 检查是否全部已读
+    const allChecked = ['risk-1','risk-2','risk-3','risk-4','risk-5']
+      .every(id => { const el = document.getElementById(id); return el && el.checked; });
+    const btn = document.getElementById('risk-next-btn');
+    if (btn && allChecked) {
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btn.style.cursor = 'pointer';
+      btn.textContent = '下一步';
+    }
   }
 
   function selectRadio(el) {

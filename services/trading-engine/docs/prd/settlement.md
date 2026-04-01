@@ -321,10 +321,166 @@ withdrawable_cash = settled_cash - margin_requirement - pending_withdrawals
 
 ---
 
-## 8. 与其他 Domain PRD 的关系
+## 9. REST API 响应定义
+
+### 9.1 WebSocket settlement.updated 消息
+
+推送时机：T+1 或 T+2 结算完成时，通常在美股盘前 4:00 AM ET（17:00 CST）或港股盘前。
+
+**消息格式**：
+```json
+{
+  "channel": "settlement.updated",
+  "data": {
+    // 持仓标识
+    "symbol": "AAPL",
+    "market": "US",
+
+    // 结算数量信息
+    "settled_qty_added": 50,             // 本次新结算的股数
+    "new_total_settled_qty": 150,        // 结算后该股总已结算数量
+    "previous_unsettled_qty": 50,        // 结算前的未结算数量（冗余，便于前端更新）
+
+    // 结算时间
+    "settlement_date": "2026-03-31T00:00:00Z",  // 结算完成日期（UTC）
+    "timestamp": "2026-03-31T04:00:00Z",        // WebSocket 推送时间
+
+    // 原始成交信息（便于审计）
+    "trade_date": "2026-03-30T00:00:00Z",       // 原成交日期
+    "settlement_cycle": "T+1"                   // US | HK 的结算周期标识
+  }
+}
+```
+
+**前端处理**：
+- 收到 settlement.updated 消息时，更新该持仓的 `settled_qty` 和 `unsettled_qty`
+- 如果 `unsettled_qty` 变为 0，可解除该持仓的"未结算"标签
+- 推送通知提示用户："AAPL 持仓 50 股已结算，现在可以卖出"
+
+---
+
+### 9.2 GET /api/v1/portfolio/summary — 200 OK
+
+账户整体资产概览，包括现金、持仓、结算信息、P&L 统计。
+
+**响应 200 OK**（综合 position-pnl.md §2 和 settlement.md §1）：
+```json
+{
+  // 资金构成（来自 settlement.md §1.1）
+  "account_summary": {
+    "total_equity": "52341.20",         // 账户总资产 = cash + unsettled_cash + market_value
+    "cash_balance": "5141.20",          // 可用现金（可买入 / 可出金）
+    "unsettled_cash": "0.00",           // 待结算资金（卖出未结算部分）
+    "total_market_value": "47200.00",   // 全部持仓市值
+
+    // 日盈亏（来自 position-pnl.md §2.3）
+    "day_pnl": "823.50",                // 当日浮动盈亏（仅持仓价格变化）
+    "day_pnl_pct": "1.60",              // 当日盈亏率（百分比）
+
+    // 累计盈亏（来自 position-pnl.md §2.1 + §2.2）
+    "cumulative_unrealized_pnl": "1581.30",   // 当前持仓的未实现盈亏总和
+    "cumulative_realized_pnl": "3200.15",     // 历史卖出的已实现盈亏总和
+    "cumulative_pnl": "4781.45",              // 累计总盈亏（未实现 + 已实现）
+    "cumulative_pnl_pct": "9.97",             // 累计盈亏率（百分比）
+
+    // 购买力信息
+    "buying_power": "10241.20",         // 可用于下单的资金（= cash_balance - margin_requirement）
+    "margin_requirement": "0.00",       // 现金账户为 0；融资账户有值
+
+    // 时间戳
+    "updated_at": "2026-03-31T09:45:05.000Z"
+  },
+
+  // 资产分布（按行业板块分析）
+  "sector_breakdown": [
+    {
+      "sector": "Technology",
+      "market_value": "20000.00",
+      "ratio": "0.3779",                // 占总持仓比例
+      "symbol_count": 3,                // 该板块内持有的股票数
+      "top_symbols": ["AAPL", "MSFT"]   // 该板块排名前 N 的持仓
+    },
+    {
+      "sector": "Consumer Discretionary",
+      "market_value": "15200.00",
+      "ratio": "0.2877",
+      "symbol_count": 2,
+      "top_symbols": ["AMZN"]
+    },
+    {
+      "sector": "Financials",
+      "market_value": "12000.00",
+      "ratio": "0.2274",
+      "symbol_count": 1,
+      "top_symbols": ["JPM"]
+    }
+  ],
+
+  // P&L 排行（按收益从高到低排序）
+  "pnl_ranking": [
+    {
+      "rank": 1,
+      "symbol": "MSFT",
+      "market_value": "62812.50",
+      "unrealized_pnl": "5737.50",
+      "unrealized_pnl_pct": "10.05"
+    },
+    {
+      "rank": 2,
+      "symbol": "AAPL",
+      "market_value": "30045.00",
+      "unrealized_pnl": "381.00",
+      "unrealized_pnl_pct": "1.29"
+    },
+    {
+      "rank": 3,
+      "symbol": "JPM",
+      "market_value": "15000.00",
+      "unrealized_pnl": "-500.00",
+      "unrealized_pnl_pct": "-3.23"
+    }
+  ]
+}
+```
+
+---
+
+### 9.3 WebSocket portfolio.summary 消息
+
+推送时机：账户资产总值变化时（通常每 5-10 秒汇总一次）。
+
+**消息格式**（来自 position-pnl.md §2.3 和 settlement.md）：
+```json
+{
+  "channel": "portfolio.summary",
+  "data": {
+    // 资金总概览
+    "total_equity": "52341.20",
+    "total_market_value": "47200.00",
+    "cash_balance": "5141.20",
+    "unsettled_cash": "0.00",           // 来自 settlement.md §1.1
+
+    // 日盈亏
+    "day_pnl": "823.50",
+    "day_pnl_pct": "1.60",
+
+    // 累计盈亏
+    "cumulative_pnl": "4781.45",
+    "cumulative_pnl_pct": "9.97",
+
+    // 时间戳
+    "updated_at": "2026-03-31T09:45:05.000Z"
+  }
+}
+```
+
+---
+
+## 10. 与其他 Domain PRD 的关系
 
 - **order-lifecycle.md**：成交（FILLED 状态）后触发结算流程
-- **position-pnl.md**：已结算数量影响可卖数量；未结算影响 P&L 展示
-- **risk-rules.md**：未结算资金冻结影响购买力计算
-- **mobile/docs/prd/06-portfolio.md**：前端展示"已结算"vs"未结算"分类
-- **fund-transfer 服务**：出金时需查询已结算余额
+- **position-pnl.md**：已结算数量影响可卖数量；未结算影响 P&L 展示（§2）
+- **risk-rules.md**：未结算资金冻结影响购买力计算（§2）；Free-Riding 检查（§3）
+- **type-definitions.md**：decimal、timestamp 的序列化规则
+- **mobile/docs/prd/06-portfolio.md**：前端展示"已结算"vs"未结算"分类；T+1 制度说明
+- **fund-transfer 服务**：出金时需查询已结算余额（§7.2）

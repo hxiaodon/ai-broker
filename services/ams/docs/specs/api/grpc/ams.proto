@@ -1,0 +1,182 @@
+// AMS gRPC Service Definition
+// Proto file: services/ams/docs/specs/api/grpc/ams.proto
+//
+// Version:      v1.1
+// Last Updated: 2026-03-30
+// Status:       AGREED (see docs/contracts/ams-to-trading.md v1.1)
+//
+// Changelog:
+//   v1.1 (2026-03-30) — GetAccountStatus: added KYCStatus, KYCTier, AccountType, is_restricted,
+//                        restriction_reason, restriction_until_ts
+//   v1.0 (2026-03-13) — Initial contract (VerifySession, GetAccountStatus basic fields,
+//                        CheckAccountRestrictions)
+
+syntax = "proto3";
+
+package ams.v1;
+
+option go_package = "github.com/brokerage/ams/api/grpc/v1;amsv1";
+
+// ---------------------------------------------------------------------------
+// Shared Enums
+// ---------------------------------------------------------------------------
+
+// KYCStatus reflects the current KYC review state of an account.
+// DB column: accounts.kyc_status
+// Migration note: old value VERIFIED renamed to APPROVED (see 00003_accounts_restriction_fields.sql)
+enum KYCStatus {
+  KYC_STATUS_UNSPECIFIED = 0;
+  KYC_STATUS_PENDING     = 1;  // 审核中（开户申请已提交，等待核验）
+  KYC_STATUS_APPROVED    = 2;  // 已通过（原 VERIFIED，重命名为 APPROVED）
+  KYC_STATUS_REJECTED    = 3;  // 已拒绝（审核未通过）
+  KYC_STATUS_SUSPENDED   = 4;  // 已暂停（合规要求临时暂停，需 EDD 或人工审核）
+}
+
+// KYCTier reflects the depth of KYC completed for an account.
+// DB column: accounts.kyc_tier
+// Migration note: old value BASIC renamed to TIER_1; STANDARD/ENHANCED renamed to TIER_2
+enum KYCTier {
+  KYC_TIER_UNSPECIFIED = 0;
+  KYC_TIER_1           = 1;  // 基础开户（较低购买力和出入金限额）
+  KYC_TIER_2           = 2;  // 完整 KYC（完整交易权限和限额）
+}
+
+// AccountType is a simplified classification for the Trading Engine.
+// DB column: accounts.trading_type (MARGIN_REG_T and MARGIN_PORTFOLIO both map to ACCOUNT_TYPE_MARGIN)
+enum AccountType {
+  ACCOUNT_TYPE_UNSPECIFIED = 0;
+  ACCOUNT_TYPE_CASH        = 1;  // 现金账户（不允许透支；DB值: CASH）
+  ACCOUNT_TYPE_MARGIN      = 2;  // 保证金账户（DB值: MARGIN_REG_T 或 MARGIN_PORTFOLIO）
+}
+
+// ---------------------------------------------------------------------------
+// AccountService — consumed by Trading Engine and Fund Transfer
+// ---------------------------------------------------------------------------
+
+service AccountService {
+  // VerifySession validates a user JWT session token.
+  // SLA: P95 < 20ms
+  rpc VerifySession(VerifySessionRequest) returns (VerifySessionResponse);
+
+  // GetAccountStatus returns the full account status snapshot needed by Trading Engine
+  // before order submission. Response is cached in Redis with TTL=60s.
+  // Cache invalidation: Kafka topic ams.account.status-changed (immediate eviction).
+  // SLA: P95 < 30ms
+  rpc GetAccountStatus(GetAccountStatusRequest) returns (GetAccountStatusResponse);
+
+  // CheckAccountRestrictions performs a targeted check for PDT flags, compliance
+  // freezes, and account suspensions. Lighter-weight alternative to GetAccountStatus.
+  // SLA: P95 < 20ms
+  rpc CheckAccountRestrictions(CheckAccountRestrictionsRequest) returns (CheckAccountRestrictionsResponse);
+
+  // GetAccountSnapshot returns the full account attribute snapshot for Fund Transfer
+  // (used before deposit/withdrawal operations).
+  rpc GetAccountSnapshot(GetAccountSnapshotRequest) returns (AccountSnapshot);
+
+  // GetKYCTier returns the KYC tier for a given account (used by Fund Transfer to
+  // determine daily deposit/withdrawal limits).
+  rpc GetKYCTier(GetKYCTierRequest) returns (GetKYCTierResponse);
+
+  // GetInvestorClass returns the investor classification (RETAIL / PROFESSIONAL / INSTITUTIONAL).
+  // Used before recommending HK products to verify PI eligibility.
+  rpc GetInvestorClass(GetInvestorClassRequest) returns (GetInvestorClassResponse);
+}
+
+// ---------------------------------------------------------------------------
+// VerifySession
+// ---------------------------------------------------------------------------
+
+message VerifySessionRequest {
+  string token     = 1;  // JWT access token (RS256)
+  string device_id = 2;  // Device fingerprint for session binding check
+}
+
+message VerifySessionResponse {
+  bool   valid      = 1;
+  string account_id = 2;
+  string user_id    = 3;
+  int64  expires_at = 4;  // Unix nanoseconds UTC
+}
+
+// ---------------------------------------------------------------------------
+// GetAccountStatus (v1.1)
+// ---------------------------------------------------------------------------
+
+message GetAccountStatusRequest {
+  string account_id = 1;
+}
+
+// GetAccountStatusResponse — v1.1 (2026-03-30)
+// Fields 3–8 are new in v1.1 per docs/contracts/ams-to-trading.md v1.1.
+message GetAccountStatusResponse {
+  // v1.0 fields
+  string account_id = 1;
+  string status     = 2;  // "ACTIVE" | "SUSPENDED" | "CLOSED" (account lifecycle state)
+
+  // v1.1 fields
+  KYCStatus   kyc_status           = 3;  // Maps from accounts.kyc_status
+  KYCTier     kyc_tier             = 4;  // Maps from accounts.kyc_tier
+  AccountType account_type         = 5;  // Derived from accounts.trading_type
+  bool        is_restricted        = 6;  // true = PDT 标记 OR 合规冻结 OR account_status=SUSPENDED
+  string      restriction_reason   = 7;  // Human-readable reason; empty string if not restricted
+  int64       restriction_until_ts = 8;  // Unix nanoseconds UTC; 0 = indefinite restriction
+}
+
+// ---------------------------------------------------------------------------
+// CheckAccountRestrictions
+// ---------------------------------------------------------------------------
+
+message CheckAccountRestrictionsRequest {
+  string account_id = 1;
+}
+
+message CheckAccountRestrictionsResponse {
+  string account_id      = 1;
+  bool   is_restricted   = 2;
+  string reason          = 3;
+  int64  until_ts        = 4;  // Unix nanoseconds UTC; 0 = indefinite
+}
+
+// ---------------------------------------------------------------------------
+// GetAccountSnapshot (Fund Transfer)
+// ---------------------------------------------------------------------------
+
+message GetAccountSnapshotRequest {
+  string account_id = 1;
+}
+
+message AccountSnapshot {
+  string account_id    = 1;
+  string account_status = 2;
+  string kyc_tier      = 3;  // "TIER_1" | "TIER_2"
+  string aml_risk_score = 4; // "LOW" | "MEDIUM" | "HIGH"
+  string jurisdiction  = 5;  // "US" | "HK" | "BOTH"
+}
+
+// ---------------------------------------------------------------------------
+// GetKYCTier
+// ---------------------------------------------------------------------------
+
+message GetKYCTierRequest {
+  string account_id = 1;
+}
+
+message GetKYCTierResponse {
+  string account_id = 1;
+  KYCTier kyc_tier  = 2;
+}
+
+// ---------------------------------------------------------------------------
+// GetInvestorClass
+// ---------------------------------------------------------------------------
+
+message GetInvestorClassRequest {
+  string account_id = 1;
+}
+
+message GetInvestorClassResponse {
+  string account_id     = 1;
+  string investor_class = 2;  // "RETAIL" | "PROFESSIONAL" | "INSTITUTIONAL"
+  bool   pi_active      = 3;  // true if PI status is currently valid (not expired)
+  int64  pi_expires_at  = 4;  // Unix nanoseconds UTC; 0 if not PI
+}

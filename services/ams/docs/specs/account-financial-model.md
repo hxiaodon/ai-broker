@@ -1,11 +1,13 @@
 # AMS 金融业务模型规格说明
 
-> **版本**: v0.2-draft
-> **日期**: 2026-03-15
+> **版本**: v0.3
+> **日期**: 2026-03-30
 > **作者**: AMS Engineering
 > **状态**: Draft — 待产品评审
 >
-> **变更记录**: v0.2 新增"账户系统架构模式"章节，整合 ISO 20022、Fowler Analysis Patterns、Stripe/Monzo Ledger、Apache Fineract 等行业参考实现的设计洞察
+> **变更记录**:
+> - v0.3（2026-03-30）：落地 ams-to-trading.md v1.1 契约 — `accounts` 表新增 3 个限制字段；更新 kyc_status 枚举（新增 SUSPENDED）；更新 kyc_tier 枚举（BASIC→TIER_1, STANDARD→TIER_2）；新增 gRPC `GetAccountStatus` v1.1 字段映射说明
+> - v0.2：新增"账户系统架构模式"章节，整合 ISO 20022、Fowler Analysis Patterns、Stripe/Monzo Ledger、Apache Fineract 等行业参考实现的设计洞察
 
 本文档定义 Account Management Service（AMS）的**金融业务模型**，覆盖账户类型体系、KYC/AML 合规模型、账户生命周期，以及跨服务的数据权威边界。注册、会话管理、认证授权等内容另见独立 spec。
 
@@ -81,11 +83,11 @@
 
 ### 2.2 维度二：资金结构类型（trading_type）
 
-| 枚举值 | 中文 | 规则要求 |
-|--------|------|----------|
-| `CASH` | 现金账户 | 全额支付，不允许透支；US T+1 结算，HK T+2 结算 |
-| `MARGIN_REG_T` | 保证金账户（Reg T） | 初始保证金 50%（Reg T）；维持保证金 25%（FINRA 最低）；最低权益 $2,000 |
-| `MARGIN_PORTFOLIO` | 组合保证金账户 | 基于风险模型计算；最低净清算价值 $110,000（行业标准） |
+| 枚举值 | 中文 | 规则要求 | gRPC AccountType 映射 |
+|--------|------|----------|-----------------------|
+| `CASH` | 现金账户 | 全额支付，不允许透支；US T+1 结算，HK T+2 结算 | `ACCOUNT_TYPE_CASH` |
+| `MARGIN_REG_T` | 保证金账户（Reg T） | 初始保证金 50%（Reg T）；维持保证金 25%（FINRA 最低）；最低权益 $2,000 | `ACCOUNT_TYPE_MARGIN` |
+| `MARGIN_PORTFOLIO` | 组合保证金账户 | 基于风险模型计算；最低净清算价值 $110,000（行业标准） | `ACCOUNT_TYPE_MARGIN` |
 
 **Margin 账户额外要求**：
 - 须签署额外风险披露协议
@@ -406,13 +408,19 @@ CLOSED（账户关闭，数据保留合规期）
 accounts 表（账户维度属性）
 ├── client_type          // INDIVIDUAL / JOINT_JTWROS / CORPORATE / ...
 ├── trading_type         // CASH / MARGIN_REG_T / MARGIN_PORTFOLIO
+│                        //   → gRPC AccountType: MARGIN_REG_T/MARGIN_PORTFOLIO → MARGIN; 其余 → CASH
 ├── delegation_type      // SELF_DIRECTED / ND / FD
 ├── jurisdiction         // US / HK / BOTH
 ├── investor_class       // RETAIL / PROFESSIONAL / INSTITUTIONAL
 ├── account_status       // PENDING → ACTIVE → SUSPENDED → CLOSED
-├── kyc_tier             // BASIC / STANDARD / ENHANCED
-├── kyc_status           // PENDING / VERIFIED / REJECTED
+├── kyc_tier             // TIER_1（基础开户）/ TIER_2（完整KYC）
+│                        //   旧值: BASIC → TIER_1, STANDARD → TIER_2 (见迁移备注)
+├── kyc_status           // PENDING / APPROVED / REJECTED / SUSPENDED
+│                        //   旧值: VERIFIED → APPROVED; 新增 SUSPENDED
 ├── aml_risk_score       // LOW / MEDIUM / HIGH
+├── is_restricted        // TINYINT(1): PDT 标记 OR 合规冻结 OR 账户 SUSPENDED 时为 1
+├── restriction_reason   // VARCHAR(255): 限制原因说明（is_restricted=1 时填写）
+├── restriction_until_at // TIMESTAMP NULL: 限制解除时间（UTC），NULL = 无限期
 └── trading_permissions  // JSON: 允许的市场/品种/功能
 ```
 
@@ -425,6 +433,10 @@ accounts 表（账户维度属性）
 | `trading_permissions` | 校验下单品种/市场是否被允许 | Redis 缓存，TTL=60s |
 | `options_level` | 校验期权策略是否被授权 | Redis 缓存，TTL=60s |
 | `delegation_type` | FD 账户下单时记录授权人 | Redis 缓存，TTL=60s |
+| `kyc_status` | 校验 KYC 是否已 APPROVED（v1.1） | Redis 缓存（GetAccountStatus 响应），TTL=60s |
+| `kyc_tier` | 校验 KYC 层级（v1.1） | Redis 缓存（GetAccountStatus 响应），TTL=60s |
+| `account_type` | 决定保证金检查路径（v1.1） | Redis 缓存（GetAccountStatus 响应），TTL=60s |
+| `is_restricted` | 是否受限，true 时拒绝下单返回 403（v1.1） | Redis 缓存（GetAccountStatus 响应），TTL=60s；Kafka 事件驱动立即失效 |
 
 ### 7.3 Fund Transfer 消费（只读）
 
@@ -441,6 +453,10 @@ accounts 表（账户维度属性）
 service AccountService {
     // 校验账户状态（Trading Engine 下单前调用）
     rpc ValidateAccount(ValidateAccountRequest) returns (ValidateAccountResponse);
+
+    // 获取账户状态快照（v1.1：含 KYCStatus / KYCTier / AccountType / is_restricted）
+    // 详见 docs/specs/api/grpc/ams.proto 及 docs/contracts/ams-to-trading.md v1.1
+    rpc GetAccountStatus(GetAccountStatusRequest) returns (GetAccountStatusResponse);
 
     // 获取账户属性快照（Fund Transfer 出入金前调用）
     rpc GetAccountSnapshot(GetAccountSnapshotRequest) returns (AccountSnapshot);
@@ -477,7 +493,11 @@ CREATE TABLE accounts (
 
     -- KYC
     kyc_status          VARCHAR(20) NOT NULL DEFAULT 'PENDING',
-    kyc_tier            VARCHAR(20) NOT NULL DEFAULT 'BASIC', -- BASIC / STANDARD / ENHANCED
+    -- 枚举值：PENDING / APPROVED / REJECTED / SUSPENDED
+    -- 注：旧值 VERIFIED 已重命名为 APPROVED（见迁移 00003_accounts_restriction_fields.sql）
+    kyc_tier            VARCHAR(20) NOT NULL DEFAULT 'TIER_1',
+    -- 枚举值：TIER_1（基础开户，较低限额）/ TIER_2（完整KYC，完整权限）
+    -- 注：旧值 BASIC → TIER_1，STANDARD → TIER_2；ENHANCED 折入 TIER_2
     kyc_verified_at     TIMESTAMP NULL,
     kyc_reviewer_id     BIGINT UNSIGNED NULL,            -- 人工审核人
 
@@ -507,6 +527,12 @@ CREATE TABLE accounts (
     pdt_flagged         TINYINT(1) NOT NULL DEFAULT 0,
     margin_call_active  TINYINT(1) NOT NULL DEFAULT 0,
 
+    -- 账户限制（ams-to-trading.md v1.1，2026-03-30）
+    -- is_restricted 为组合字段：PDT 标记 OR 合规冻结 OR account_status=SUSPENDED 时由业务逻辑置 1
+    is_restricted        TINYINT(1)   NOT NULL DEFAULT 0     COMMENT 'PDT/合规/账户暂停限制标记，Trading Engine 据此拒绝下单',
+    restriction_reason   VARCHAR(255) NULL                   COMMENT '限制原因说明（is_restricted=1 时填写）',
+    restriction_until_at TIMESTAMP    NULL                   COMMENT '限制解除时间(UTC)，NULL=无限期',
+
     -- 交易权限
     trading_permissions JSON,                             -- {"markets":["US","HK"],"products":["STOCK","ETF"]}
 
@@ -517,7 +543,8 @@ CREATE TABLE accounts (
 
     INDEX idx_accounts_user (user_id),
     INDEX idx_accounts_status (account_status),
-    INDEX idx_accounts_kyc (kyc_status, kyc_tier)
+    INDEX idx_accounts_kyc (kyc_status, kyc_tier),
+    INDEX idx_accounts_is_restricted (is_restricted)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 ```
 
