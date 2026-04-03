@@ -1,0 +1,105 @@
+# Mobile Domain — Feature Implementation Dashboard
+#
+# 更新规则：
+#   - 每当模块状态变更（pending → in_progress → review → shipped）时更新
+#   - phase1_tasks 字段随 tracker 实际进度更新
+#   - 新模块开始前必须先创建对应的 tracker 文件
+#
+# 状态定义：
+#   pending     — 尚未开始，tracker 待创建
+#   in_progress — 正在实现，tracker 已创建
+#   review      — 实现完成，等待 security-engineer + code-reviewer 审核
+#   shipped     — 审核通过，合并至 main
+
+domain: mobile
+last_updated: 2026-04-02
+current_focus: auth
+
+development_order:
+  - auth
+  - market
+  - trading
+  - portfolio
+  - funding
+  - kyc
+  - settings
+
+modules:
+  - id: auth
+    name: 认证模块
+    status: review
+    phase1_tasks: "17/17"   # completed/total — 更新自 auth.tracker.md
+    prd: mobile/docs/prd/01-auth.md
+    tracker: mobile/docs/specs/auth.tracker.md
+    hifi: mobile/prototypes/01-auth/
+    contracts:
+      - docs/contracts/ams-to-mobile.md  # § Auth
+    notes: "Phase 1 实现完成，flutter analyze 0 issues，等待 security-engineer + code-reviewer 审核"
+
+  - id: market
+    name: 行情模块
+    status: pending
+    phase1_tasks: "0/?"   # tracker 创建时确定
+    prd: mobile/docs/prd/03-market.md
+    tracker: mobile/docs/specs/market.tracker.md   # JIT
+    hifi: mobile/prototypes/03-market/
+    contracts:
+      - docs/contracts/market-data-to-mobile.md
+    notes: "PRD-03 已通过 review；行情 WebSocket 合约在 market-data-to-mobile.md"
+
+  - id: trading
+    name: 交易模块
+    status: pending
+    phase1_tasks: "0/?"
+    prd: mobile/docs/prd/04-trading.md
+    tracker: mobile/docs/specs/trading.tracker.md  # JIT
+    hifi: mobile/prototypes/04-trading/
+    contracts:
+      - docs/contracts/trading-to-mobile.md
+    notes: "Phase 1 仅美股现金账户；KYC APPROVED 为前置条件"
+
+  - id: portfolio
+    name: 持仓模块
+    status: pending
+    phase1_tasks: "0/?"
+    prd: mobile/docs/prd/06-portfolio.md
+    tracker: mobile/docs/specs/portfolio.tracker.md  # JIT
+    hifi: mobile/prototypes/06-portfolio/
+    contracts:
+      - docs/contracts/trading-to-mobile.md   # 持仓/P&L 接口
+    notes: ""
+
+  - id: funding
+    name: 资金模块
+    status: pending
+    phase1_tasks: "0/?"
+    prd: mobile/docs/prd/05-funding.md
+    tracker: mobile/docs/specs/funding.tracker.md  # JIT
+    hifi: mobile/prototypes/05-funding/
+    contracts:
+      - docs/contracts/fund-to-mobile.md
+    notes: "AML 合规要求高；银行账号加密、出入金审批流程"
+
+  - id: kyc
+    name: KYC 模块
+    status: pending
+    phase1_tasks: "0/?"
+    prd: mobile/docs/prd/02-kyc.md
+    tracker: mobile/docs/specs/kyc.tracker.md  # JIT
+    hifi: mobile/prototypes/02-kyc/
+    contracts:
+      - docs/contracts/ams-to-mobile.md   # § KYC
+    notes: >
+      Steps 1-6 Flutter Native；Steps 7-8 H5 WebView
+      （详见 mobile/docs/specs/h5-vs-native-decision.md）
+
+  - id: settings
+    name: 设置模块
+    status: pending
+    phase1_tasks: "0/?"
+    prd: mobile/docs/prd/08-settings-profile.md
+    tracker: mobile/docs/specs/settings.tracker.md  # JIT
+    hifi: mobile/prototypes/08-settings-profile/
+    contracts:
+      - docs/contracts/ams-to-mobile.md   # § Profile / Notifications
+    notes: "包含跨模块的通知设置（PRD-07）和安全设置（设备管理在 auth 模块）"

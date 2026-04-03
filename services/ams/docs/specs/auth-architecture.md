@@ -642,4 +642,207 @@ Step 6: 从 JWKS 删除旧公钥
 
 ---
 
-*参考：`docs/specs/tech-stack.md`（库选型）、`docs/specs/account-financial-model.md`（账户模型）、`.claude/rules/security-compliance.md`（安全规则）*
+## 12. OTP（一次性密码）流程补充
+
+### 12.1 OTP 发送规则（参考 decisions-2026-03-29.md）
+
+| 规则 | 说明 |
+|------|------|
+| **发送间隔** | 同一手机号 60 秒内只能发送 1 次 |
+| **小时上限** | 1 小时内最多 5 次；超限后需等待至下一小时 |
+| **有效期** | 5 分钟内有效，过期需重新发送 |
+| **错误上限** | 同一 OTP 请求最多错误 5 次，超限锁定账号 30 分钟 |
+| **失败处理** | OTP 发送失败时不消耗次数配额（防网络问题导致卡顿） |
+
+### 12.2 OTP 重发机制
+
+```
+用户点击"重新发送"按钮
+  ↓
+检查距离上次发送的时间
+  ├─ < 60 秒：拒绝，返回"请稍后再试，还需等待 XX 秒"
+  └─ ≥ 60 秒：继续
+  ↓
+检查 1 小时内发送次数
+  ├─ < 5 次：继续发送
+  ├─ = 5 次：拒绝，返回"验证码发送次数已达上限，请稍后重试"
+  └─ 标记 last_otp_sent_at = NOW，increment send_count
+  ↓
+发送新 OTP 码（SMS / Email）
+  ├─ OTP 有效期 = 5 分钟
+  ├─ 每次发送生成新 OTP（不重用）
+  └─ 记录发送时间戳（用于过期判断）
+  ↓
+若发送失败（网络错误）
+  ├─ 不增加 send_count（此次不计入 5 次限制）
+  ├─ 显示"验证码发送失败，请稍后重试"
+  └─ 用户可立即点击"重新发送"
+```
+
+### 12.3 OTP 验证与错误处理
+
+```
+用户输入 6 位 OTP 码
+  ↓
+后端验证：
+  ├─ OTP 是否存在（已发送）
+  ├─ OTP 是否过期（> 5 分钟）
+  ├─ OTP 是否正确
+  └─ 错误次数是否超限（≥ 5）
+  ↓
+错误场景：
+  ├─ OTP 过期 → "验证码已过期，请重新获取"
+  │   └─ 清空输入框，用户重新点击"发送"
+  │
+  ├─ OTP 不正确 → "验证码不正确，还可重试 N 次"（剩余 1 次时加粗警示）
+  │   └─ 增加 error_count，当 error_count < 5 时继续
+  │
+  └─ 错误超限（error_count = 5） → "登录失败次数过多，账号已暂时锁定，请 30 分钟后重试"
+      ├─ 标记 account.locked_until = NOW + 30 min
+      ├─ 阻止后续 OTP 验证请求
+      ├─ 发布 Kafka 事件：auth.account_locked
+      └─ 推送通知：FCM + SMS 告警
+  ↓
+验证成功 → 创建会话（见 § 3 Token 颁发）
+```
+
+---
+
+## 13. 生物识别认证补充
+
+### 13.1 生物识别验证流程
+
+```
+用户点击"使用 Face ID 登录"或"使用指纹登录"
+  ↓
+客户端调用系统生物识别 API
+  ├─ iOS：`LAContext.evaluatePolicy(.deviceOwnerAuthenticationWithBiometrics)`
+  └─ Android：`BiometricPrompt.authenticate()`
+  ↓
+生物识别结果：
+  ├─ 成功：客户端生成生物识别验证签名（见 13.2）
+  ├─ 失败（1-2 次）：提示用户"验证未通过，请重试"，允许继续尝试
+  ├─ 失败（≥ 3 次）：显示"生物识别验证失败，请使用验证码登录"
+  │   └─ 自动切换到 OTP 流程（见 12.2）
+  └─ 用户取消：返回冷启动页，允许重新操作
+  ↓
+验证签名有效 → 刷新 Token（见 session-refresh-strategy.md § 4.3）
+```
+
+### 13.2 生物识别验证签名规范
+
+在 Token 刷新或下单等敏感操作时，需要佐证用户已通过生物识别验证。使用以下机制：
+
+**HTTP Header：`X-Biometric-Verified`**
+
+```
+生成方法：
+  1. 客户端获取生物识别验证成功后，记录 timestamp = NOW
+  2. 生成签名：
+     signature = HMAC-SHA256(
+       timestamp + "|" + device_id + "|" + api_endpoint,
+       biometric_secret  // 存储在 Keychain / EncryptedSharedPreferences
+     )
+  3. 添加 HTTP Header：
+     X-Biometric-Verified: {timestamp}|{signature}
+
+验证方法（后端）：
+  1. 提取 timestamp 和 signature
+  2. 验证 timestamp 在 5 分钟内（防重放）
+  3. 重新计算签名
+  4. 对比提供的 signature
+  5. 若验证失败 → 返回 403 BIOMETRIC_VERIFICATION_REQUIRED
+
+使用场景：
+  ├─ 资金操作（提现、汇兑）
+  ├─ 密码修改
+  ├─ KYC 文档上传
+  └─ 远程注销设备
+```
+
+### 13.3 生物识别设置流程
+
+```
+首次 OTP 登录成功后
+  ↓
+显示"设置生物识别以加快登录"提示页面
+  ├─ "开启 Face ID"、"开启指纹"、"现在跳过"
+  └─ 若设备不支持，自动隐藏相关选项
+  ↓
+用户选择"开启"
+  ├─ 调用客户端生物识别注册 API
+  ├─ 系统完成指纹/面容采集
+  └─ 若注册成功，保存本地标记：biometric_enabled = true
+  ↓
+用户选择"跳过"
+  ├─ 记录跳过次数（最多提醒 3 次）
+  ├─ 若跳过次数 ≥ 3，不再主动提示
+  └─ 用户可在设置中手动开启
+```
+
+### 13.4 生物识别变更检测（指纹/面容更换）
+
+```
+系统环境变化（重装系统、越狱/root、Face ID 重新注册等）
+  ↓
+客户端检测到 biometric 变更：
+  ├─ iOS：检查 `LAContext.canEvaluatePolicy()` 返回值变化
+  └─ Android：检查生物识别可用性变化
+  ↓
+若检测到变更：
+  ├─ 清除本地 biometric_enabled 标记
+  ├─ 显示提示："设备安全信息已变更，请重新设置生物识别"
+  ├─ 跳转冷启动页，要求重新登录
+  └─ 首次 OTP 登录后，重新引导设置生物识别
+  ↓
+后端支持：
+  ├─ 在 devices 表记录 device_fingerprint（硬件/系统信息哈希）
+  ├─ 若客户端上报 fingerprint 变更，触发安全重新验证
+  └─ 发布 Kafka 事件：device.biometric_reset
+```
+
+---
+
+## 14. 安全事件与异常检测补充
+
+### 14.1 新设备登录告警
+
+```
+新设备首次登录时
+  ↓
+判断是否为"新设备"：
+  ├─ device_id 在 devices 表中不存在 → 新设备
+  └─ device_id 存在但 status = LOCALLY_LOGGED_OUT/REMOTELY_KICKED → 重新激活
+  ↓
+若为新设备且地理位置异常（可选）：
+  ├─ 检查最近 2 小时内的登录位置
+  ├─ 若距离 > 1000km，标记为异常
+  └─ 发送高优先级推送告警（见 push-notification.md）
+  ↓
+否则，发送普通推送：
+  ├─ "您的账号已在 [设备名] 登录，如非本人操作请立即联系客服"
+  └─ 包含快速链接：设备管理页面
+```
+
+### 14.2 多地登录异常检测（Phase 2 可选）
+
+```
+同一账户在短时间内从远距离地点登录
+  ↓
+检测逻辑：
+  ├─ Device A 位置：Beijing (39.90°N, 116.41°E)
+  ├─ Device B 位置：New York (40.71°N, 74.01°W)
+  ├─ 时间间隔：< 2 小时
+  ├─ 距离计算：> 1000 km（物理上不可能）
+  └─ 触发告警
+  ↓
+行为：
+  ├─ 标记 account.risk_score = 'MEDIUM'
+  ├─ 推送告警："{location} 新地点登录，如非本人操作请立即修改密码"
+  ├─ 可选：要求生物识别重新验证
+  └─ 记录审计日志
+```
+
+---
+
+*参考：`docs/specs/tech-stack.md`（库选型）、`docs/specs/account-financial-model.md`（账户模型）、`docs/specs/device-management.md`（设备管理）、`docs/specs/push-notification.md`（推送通知）、`.claude/rules/security-compliance.md`（安全规则）*

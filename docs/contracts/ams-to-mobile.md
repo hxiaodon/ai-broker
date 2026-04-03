@@ -2,11 +2,11 @@
 provider: services/ams
 consumer: mobile
 protocol: REST + gRPC
-status: REVIEWED
-version: 1
+status: FINAL
+version: 2
 created: 2026-03-13
-last_updated: 2026-03-31
-last_reviewed: 2026-03-31
+last_updated: 2026-04-01
+last_reviewed: 2026-04-01
 sync_strategy: provider-owns
 ---
 
@@ -20,22 +20,36 @@ sync_strategy: provider-owns
 
 ### 1️⃣ 认证（Authentication）
 
-**实现状态**：❌ 待实现
-**来源文档**：TBD in `services/ams/docs/specs/api/rest/auth.md`
-**描述**：登录、注册、Token 刷新、生物识别认证
+**实现状态**：✅ **已定义** (Final)
+**来源文档**：`services/ams/docs/specs/api/rest/auth.md`
+**描述**：OTP 登录、Token 刷新、生物识别认证、设备管理
 
 | 方法 | 路径 | 用途 | SLA | 引入版本 |
 |------|------|------|-----|---------|
-| POST | /api/v1/auth/login | 手机号+密码登录，返回 JWT access + refresh token | TBD | v1 |
-| POST | /api/v1/auth/register | 新用户注册（邮箱、密码） | TBD | v1 |
-| POST | /api/v1/auth/refresh | 使用 refresh token 刷新 access token | TBD | v1 |
-| POST | /api/v1/auth/biometric | 生物识别认证（指纹/面容），绑定设备 ID | TBD | v1 |
+| POST | /v1/auth/otp/send | 发送 OTP 验证码（SMS/Email） | <200ms | v2 |
+| POST | /v1/auth/otp/verify | 验证 OTP 并签发 JWT access + refresh token | <500ms | v2 |
+| POST | /v1/auth/token/refresh | 使用 refresh token 刷新 access token（单次使用） | <300ms | v2 |
+| POST | /v1/auth/biometric/register | 注册生物识别（Face ID/Fingerprint），绑定设备 | <200ms | v2 |
+| POST | /v1/auth/biometric/verify | 验证生物识别签名（敏感操作） | <300ms | v2 |
+| POST | /v1/auth/logout | 注销会话，吊销 token | <200ms | v2 |
+| GET | /v1/auth/devices | 列出用户所有已绑定设备 | <200ms | v2 |
+| DELETE | /v1/auth/devices/{device_id} | 远程注销设备（踢出会话） | <200ms | v2 |
 
-**规范参考**：
-- Token 生命周期：access token 15 分钟，refresh token 7 天（JWT RS256）
-- 设备绑定：Token 绑定 device_id + IP 范围
-- MFA：TOTP + SMS/Email 备用
-- 速率限制：5 req/5min per IP+user
+**核心特性**：
+- OTP 流程：60 秒发送间隔，5/小时限制，5 分钟有效期，5 次错误后 30 分钟锁定
+- Token 生命周期：access token 15 分钟，refresh token 7 天（单次使用、轮换）
+- 设备绑定：最多 3 台设备，超限踢出最早设备（FIFO）
+- 生物识别：HMAC-SHA256 签名验证，设备指纹变更检测，重新注册提示
+- 设备状态机：ACTIVE / LOCALLY_LOGGED_OUT / REMOTELY_KICKED / SESSION_EXPIRED
+- 速率限制：5 req/5min per IP+phone（登录），1/60s per phone（OTP 发送）
+- Kafka 事件：`auth.otp_sent`、`auth.otp_verified`、`auth.device_added`、`auth.device_kicked`
+
+**详见**：`api/rest/auth.md` 的：
+- § 1-2：OTP 发送与验证流程（新用户自动创建账户）
+- § 3：Token 刷新与单次使用强制（防止 token 泄露）
+- § 4-5：生物识别注册与验证（设备指纹检测）
+- § 6-8：注销、设备列表、设备远程注销（RBAC：需生物识别）
+- 速率限制与错误码完整参考表
 
 ---
 
@@ -82,42 +96,86 @@ sync_strategy: provider-owns
 
 ### 3️⃣ 个人资料（User Profile）
 
-**实现状态**：❌ 待实现
-**来源文档**：TBD in `services/ams/docs/specs/api/rest/profile.md`
-**描述**：获取、更新个人资料，包括基本信息、偏好设置、PII 脱敏
+**实现状态**：✅ **已定义** (Final)
+**来源文档**：`services/ams/docs/specs/api/rest/profile.md`
+**描述**：获取、更新个人资料，包括基本信息、财务信息、KYC 与 AML 状态
 
 | 方法 | 路径 | 用途 | SLA | 引入版本 |
 |------|------|------|-----|---------|
-| GET | /api/v1/profile | 获取个人资料（脱敏返回） | TBD | v1 |
-| PUT | /api/v1/profile | 更新个人资料（关键字段需重新验证） | TBD | v1 |
+| GET | /v1/profile | 获取个人资料（PII 解密返回） | <200ms | v2 |
+| PUT | /v1/profile | 更新个人资料（敏感字段需生物识别验证） | <300ms | v2 |
+| GET | /v1/profile/account-status | 获取账户合规状态（KYC、AML、限制、W-8BEN） | <200ms | v2 |
 
-**规范参考**：
-- 资料字段：姓名、出生日期、国籍、税务居住地、就业、财务信息
-- PII 加密：SSN、HKID、护照号在应用层 AES-256-GCM 加密
-- PII 脱敏：SSN `***-**-1234`，HKID `A****(3)`，Email `j***e@example.com`
-- 关键字段变更（姓名、税号）需重新验证
+**核心特性**：
+- 资料字段：姓名、出生日期、国籍、就业状态、财务信息、投资适合性评级
+- PII 加密：SSN、HKID、DOB 在应用层 AES-256-GCM 加密存储（盲索引支持查询）
+- PII 脱敏：返回明文给已认证客户端，UI 展示时二次脱敏（SSN `***-**-1234`，HKID `A****(3)`）
+- 敏感字段更新（email、phone、SSN、HKID）需生物识别验证 + 二次确认
+- 账户状态：KYC 状态（PENDING/APPROVED/REJECTED/SUSPENDED）、AML 筛查状态（CLEAR/REVIEW/FLAGGED）、活跃限制（交易禁用、提现禁用等）
+- W-8BEN 税务表单：3 年有效期，T-90 自动续期提醒
+
+**详见**：`api/rest/profile.md` 的：
+- § 1：Get Profile（PII 解密逻辑）
+- § 2：Update Profile（敏感字段验证、邮箱/手机二次确认流程）
+- § 3：Get Account Status（KYC/AML 状态、活跃限制、W-8BEN 状态）
+- PII 字段分类与脱敏规则表
 
 ---
 
 ### 4️⃣ 通知（Notifications）
 
-**实现状态**：❌ 待实现
-**来源文档**：TBD in `services/ams/docs/specs/api/rest/notifications.md`
-**描述**：获取站内通知列表，支持分页、已读/未读筛选、多渠道投递
+**实现状态**：✅ **已定义** (Final)
+**来源文档**：`services/ams/docs/specs/api/rest/notifications.md`
+**描述**：获取站内通知列表、管理已读状态、配置通知偏好
 
 | 方法 | 路径 | 用途 | SLA | 引入版本 |
 |------|------|------|-----|---------|
-| GET | /api/v1/notifications | 通知列表（分页，已读/未读筛选） | TBD | v1 |
+| GET | /v1/notifications | 分页获取通知列表（支持已读/未读/事件类型筛选） | <300ms | v2 |
+| PATCH | /v1/notifications/{notification_id}/read | 标记单个通知为已读 | <200ms | v2 |
+| PATCH | /v1/notifications/read | 批量标记通知为已读（最多 100 条） | <300ms | v2 |
+| GET | /v1/notifications/preferences | 获取用户通知偏好设置 | <200ms | v2 |
+| PUT | /v1/notifications/preferences | 更新通知偏好（渠道、事件类型、勿扰时间） | <200ms | v2 |
 
-**规范参考**：
-- 多渠道：Push (FCM)、邮件、短信、应用内
-- 事件类型：KYC 状态变更、W-8BEN 续期、账户警告、合规冻结
-- 用户偏好设置：按渠道和事件类型配置
-- 通知持久化：应用内已读/未读状态
+**核心特性**：
+- 事件类型：设备登录、设备被踢、异常登录、账户锁定、KYC 状态、W-8BEN 过期、Session 过期、提现/存款完成（8 类）
+- 多渠道投递：FCM（推送）、SMS（短信）、Email（邮件），每个用户可独立配置
+- 优先级：HIGH（安全相关）、NORMAL（账户通知）、LOW（信息性）
+- 已读状态：应用内追踪，Redis 计数器快速查询未读数
+- 勿扰时间：用户可设置静音时间段（推送仍投递但不弹出）
+- 安全事件强制：设备被踢、账户锁定通知无法关闭（compliance required）
+- Kafka 事件：消费 `auth.device_kicked`、`kyc.status_changed`、`account.restricted` 等事件
+
+**详见**：`api/rest/notifications.md` 的：
+- § 1：List Notifications（分页、过滤、排序）
+- § 2-3：Mark Read（单个及批量）
+- § 4-5：Get/Update Preferences（渠道偏好、事件类型订阅、勿扰时间）
+- 推送 Kafka 事件映射表
 
 ---
 
-## 数据流向
+### 5️⃣ 访客模式（Guest Mode）
+
+**实现状态**：✅ **已定义** (Final)
+**来源文档**：`services/ams/docs/specs/api/rest/guest.md`
+**描述**：无认证用户浏览延迟行情、搜索、浏览库存后升级为认证用户
+
+| 方法 | 路径 | 用途 | SLA | 引入版本 |
+|------|------|------|-----|---------|
+| POST | /v1/guest/session | 创建访客会话（IP 追踪，7 天过期） | <200ms | v2 |
+
+**核心特性**：
+- 页面权限矩阵：6 个页面，3 个开放（行情首页、股票详情、搜索），3 个限制（订单、持仓、个人资料）
+- 行情延迟：15+ 分钟延迟，满足 SEC Regulation NMS（合规标签强制显示 "Delayed 15 minutes"）
+- 会话生命周期：7 天 TTL，无 PII 存储，支持本地 watchlist（非服务端同步）
+- 登录触发：点击买/卖、加入 watchlist 时弹出登录 sheet → OTP 流程 → 自动升级为认证用户
+- 本地数据：Watchlist 存储在客户端（localStorage/indexedDB），升级时可同步到服务端
+- Kafka 事件：`guest.session_created`、`guest.upgraded_to_user`
+
+**详见**：`api/rest/guest.md` 的：
+- § Create Guest Session 流程与响应格式
+- § Guest Session Lifecycle（状态转换、页面访问矩阵、升级流程）
+- § SEC Compliance 标签规则与显示位置
+- Watchlist 同步端点
 
 ```
 移动端 (Flutter)
@@ -195,5 +253,6 @@ Notifications:     20 req / min per user
 
 | 版本 | 日期 | 变更 | 状态 |
 |------|------|------|------|
+| v2 | 2026-04-01 | 完成全部 4 个移动端模块 REST API 规范（auth、profile、notifications、guest）。标记认证、个人资料、通知、访客模式状态为 **Final**；引用新建的规范文档（auth.md, profile.md, notifications.md, guest.md）。补充核心特性、Kafka 事件、详细参考链接。 | FINAL |
 | v1 | 2026-03-31 | 首次审核：按模块分类，引用已定义的 KYC 合约，标记待实现模块指向 TBD 文档。完善安全规范（认证、PII 脱敏、速率限制）。 | REVIEWED |
 | v0 | 2026-03-13 | 初始创建（占位符） | DRAFT |

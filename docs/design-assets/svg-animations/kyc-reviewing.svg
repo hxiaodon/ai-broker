@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <style>
+    .outer-ring {
+      fill: none;
+      stroke: #E8F0FE;
+      stroke-width: 4;
+    }
+    .progress-ring {
+      fill: none;
+      stroke: #1A73E8;
+      stroke-width: 4;
+      stroke-linecap: round;
+      stroke-dasharray: 160;
+      stroke-dashoffset: 160;
+      transform-origin: 40px 40px;
+      transform: rotate(-90deg);
+      animation: fill-progress 2s ease-in-out 0.2s infinite;
+    }
+    .doc-body {
+      fill: none;
+      stroke: #1A73E8;
+      stroke-width: 3.5;
+      stroke-linejoin: round;
+      opacity: 0;
+      animation: fade-in 0.4s ease-out 0.2s forwards;
+    }
+    .doc-fold {
+      fill: none;
+      stroke: #1A73E8;
+      stroke-width: 3.5;
+      stroke-linejoin: round;
+      opacity: 0;
+      animation: fade-in 0.4s ease-out 0.2s forwards;
+    }
+    .doc-line {
+      stroke: #1A73E8;
+      stroke-width: 3;
+      stroke-linecap: round;
+      opacity: 0;
+      animation: fade-in 0.4s ease-out 0.4s forwards;
+    }
+    .dot {
+      fill: #1A73E8;
+      animation: pulse 1.4s ease-in-out 0.2s infinite;
+    }
+    @keyframes fill-progress {
+      0%   { stroke-dashoffset: 160; }
+      70%  { stroke-dashoffset: 0; }
+      100% { stroke-dashoffset: 0; }
+    }
+    @keyframes fade-in {
+      to { opacity: 1; }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1);   transform-origin: 40px 62px; }
+      50%       { opacity: 0.4; transform: scale(0.7); transform-origin: 40px 62px; }
+    }
+  </style>
+
+  <!-- Background track -->
+  <circle class="outer-ring"    cx="40" cy="40" r="26"/>
+  <!-- Animated progress arc -->
+  <circle class="progress-ring" cx="40" cy="40" r="26"/>
+
+  <!-- Document icon in center -->
+  <path class="doc-body" d="M32 25 L32 55 L48 55 L48 32 L41 25 Z"/>
+  <path class="doc-fold" d="M41 25 L41 32 L48 32"/>
+  <line class="doc-line" x1="35.5" y1="37" x2="44.5" y2="37"/>
+  <line class="doc-line" x1="35.5" y1="42" x2="44.5" y2="42"/>
+  <line class="doc-line" x1="35.5" y1="47" x2="41"   y2="47"/>
+
+  <!-- Pulsing dot below (reviewing indicator) -->
+  <circle class="dot" cx="40" cy="62" r="3"/>
+</svg>

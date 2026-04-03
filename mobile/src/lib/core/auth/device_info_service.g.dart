@@ -10,7 +10,7 @@ part of 'device_info_service.dart';
 // ignore_for_file: type=lint, type=warning
 
 @ProviderFor(deviceInfoService)
-const deviceInfoServiceProvider = DeviceInfoServiceProvider._();
+final deviceInfoServiceProvider = DeviceInfoServiceProvider._();
 
 final class DeviceInfoServiceProvider
     extends
@@ -20,7 +20,7 @@ final class DeviceInfoServiceProvider
           DeviceInfoService
         >
     with $Provider<DeviceInfoService> {
-  const DeviceInfoServiceProvider._()
+  DeviceInfoServiceProvider._()
     : super(
         from: null,
         argument: null,

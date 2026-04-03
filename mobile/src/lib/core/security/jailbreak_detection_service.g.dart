@@ -10,7 +10,7 @@ part of 'jailbreak_detection_service.dart';
 // ignore_for_file: type=lint, type=warning
 
 @ProviderFor(jailbreakDetectionService)
-const jailbreakDetectionServiceProvider = JailbreakDetectionServiceProvider._();
+final jailbreakDetectionServiceProvider = JailbreakDetectionServiceProvider._();
 
 final class JailbreakDetectionServiceProvider
     extends
@@ -20,7 +20,7 @@ final class JailbreakDetectionServiceProvider
           JailbreakDetectionService
         >
     with $Provider<JailbreakDetectionService> {
-  const JailbreakDetectionServiceProvider._()
+  JailbreakDetectionServiceProvider._()
     : super(
         from: null,
         argument: null,

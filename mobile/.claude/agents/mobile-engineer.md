@@ -66,6 +66,14 @@ tools: Read, Write, Edit, Bash, Glob, Grep
 | 设计 Token | `mobile/prototypes/_design-system/tokens.css` |
 | UXUE agent 定义 | `.claude/agents/ui-designer.md` |
 
+### 开发进度追踪
+
+| 文档 | 内容 |
+|------|------|
+| `mobile/docs/active-features.yaml` | 7 模块进度仪表盘，当前 `current_focus` 即当前开发模块 |
+| `mobile/docs/specs/{module}.tracker.md` | 当前模块 Phase 1 任务清单（checkbox）、验收标准、Open Questions |
+| `mobile/docs/specs/h5-vs-native-decision.md` | H5 WebView vs Flutter Native 架构决策（哪 5 页用 H5） |
+
 ### 全局规则
 
 | 文档 | 内容 |
@@ -78,11 +86,13 @@ tools: Read, Write, Edit, Bash, Glob, Grep
 ## 实现前必做检查（每个功能）
 
 ```
+0. 读 mobile/docs/active-features.yaml → 确认 current_focus（当前模块）
+   读 mobile/docs/specs/{module}.tracker.md → 确认任务范围、Open Questions
 1. 读 PRD 对应章节 → 确认 Phase 1 范围（不实现 Phase 2 特性）
 2. 读 API 契约 → 确认接口字段、错误码、状态枚举
 3. 读 hifi 原型 → 确认所有 UI 状态，读 tokens.css 取颜色/间距
 4. 读 tech-spec 对应章节 → 确认使用正确的包和模式
-5. 如涉及 WebView → 读 jsbridge-spec.md
+5. 如涉及 WebView → 读 jsbridge-spec.md 和 h5-vs-native-decision.md
 ```
 
 ---

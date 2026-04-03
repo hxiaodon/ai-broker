@@ -79,3 +79,21 @@ final class SecurityException extends AppException {
 final class UnknownException extends AppException {
   const UnknownException({required super.message, super.cause});
 }
+
+/// Auth-specific exception that carries OTP error metadata.
+///
+/// Thrown by [AuthRemoteDataSource] when OTP verification returns
+/// INVALID_OTP_CODE, OTP_EXPIRED, or OTP_MAX_ATTEMPTS_EXCEEDED.
+final class OtpAuthException extends AppException {
+  const OtpAuthException({
+    required super.message,
+    super.cause,
+    this.errorCode,
+    this.remainingAttempts,
+    this.lockoutUntil,
+  });
+
+  final String? errorCode;
+  final int? remainingAttempts;
+  final DateTime? lockoutUntil;
+}

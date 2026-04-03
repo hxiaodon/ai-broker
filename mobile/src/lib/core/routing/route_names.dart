@@ -8,9 +8,12 @@ class RouteNames {
   RouteNames._();
 
   // Auth
+  static const authSplash = '/';
   static const authLogin = '/auth/login';
   static const authOtp = '/auth/otp';
   static const authBiometricSetup = '/auth/biometric-setup';
+  static const authBiometricLogin = '/auth/biometric-login';
+  static const authDevices = '/auth/devices';
 
   // Main tab shell
   static const market = '/market';

@@ -1,6 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+import '../../features/auth/application/auth_notifier.dart';
+import '../../features/auth/presentation/screens/biometric_login_screen.dart';
+import '../../features/auth/presentation/screens/biometric_setup_screen.dart';
+import '../../features/auth/presentation/screens/device_management_screen.dart';
+import '../../features/auth/presentation/screens/login_screen.dart';
+import '../../features/auth/presentation/screens/otp_input_screen.dart';
+import '../../features/auth/presentation/screens/splash_screen.dart';
 import 'route_names.dart';
 import 'scaffold_with_nav.dart';
 
@@ -8,56 +17,75 @@ part 'app_router.g.dart';
 
 /// go_router configuration with 4-tab StatefulShellRoute.
 ///
-/// Authentication redirect logic uses placeholder booleans in Phase 1.
-/// Wire to [AuthNotifier] in Phase 2 when the auth feature is implemented.
+/// Auth redirect logic:
+///   - unauthenticated + non-auth route → splash (/)
+///   - guest + restricted route (trading/portfolio/settings) → guest placeholder
+///   - authenticated + auth route → market
+///   - PENDING_KYC → /kyc
 ///
-/// Route hierarchy:
-///   /auth/login        → LoginScreen (placeholder)
-///   /auth/otp          → OtpScreen (placeholder)
-///   /kyc               → KycRootScreen (placeholder)
-///   / (shell)
-///     /market          → MarketListScreen (placeholder)
-///     /trading         → TradingScreen (placeholder)
-///     /portfolio       → PortfolioScreen (placeholder)
-///     /settings        → SettingsScreen (placeholder)
+/// GoRouter is created as a [Riverpod(keepAlive: true)] provider so it can
+/// listen to [authProvider] and refresh on state changes.
 @riverpod
-GoRouter appRouter(Ref ref) => GoRouter(
-    initialLocation: RouteNames.market,
+GoRouter appRouter(Ref ref) {
+  // Trigger router refresh whenever auth state changes
+  final authListenable = _AuthStateListenable(ref);
+
+  return GoRouter(
+    initialLocation: RouteNames.authSplash,
     debugLogDiagnostics: true,
-    // Phase 1: no redirect — always navigate directly to tab shell.
-    // Phase 2: wire AuthNotifier here for auth/KYC guards.
-    redirect: null,
+    refreshListenable: authListenable,
+    redirect: (context, state) {
+      final authState = ref.read(authProvider);
+      return _redirect(authState, state);
+    },
     routes: [
-      // Auth routes
+      // ── Splash ────────────────────────────────────────────────────────────
+      GoRoute(
+        path: RouteNames.authSplash,
+        builder: (_, _) => const SplashScreen(),
+      ),
+
+      // ── Auth flow ─────────────────────────────────────────────────────────
       GoRoute(
         path: RouteNames.authLogin,
-        builder: (_, __) => const _Placeholder('Login'),
+        builder: (_, _) => const LoginScreen(),
       ),
       GoRoute(
         path: RouteNames.authOtp,
-        builder: (_, __) => const _Placeholder('OTP Verification'),
+        builder: (_, state) {
+          final args = state.extra as OtpScreenArgs;
+          return OtpInputScreen(args: args);
+        },
       ),
       GoRoute(
         path: RouteNames.authBiometricSetup,
-        builder: (_, __) => const _Placeholder('Biometric Setup'),
+        builder: (_, _) => const BiometricSetupScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.authBiometricLogin,
+        builder: (_, _) => const BiometricLoginScreen(),
+      ),
+      GoRoute(
+        path: RouteNames.authDevices,
+        builder: (_, _) => const DeviceManagementScreen(),
       ),
 
-      // KYC routes (modal flow)
+      // ── KYC modal flow ────────────────────────────────────────────────────
       GoRoute(
         path: RouteNames.kycRoot,
-        builder: (_, __) => const _Placeholder('KYC — Personal Info'),
+        builder: (_, _) => const _Placeholder('KYC — Personal Info'),
       ),
 
-      // Main tab shell
+      // ── Main tab shell ────────────────────────────────────────────────────
       StatefulShellRoute.indexedStack(
-        builder: (_, __, shell) => MainTabScaffold(navigationShell: shell),
+        builder: (_, _, shell) => MainTabScaffold(navigationShell: shell),
         branches: [
-          // Market tab
+          // Market tab — available to both guests and authenticated users
           StatefulShellBranch(
             routes: [
               GoRoute(
                 path: RouteNames.market,
-                builder: (_, __) => const _Placeholder('Market'),
+                builder: (_, _) => const _Placeholder('Market'),
                 routes: [
                   GoRoute(
                     path: 'stock/:symbol',
@@ -67,57 +95,57 @@ GoRouter appRouter(Ref ref) => GoRouter(
                   ),
                   GoRoute(
                     path: 'search',
-                    builder: (_, __) => const _Placeholder('Search'),
+                    builder: (_, _) => const _Placeholder('Search'),
                   ),
                 ],
               ),
             ],
           ),
 
-          // Trading tab
+          // Trading tab — guests see placeholder
           StatefulShellBranch(
             routes: [
               GoRoute(
                 path: RouteNames.trading,
-                builder: (_, __) => const _Placeholder('Trading'),
+                builder: (_, _) => const _Placeholder('Trading'),
                 routes: [
                   GoRoute(
                     path: 'order',
-                    builder: (_, __) => const _Placeholder('Order Entry'),
+                    builder: (_, _) => const _Placeholder('Order Entry'),
                   ),
                 ],
               ),
             ],
           ),
 
-          // Portfolio tab
+          // Portfolio tab — guests see placeholder
           StatefulShellBranch(
             routes: [
               GoRoute(
                 path: RouteNames.portfolio,
-                builder: (_, __) => const _Placeholder('Portfolio'),
+                builder: (_, _) => const _Placeholder('Portfolio'),
               ),
             ],
           ),
 
-          // Settings tab
+          // Settings tab — guests see placeholder
           StatefulShellBranch(
             routes: [
               GoRoute(
                 path: RouteNames.settings,
-                builder: (_, __) => const _Placeholder('Settings'),
+                builder: (_, _) => const _Placeholder('Settings'),
                 routes: [
                   GoRoute(
                     path: 'security',
-                    builder: (_, __) => const _Placeholder('Security Settings'),
+                    builder: (_, _) => const _Placeholder('Security Settings'),
                   ),
                   GoRoute(
                     path: 'profile',
-                    builder: (_, __) => const _Placeholder('Profile'),
+                    builder: (_, _) => const _Placeholder('Profile'),
                   ),
                   GoRoute(
                     path: 'help',
-                    builder: (_, __) => const _Placeholder('Help Center'),
+                    builder: (_, _) => const _Placeholder('Help Center'),
                   ),
                 ],
               ),
@@ -128,9 +156,71 @@ GoRouter appRouter(Ref ref) => GoRouter(
     ],
     errorBuilder: (_, state) => _ErrorPage(state.error),
   );
+}
+
+/// Redirect logic (pure function for testability).
+///
+/// Returns redirect path or null.
+String? _redirect(AuthState authState, GoRouterState state) {
+  final path = state.matchedLocation;
+  final isAuthPath = path.startsWith('/auth');
+  final isSplash = path == '/';
+  final isKycPath = path.startsWith('/kyc');
+
+  return authState.when(
+    unauthenticated: () {
+      // Allow auth routes and splash
+      if (isAuthPath || isSplash) return null;
+      // Redirect everything else to splash for login
+      return RouteNames.authSplash;
+    },
+    authenticating: () => null, // Let splash handle the loading UI
+    authenticated: (accountId, accountStatus, biometricEnabled) {
+      // Push KYC-pending users to KYC flow
+      if (accountStatus == 'PENDING_KYC' && !isKycPath && !isAuthPath) {
+        return RouteNames.kycRoot;
+      }
+      // Prevent re-entering auth screens once logged in
+      if (isAuthPath || isSplash) return RouteNames.market;
+      return null;
+    },
+    guest: () {
+      // Guests may use splash and auth routes
+      if (isAuthPath || isSplash) return null;
+      // Guests may browse market; restricted tabs get placeholder inline
+      // (We do not redirect — each tab builder shows GuestPlaceholderScreen)
+      return null;
+    },
+  );
+}
 
 // ---------------------------------------------------------------------------
-// Internal placeholder widget (used only during scaffolding phase)
+// Refresh listenable — bridges Riverpod → GoRouter
+// ---------------------------------------------------------------------------
+
+/// Notifies [GoRouter] when [AuthNotifier] state changes.
+///
+/// GoRouter's [refreshListenable] calls [GoRouter.refresh()] when this
+/// ChangeNotifier fires.
+class _AuthStateListenable extends ChangeNotifier {
+  _AuthStateListenable(Ref ref) {
+    _subscription = ref.listen<AuthState>(
+      authProvider,
+      (_, _) => notifyListeners(),
+    );
+  }
+
+  late final ProviderSubscription<AuthState> _subscription;
+
+  @override
+  void dispose() {
+    _subscription.close();
+    super.dispose();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Internal placeholder widget — retained during scaffolding phase
 // ---------------------------------------------------------------------------
 
 class _Placeholder extends StatelessWidget {

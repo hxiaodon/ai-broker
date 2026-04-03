@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <style>
+    .bg-circle {
+      fill: none;
+      stroke: #D93025;
+      stroke-width: 5;
+      stroke-linecap: round;
+      stroke-dasharray: 200;
+      stroke-dashoffset: 200;
+      transform-origin: 40px 40px;
+      transform: rotate(-90deg);
+      animation: draw-circle 0.5s ease-out 0.1s forwards;
+    }
+    .line1 {
+      stroke: #D93025;
+      stroke-width: 5.5;
+      stroke-linecap: round;
+      stroke-dasharray: 34;
+      stroke-dashoffset: 34;
+      animation: draw-line 0.3s ease-out 0.65s forwards;
+    }
+    .line2 {
+      stroke: #D93025;
+      stroke-width: 5.5;
+      stroke-linecap: round;
+      stroke-dasharray: 34;
+      stroke-dashoffset: 34;
+      animation: draw-line 0.3s ease-out 0.9s forwards;
+    }
+    @keyframes draw-circle {
+      to { stroke-dashoffset: 0; }
+    }
+    @keyframes draw-line {
+      to { stroke-dashoffset: 0; }
+    }
+  </style>
+  <circle class="bg-circle" cx="40" cy="40" r="32"/>
+  <line class="line1" x1="26" y1="26" x2="54" y2="54"/>
+  <line class="line2" x1="54" y1="26" x2="26" y2="54"/>
+</svg>

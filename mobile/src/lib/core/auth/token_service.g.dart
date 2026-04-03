@@ -10,12 +10,12 @@ part of 'token_service.dart';
 // ignore_for_file: type=lint, type=warning
 
 @ProviderFor(tokenService)
-const tokenServiceProvider = TokenServiceProvider._();
+final tokenServiceProvider = TokenServiceProvider._();
 
 final class TokenServiceProvider
     extends $FunctionalProvider<TokenService, TokenService, TokenService>
     with $Provider<TokenService> {
-  const TokenServiceProvider._()
+  TokenServiceProvider._()
     : super(
         from: null,
         argument: null,

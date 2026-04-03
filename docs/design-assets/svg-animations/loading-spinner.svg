@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" width="80" height="80">
+  <style>
+    .track {
+      fill: none;
+      stroke: #E8F0FE;
+      stroke-width: 6;
+      stroke-linecap: round;
+    }
+    .arc {
+      fill: none;
+      stroke: #1A73E8;
+      stroke-width: 6;
+      stroke-linecap: round;
+      stroke-dasharray: 80 120;
+      transform-origin: 40px 40px;
+      animation: spin 1.2s linear infinite;
+    }
+    @keyframes spin {
+      0%   { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+  <circle class="track" cx="40" cy="40" r="30"/>
+  <circle class="arc"   cx="40" cy="40" r="30" stroke-dashoffset="0"/>
+</svg>

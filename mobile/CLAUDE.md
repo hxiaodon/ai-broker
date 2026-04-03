@@ -57,6 +57,7 @@ src/
 | `mobile-flutter-tech-spec.md` | Flutter architecture, folder structure, navigation, DI, security implementation |
 | `mobile-market-data-layer.md` | **[ARCHIVED]** KMP/Kotlin era market data layer — superseded; pending rewrite after PRD-03 approval |
 | `flutter-init-report.md` | Phase 1 skeleton init report, dependency decisions, build verification |
+| `h5-vs-native-decision.md` | **Architecture decision**: which pages are H5 WebView vs Flutter Native, KYC breakdown, JSBridge sufficiency |
 | `*.tracker.md` | 实现跟踪文件（动态进度 + 验收记录） |
 | `../active-features.yaml` | 域级功能实现进度仪表盘（`docs/active-features.yaml`） |
 | `../patches.yaml` | Patch 注册表（`docs/patches.yaml`） |

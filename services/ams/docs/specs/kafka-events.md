@@ -13,9 +13,10 @@
 
 1. [总体原则](#1-总体原则)
 2. [事件：account.status_changed](#2-事件-accountstatus_changed)
-3. [Kafka 主题配置](#3-kafka-主题配置)
-4. [消费方职责](#4-消费方职责)
-5. [Schema 演进规则](#5-schema-演进规则)
+3. [事件：认证相关事件](#3-事件认证相关事件)
+4. [Kafka 主题配置](#4-kafka-主题配置)
+5. [消费方职责](#5-消费方职责)
+6. [Schema 演进规则](#6-schema-演进规则)
 
 ---
 
@@ -253,7 +254,229 @@
 
 ---
 
-## 3. Kafka 主题配置
+## 3. 事件：认证相关事件
+
+### 3.1 事件列表
+
+本节定义 AMS 认证系统（device-management.md、auth-architecture.md、session-refresh-strategy.md）发布的事件。
+
+| 事件类型 | Topic | Partition Key | 优先级 | 消费方 |
+|---------|-------|-------------|-------|-------|
+| `auth.otp_sent` | `ams.auth.otp-sent` | account_id | LOW | Analytics |
+| `auth.otp_verified` | `ams.auth.otp-verified` | account_id | NORMAL | AuditLog |
+| `auth.login_failed` | `ams.auth.login-failed` | account_id | NORMAL | AuditLog, Notification |
+| `auth.device_added` | `ams.auth.device-added` | account_id | NORMAL | Notification |
+| `auth.device_kicked` | `ams.auth.device-kicked` | account_id | **HIGH** | Notification, AuditLog |
+| `auth.device_revoked` | `ams.auth.device-revoked` | account_id | NORMAL | Notification, AuditLog |
+| `auth.session_expired` | `ams.auth.session-expired` | account_id | LOW | AuditLog |
+| `auth.account_locked` | `ams.auth.account-locked` | account_id | **HIGH** | Notification, AuditLog |
+
+### 3.2 事件详定义
+
+#### auth.otp_sent（OTP 发送）
+
+```json
+{
+  "event_id": "evt-uuid-v4",
+  "event_type": "auth.otp_sent",
+  "schema_version": 1,
+  "timestamp": "2026-04-01T10:30:00.000Z",
+  "phone_number_hash": "HMAC-SHA256(phone_number, secret)",
+  "account_id": "account-uuid-or-null",  // 新用户时为 null
+  "send_method": "SMS",  // SMS, EMAIL, VOICE
+  "region_code": "+86",  // E.164 区号
+  "correlation_id": "req-abc"
+}
+```
+
+**消费方**：Analytics —— 追踪 OTP 发送成功率、区域分布等
+
+---
+
+#### auth.otp_verified（OTP 验证成功）
+
+```json
+{
+  "event_id": "evt-uuid-v4",
+  "event_type": "auth.otp_verified",
+  "schema_version": 1,
+  "timestamp": "2026-04-01T10:31:00.000Z",
+  "account_id": "account-uuid",
+  "is_new_user": true,  // 新注册 vs 已有用户
+  "device_id": "device-uuid",
+  "phone_number_hash": "HMAC-SHA256(phone_number, secret)",
+  "attempts_count": 1,  // 本次 OTP 请求需要的尝试次数
+  "correlation_id": "req-abc"
+}
+```
+
+**消费方**：AuditLog —— 审计用户登录记录（7 年保留）
+
+---
+
+#### auth.login_failed（登录失败，多次失败时锁定）
+
+```json
+{
+  "event_id": "evt-uuid-v4",
+  "event_type": "auth.login_failed",
+  "schema_version": 1,
+  "timestamp": "2026-04-01T10:32:00.000Z",
+  "phone_number_hash": "HMAC-SHA256(phone_number, secret)",
+  "account_id": "account-uuid-or-null",
+  "failure_reason": "INVALID_OTP",  // INVALID_OTP, OTP_EXPIRED, INVALID_REFRESH_TOKEN 等
+  "attempt_count": 3,  // 当前累计尝试次数（本次错误的计数值）
+  "ip_address": "192.168.1.100",
+  "device_fingerprint": "device-uuid",
+  "locked": false,  // 当 attempt_count >= 5 时，locked = true
+  "locked_until": "2026-04-01T10:47:00.000Z",  // attempt_count >= 5 时出现
+  "correlation_id": "req-abc"
+}
+```
+
+**消费方**：
+- AuditLog —— 审计日志
+- Notification Service —— 当 locked = true 时，发送 HIGH 优先级推送告警
+
+---
+
+#### auth.device_added（新设备登录）
+
+```json
+{
+  "event_id": "evt-uuid-v4",
+  "event_type": "auth.device_added",
+  "schema_version": 1,
+  "timestamp": "2026-04-01T10:35:00.000Z",
+  "account_id": "account-uuid",
+  "device_id": "device-uuid",
+  "device_name": "iPhone 15 Pro",
+  "os_type": "ios",
+  "os_version": "17.3",
+  "app_version": "1.0.0",
+  "location_country": "CN",
+  "location_city": "Beijing",
+  "ip_address": "192.168.1.100",
+  "correlation_id": "req-abc"
+}
+```
+
+**消费方**：Notification Service —— 发送推送通知："您的账号已在 [设备名] 登录"
+
+---
+
+#### auth.device_kicked（设备被超限踢出）【HIGH 优先级】
+
+```json
+{
+  "event_id": "evt-uuid-v4",
+  "event_type": "auth.device_kicked",
+  "schema_version": 1,
+  "timestamp": "2026-04-01T10:37:00.000Z",
+  "account_id": "account-uuid",
+  "kicked_device_id": "device-uuid",
+  "kicked_device_name": "iPad Air",
+  "reason": "AUTO_LIMIT",  // AUTO_LIMIT, MANUAL_REVOCATION, SECURITY_POLICY
+  "initiator": "system",  // system 或触发者的 device_id
+  "correlation_id": "req-abc"
+}
+```
+
+**消费方**：
+- Notification Service (Priority: HIGH) —— 立即推送 + SMS："您的账号已在新设备登录，如非本人操作请立即联系客服"
+- AuditLog —— 审计日志
+
+**SLA**：5 秒内首次投递尝试
+
+---
+
+#### auth.device_revoked（设备被手动注销）
+
+```json
+{
+  "event_id": "evt-uuid-v4",
+  "event_type": "auth.device_revoked",
+  "schema_version": 1,
+  "timestamp": "2026-04-01T10:40:00.000Z",
+  "account_id": "account-uuid",
+  "revoked_device_id": "device-uuid",
+  "revoked_device_name": "MacBook Pro",
+  "initiator_device_id": "device-xxx",  // 执行远程注销的设备
+  "reason": "MANUAL_REVOCATION",
+  "correlation_id": "req-abc"
+}
+```
+
+**消费方**：
+- Notification Service —— 推送通知给被注销设备："您已在该设备上注销登录"
+- AuditLog —— 审计日志
+
+---
+
+#### auth.session_expired（会话过期）
+
+```json
+{
+  "event_id": "evt-uuid-v4",
+  "event_type": "auth.session_expired",
+  "schema_version": 1,
+  "timestamp": "2026-04-01T10:45:00.000Z",
+  "account_id": "account-uuid",
+  "device_id": "device-uuid",
+  "reason": "REFRESH_TOKEN_EXPIRED",  // REFRESH_TOKEN_EXPIRED, DEVICE_REMOVED, MANUAL_LOGOUT
+  "correlation_id": "req-abc"
+}
+```
+
+**消费方**：AuditLog —— 会话生命周期审计
+
+---
+
+#### auth.account_locked（账户锁定）【HIGH 优先级】
+
+```json
+{
+  "event_id": "evt-uuid-v4",
+  "event_type": "auth.account_locked",
+  "schema_version": 1,
+  "timestamp": "2026-04-01T10:32:00.000Z",
+  "account_id": "account-uuid",
+  "phone_number_hash": "HMAC-SHA256(phone_number, secret)",
+  "reason": "OTP_ERROR_LIMIT",  // OTP_ERROR_LIMIT, COMPLIANCE, SECURITY_POLICY
+  "locked_until": "2026-04-01T10:47:00.000Z",  // 30 分钟后自动解锁
+  "unlock_reason": "AUTO_UNLOCK_AFTER_TIMEOUT",  // 预置解锁原因
+  "correlation_id": "req-abc"
+}
+```
+
+**消费方**：
+- Notification Service (Priority: HIGH) —— 立即推送 + SMS："多次登录失败，账号已暂时锁定，请 30 分钟后重试"
+- AuditLog —— 安全事件审计
+
+**SLA**：5 秒内首次投递尝试
+
+---
+
+### 3.3 事件通用字段
+
+所有认证事件都包含以下字段：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `event_id` | string(UUID) | 唯一事件 ID，用于消费方幂等去重 |
+| `event_type` | string | 事件类型（如 `auth.otp_sent`） |
+| `schema_version` | int | Payload schema 版本，当前为 1 |
+| `timestamp` | string(ISO8601-UTC) | 事件发生时间 |
+| `correlation_id` | string | 链路追踪 ID（来自 HTTP 请求的 X-Correlation-ID）|
+
+**约束**：
+- 所有时间戳使用 UTC 并为 ISO 8601 格式
+- 所有 ID（account_id、device_id、event_id）为 UUID v4
+- 个人信息（手机号、邮箱）使用哈希：`HMAC-SHA256(value, HMAC_KEY)`
+
+---
+
+
 
 | 主题 | Partitions | Replication Factor | Retention | 压缩 |
 |------|-----------|-------------------|-----------|------|
@@ -281,9 +504,34 @@
 
 ---
 
-## 5. Schema 演进规则
+### Admin Panel
+
+订阅 `ams.account.status-changed`，Consumer Group: `admin-panel-account-audit`，用于实时更新合规监控仪表盘和触发告警通知。
+
+---
+
+## 6. Schema 演进规则
 
 1. **向后兼容**：只追加新字段，已有字段不重命名、不删除、不改类型。
 2. **版本号**：追加新必填字段时递增 `schema_version`（从 1 → 2）。
 3. **消费方容错**：消费方须忽略未知字段（`additionalProperties` 实际处理时不报错）。
 4. **变更通知**：任何 breaking change 须提前 2 周通知所有消费方，并在 `docs/contracts/` 更新对应契约文件。
+
+---
+
+## Changelog
+
+| 版本 | 日期 | 变更 |
+|------|------|------|
+| v0.2 | 2026-04-01 | 新增认证相关事件（8 个）：OTP、设备管理、账户锁定、会话管理 |
+| v0.1 | 2026-03-30 | 初版：account.status_changed 事件定义 |
+
+---
+
+## 参考资料
+
+- `device-management.md` — 设备事件来源
+- `auth-architecture.md` — 认证系统与 OTP 规则
+- `session-refresh-strategy.md` — 会话生命周期事件
+- `push-notification.md` — 通知消费方处理
+- `../../.claude/rules/financial-coding-standards.md` — 审计日志保留规则

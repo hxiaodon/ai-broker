@@ -10,55 +10,43 @@ part of 'app_router.dart';
 // ignore_for_file: type=lint, type=warning
 /// go_router configuration with 4-tab StatefulShellRoute.
 ///
-/// Authentication redirect logic uses placeholder booleans in Phase 1.
-/// Wire to [AuthNotifier] in Phase 2 when the auth feature is implemented.
+/// Auth redirect logic:
+///   - unauthenticated + non-auth route → splash (/)
+///   - guest + restricted route (trading/portfolio/settings) → guest placeholder
+///   - authenticated + auth route → market
+///   - PENDING_KYC → /kyc
 ///
-/// Route hierarchy:
-///   /auth/login        → LoginScreen (placeholder)
-///   /auth/otp          → OtpScreen (placeholder)
-///   /kyc               → KycRootScreen (placeholder)
-///   / (shell)
-///     /market          → MarketListScreen (placeholder)
-///     /trading         → TradingScreen (placeholder)
-///     /portfolio       → PortfolioScreen (placeholder)
-///     /settings        → SettingsScreen (placeholder)
+/// GoRouter is created as a [Riverpod(keepAlive: true)] provider so it can
+/// listen to [authProvider] and refresh on state changes.
 
 @ProviderFor(appRouter)
-const appRouterProvider = AppRouterProvider._();
+final appRouterProvider = AppRouterProvider._();
 
 /// go_router configuration with 4-tab StatefulShellRoute.
 ///
-/// Authentication redirect logic uses placeholder booleans in Phase 1.
-/// Wire to [AuthNotifier] in Phase 2 when the auth feature is implemented.
+/// Auth redirect logic:
+///   - unauthenticated + non-auth route → splash (/)
+///   - guest + restricted route (trading/portfolio/settings) → guest placeholder
+///   - authenticated + auth route → market
+///   - PENDING_KYC → /kyc
 ///
-/// Route hierarchy:
-///   /auth/login        → LoginScreen (placeholder)
-///   /auth/otp          → OtpScreen (placeholder)
-///   /kyc               → KycRootScreen (placeholder)
-///   / (shell)
-///     /market          → MarketListScreen (placeholder)
-///     /trading         → TradingScreen (placeholder)
-///     /portfolio       → PortfolioScreen (placeholder)
-///     /settings        → SettingsScreen (placeholder)
+/// GoRouter is created as a [Riverpod(keepAlive: true)] provider so it can
+/// listen to [authProvider] and refresh on state changes.
 
 final class AppRouterProvider
     extends $FunctionalProvider<GoRouter, GoRouter, GoRouter>
     with $Provider<GoRouter> {
   /// go_router configuration with 4-tab StatefulShellRoute.
   ///
-  /// Authentication redirect logic uses placeholder booleans in Phase 1.
-  /// Wire to [AuthNotifier] in Phase 2 when the auth feature is implemented.
+  /// Auth redirect logic:
+  ///   - unauthenticated + non-auth route → splash (/)
+  ///   - guest + restricted route (trading/portfolio/settings) → guest placeholder
+  ///   - authenticated + auth route → market
+  ///   - PENDING_KYC → /kyc
   ///
-  /// Route hierarchy:
-  ///   /auth/login        → LoginScreen (placeholder)
-  ///   /auth/otp          → OtpScreen (placeholder)
-  ///   /kyc               → KycRootScreen (placeholder)
-  ///   / (shell)
-  ///     /market          → MarketListScreen (placeholder)
-  ///     /trading         → TradingScreen (placeholder)
-  ///     /portfolio       → PortfolioScreen (placeholder)
-  ///     /settings        → SettingsScreen (placeholder)
-  const AppRouterProvider._()
+  /// GoRouter is created as a [Riverpod(keepAlive: true)] provider so it can
+  /// listen to [authProvider] and refresh on state changes.
+  AppRouterProvider._()
     : super(
         from: null,
         argument: null,
@@ -91,4 +79,4 @@ final class AppRouterProvider
   }
 }
 
-String _$appRouterHash() => r'b7aa46accc0276219fb274dd1bc3253268ea850d';
+String _$appRouterHash() => r'91fd0ca2c08858af7061d9a4fca2d03164fbaf77';

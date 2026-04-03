@@ -4,7 +4,7 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.8.0 <4.0.0'
+  sdk: '>=3.11.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -13,9 +13,9 @@ dependencies:
     sdk: flutter
 
   # State management
-  flutter_riverpod: ^3.0.0
-  riverpod_annotation: ^3.0.0
-  hooks_riverpod: ^3.0.0
+  flutter_riverpod: ^3.3.1
+  riverpod_annotation: ^4.0.2
+  hooks_riverpod: ^3.3.1
   flutter_hooks: ^0.21.0
 
   # Network
@@ -30,11 +30,11 @@ dependencies:
   local_auth: ^3.0.1
 
   # Charts
-  syncfusion_flutter_charts: ^32.2.9
+  syncfusion_flutter_charts: ^33.1.46
 
   # Image
   image_picker: ^1.2.1
-  image_cropper: ^11.0.0
+  image_cropper: ^12.1.1
   cached_network_image: ^3.4.1
 
   # PDF
@@ -44,17 +44,17 @@ dependencies:
   webview_flutter: ^4.10.0
 
   # Local database & cache
-  drift: ^2.23.1
-  shared_preferences: ^2.3.4
+  drift: ^2.31.0
+  shared_preferences: ^2.5.5
   hive_ce: ^2.9.0
 
   # Routing
-  go_router: ^14.6.2
+  go_router: ^14.8.1
 
   # Device & platform info
-  device_info_plus: ^12.3.0
-  package_info_plus: ^8.1.3
-  permission_handler: ^11.3.1
+  device_info_plus: ^12.4.0
+  package_info_plus: ^9.0.1
+  permission_handler: ^12.0.1
 
   # Security & protection
   screen_protector: ^1.5.1
@@ -64,12 +64,12 @@ dependencies:
   uuid: ^4.5.3
   intl: ^0.20.2
   decimal: ^3.2.1
-  logger: ^2.5.0
-  connectivity_plus: ^6.1.1
+  logger: ^2.7.0
+  connectivity_plus: ^7.1.0
   rxdart: ^0.28.0
   timeago: ^3.7.0
   freezed_annotation: ^3.0.0
-  json_annotation: ^4.9.0
+  json_annotation: ^4.11.0
 
   # SMS OTP
   smart_auth: ^3.2.0
@@ -79,6 +79,10 @@ dependencies:
   path_provider: ^2.1.5
   path: ^1.9.1
 
+  # Assets rendering
+  flutter_svg: ^2.0.17
+  rive: ^0.13.20
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -86,18 +90,38 @@ dev_dependencies:
     sdk: flutter
 
   # Code generation
-  build_runner: ^2.4.14
-  riverpod_generator: ^3.0.0
-  drift_dev: ^2.23.1
-  freezed: ^3.0.0
-  json_serializable: ^6.9.4
+  # analyzer version ceiling imposed by riverpod_generator 4.x (requires ^9.0.0):
+  #   - json_serializable capped at ^6.12.0 (6.13+ needs analyzer >=10.0.0)
+  #   - drift_dev capped at ^2.28.0 (2.32+ needs analyzer >=10.0.0)
+  # Unblock all three when riverpod_generator adds support for analyzer 10+.
+  build_runner: ^2.13.1
+  riverpod_generator: ^4.0.3
+  drift_dev: ^2.28.0
+  freezed: ^3.2.5
+  json_serializable: ^6.12.0
 
   # Testing
   mocktail: ^1.0.4
 
   # Linting
-  flutter_lints: ^5.0.0
+  flutter_lints: ^6.0.0
   very_good_analysis: ^7.0.0
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/logos/
+    - assets/icons/nav/
+    - assets/icons/system/
+    - assets/icons/kyc/
+    - assets/icons/trading/
+    - assets/icons/funding/
+    - assets/icons/market/
+    - assets/icons/account/
+    - assets/illustrations/onboarding/
+    - assets/illustrations/empty-states/
+    - assets/illustrations/kyc-status/
+    - assets/illustrations/result-states/
+    - assets/motion/
+    - assets/avatars/
+    - assets/stock/
