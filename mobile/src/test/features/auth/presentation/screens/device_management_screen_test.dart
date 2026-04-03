@@ -73,7 +73,7 @@ void main() {
 
   group('DeviceManagementScreen - Deferred to Phase 2', () {
     // These tests require full app context with GoRouter and are deferred to Phase 2
-    // See: docs/specs/h5-vs-native-decision.md for navigation architecture
+    // See: docs/specs/shared/h5-vs-native-decision.md for navigation architecture
 
     // === Data Loading Tests (3) ===
     testWidgets('displays device list after loading', (tester) async {

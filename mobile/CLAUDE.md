@@ -51,14 +51,33 @@ src/
 
 ## Spec Index (docs/specs/)
 
+### Shared Architecture Specs (Cross-Module)
+
 | File | Scope |
 |------|-------|
-| `10-jsbridge-spec.md` | JSBridge contract between Flutter and H5 WebView pages |
-| `mobile-flutter-tech-spec.md` | Flutter architecture, folder structure, navigation, DI, security implementation |
-| `mobile-market-data-layer.md` | **[ARCHIVED]** KMP/Kotlin era market data layer — superseded; pending rewrite after PRD-03 approval |
-| `flutter-init-report.md` | Phase 1 skeleton init report, dependency decisions, build verification |
-| `h5-vs-native-decision.md` | **Architecture decision**: which pages are H5 WebView vs Flutter Native, KYC breakdown, JSBridge sufficiency |
-| `*.tracker.md` | 实现跟踪文件（动态进度 + 验收记录） |
+| `shared/mobile-flutter-tech-spec.md` | Flutter 3.41.4 architecture, folder structure, navigation, DI, security implementation |
+| `shared/10-jsbridge-spec.md` | JSBridge contract between Flutter and H5 WebView pages |
+| `shared/h5-vs-native-decision.md` | **Architecture decision**: which pages are H5 WebView vs Flutter Native, KYC breakdown, JSBridge sufficiency |
+| `shared/flutter-init-report.md` | Phase 1 skeleton init report, dependency decisions, build verification |
+| `shared/mobile-market-data-layer.md` | **[ARCHIVED]** KMP/Kotlin era market data layer — superseded; pending rewrite after PRD-03 approval |
+
+### Module-Specific Specs
+
+| File | Scope |
+|------|-------|
+| `auth/` | Auth module specs: implementation, tests, code review, security analysis (T04, T05, T06, T17) |
+| `market/` | **[PENDING]** Market module specs (created JIT with PRD-03 approval) |
+| `trading/` | **[PENDING]** Trading module specs |
+| `kyc/` | **[PENDING]** KYC/AML module specs |
+| `portfolio/` | **[PENDING]** Portfolio module specs |
+| `funding/` | **[PENDING]** Funding (deposit/withdrawal) module specs |
+| `settings/` | **[PENDING]** Settings/Profile module specs |
+
+### Progress Tracking
+
+| File | Scope |
+|------|-------|
+| `*.tracker.md` | 实现跟踪文件（动态进度 + 验收记录） — Tracker files at root level, linked by active-features.yaml |
 | `../active-features.yaml` | 域级功能实现进度仪表盘（`docs/active-features.yaml`） |
 | `../patches.yaml` | Patch 注册表（`docs/patches.yaml`） |
 

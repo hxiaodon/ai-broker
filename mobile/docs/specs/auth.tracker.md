@@ -10,10 +10,10 @@
 
 | 项目 | 链接 |
 |------|------|
-| PRD | [mobile/docs/prd/01-auth.md](../prd/01-auth.md) |
-| 高保真原型 | [mobile/prototypes/01-auth/](../../prototypes/01-auth/index.html) |
-| API 合约 | [docs/contracts/ams-to-mobile.md](../../../docs/contracts/ams-to-mobile.md) § Auth |
-| 总览仪表盘 | [mobile/docs/active-features.yaml](../active-features.yaml) |
+| PRD | [mobile/docs/prd/01-auth.md](../../prd/01-auth.md) |
+| 高保真原型 | [mobile/prototypes/01-auth/](../../../prototypes/01-auth/index.html) |
+| API 合约 | [docs/contracts/ams-to-mobile.md](../../../../docs/contracts/ams-to-mobile.md) § Auth |
+| 总览仪表盘 | [mobile/docs/active-features.yaml](../../active-features.yaml) |
 
 **依赖的合约端点**：
 

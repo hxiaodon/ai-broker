@@ -45,12 +45,12 @@ tools: Read, Write, Edit, Bash, Glob, Grep
 | 跨模块交互 / 通知 / 状态机 | `mobile/docs/prd/07-cross-module.md` |
 | 设置 / 个人中心 | `mobile/docs/prd/08-settings-profile.md` |
 
-### 技术规格
+### 技术规格（共享架构）
 
 | 文档 | 内容 |
 |------|------|
-| `mobile/docs/specs/mobile-flutter-tech-spec.md` | 完整技术选型、架构、依赖库、安全实现、代码模式 |
-| `mobile/docs/specs/10-jsbridge-spec.md` | H5 ↔ Flutter WebView 通信接口完整定义 |
+| `mobile/docs/specs/shared/mobile-flutter-tech-spec.md` | 完整技术选型、架构、依赖库、安全实现、代码模式 |
+| `mobile/docs/specs/shared/10-jsbridge-spec.md` | H5 ↔ Flutter WebView 通信接口完整定义 |
 
 ### API 契约
 
@@ -71,8 +71,8 @@ tools: Read, Write, Edit, Bash, Glob, Grep
 | 文档 | 内容 |
 |------|------|
 | `mobile/docs/active-features.yaml` | 7 模块进度仪表盘，当前 `current_focus` 即当前开发模块 |
-| `mobile/docs/specs/{module}.tracker.md` | 当前模块 Phase 1 任务清单（checkbox）、验收标准、Open Questions |
-| `mobile/docs/specs/h5-vs-native-decision.md` | H5 WebView vs Flutter Native 架构决策（哪 5 页用 H5） |
+| `mobile/docs/specs/auth.tracker.md` | Auth 模块 Phase 1 任务清单（checkbox）、验收标准、Open Questions |
+| `mobile/docs/specs/shared/h5-vs-native-decision.md` | H5 WebView vs Flutter Native 架构决策（哪 5 页用 H5） |
 
 ### 全局规则
 

@@ -40,7 +40,7 @@ void main() {
 
   group('BiometricSetupScreen - Deferred to Phase 2', () {
     // These tests require full app context with GoRouter and are deferred to Phase 2
-    // See: docs/specs/h5-vs-native-decision.md for navigation architecture
+    // See: docs/specs/shared/h5-vs-native-decision.md for navigation architecture
 
     testWidgets('renders and handles biometric setup flow', (tester) async {
       // TODO: Phase 2 - Full setup flow testing with ProviderScope
