@@ -12,8 +12,8 @@
 #   shipped     — 审核通过，合并至 main
 
 domain: mobile
-last_updated: 2026-04-02
-current_focus: auth
+last_updated: 2026-04-04
+current_focus: market
 
 development_order:
   - auth
@@ -38,14 +38,14 @@ modules:
 
   - id: market
     name: 行情模块
-    status: pending
-    phase1_tasks: "0/?"   # tracker 创建时确定
+    status: in_progress
+    phase1_tasks: "0/22"
     prd: mobile/docs/prd/03-market.md
-    tracker: mobile/docs/specs/market.tracker.md   # JIT
+    tracker: mobile/docs/specs/market.tracker.md
     hifi: mobile/prototypes/03-market/
     contracts:
       - docs/contracts/market-data-to-mobile.md
-    notes: "PRD-03 已通过 review；行情 WebSocket 合约在 market-data-to-mobile.md"
+    notes: "Tracker 已创建；WebSocket 双轨推送（实时/延迟）；Syncfusion Charts K线图；Protobuf 二进制帧"
 
   - id: trading
     name: 交易模块
