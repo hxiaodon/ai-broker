@@ -97,3 +97,14 @@ final class OtpAuthException extends AppException {
   final int? remainingAttempts;
   final DateTime? lockoutUntil;
 }
+
+/// Surfaced by [QuoteWebSocketClient] when the server sends `token_expiring`.
+///
+/// The caller should refresh the access token and call `reauth(newToken)` on
+/// the WebSocket client before [expiresInSeconds] elapses.
+final class WsTokenExpiringException extends AppException {
+  const WsTokenExpiringException({required this.expiresInSeconds})
+      : super(message: 'WS token expiring in ${expiresInSeconds}s');
+
+  final int expiresInSeconds;
+}

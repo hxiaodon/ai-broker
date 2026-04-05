@@ -2,7 +2,7 @@
 
 **模块**: 行情（Market）  
 **状态**: 🟡 in_progress  
-**Phase 1 进度**: 0 / 22
+**Phase 1 进度**: 4 / 22
 
 ---
 
@@ -133,19 +133,19 @@
 
 ### Data 层（Repository / DataSource）
 
-- [ ] **T14** — `MarketDataRepository`（abstract）+ `MarketDataRepositoryImpl`
+- [x] **T14** — `MarketDataRepository`（abstract）+ `MarketDataRepositoryImpl`
   - 接口：`getQuotes` / `getKline` / `searchStocks` / `getMovers` / `getStockDetail` / `getNews` / `getFinancials`
   - 实现：调用 MarketDataRemoteDataSource
   - 错误转换：HTTP 错误 → Domain 层异常
 
-- [ ] **T15** — `MarketDataRemoteDataSource`（Dio）
+- [x] **T15** — `MarketDataRemoteDataSource`（Dio）
   - 实现上述7个 REST API 端点调用
   - 请求/响应模型（freezed + json_serializable）
   - DTO → Entity 映射（价格字段 string → Decimal）
   - 认证：可选 JWT（访客 vs 注册用户）
   - 限流处理：429 错误重试（Retry-After header）
 
-- [ ] **T16** — `QuoteWebSocketClient`：WebSocket 客户端
+- [x] **T16** — `QuoteWebSocketClient`：WebSocket 客户端
   - 连接生命周期：connect → auth → subscribe → receive → unsubscribe → close
   - 消息级认证（5s内发送auth消息，否则服务端关闭连接）
   - 订阅管理（最多50 symbols，超限返回错误）
@@ -154,6 +154,7 @@
   - Token 续期（reauth，无需断开连接）
   - 访客升级为注册用户（reauth后自动切换实时流）
   - 错误处理：4001-4004 关闭码
+  - ✅ 单元测试：`test/features/market/data/websocket/quote_websocket_client_test.dart`（34 tests, all passing）
 
 - [ ] **T17** — `WatchlistRepository`（abstract）+ `WatchlistRepositoryImpl`
   - 接口：`getWatchlist` / `addToWatchlist` / `removeFromWatchlist` / `reorderWatchlist`
@@ -187,7 +188,7 @@
   - WebSocket 高频更新：RxDart throttle（100ms）避免过度rebuild
   - 内存泄漏检测（leak_tracker，CI检查）
 
-- [ ] **T22** — Data Models：Domain Entities + DTOs
+- [x] **T22** — Data Models：Domain Entities + DTOs
   - Domain Entities（纯Dart，不依赖框架）：
     - `Quote`（symbol/price/change/change_pct/volume/bid/ask/market_status/is_stale/delayed）
     - `Candle`（t/o/h/l/c/v/n）
@@ -220,6 +221,7 @@
 - [ ] 内存泄漏检测：行情页反复进入/退出，无内存泄漏
 - [ ] `security-engineer` review 通过（WebSocket 认证、证书固定）
 - [ ] `code-reviewer` review 通过
+- [ ] **[生产上线前置]** Polygon.io Poly.feed+ 授权已完成（PM + Legal 确认），方可发布生产环境
 
 ---
 
@@ -241,11 +243,11 @@
 
 | # | 问题 | 阻塞任务 | 负责人 | 状态 |
 |---|------|---------|--------|------|
-| 1 | Polygon.io Poly.feed+ 授权是否已完成？当前使用标准 API Key 向用户展示行情违反服务条款 | T16 | PM + Legal | ⏳ **待确认** |
-| 2 | 换手率计算所需的"流通股数"数据源是否已接入 Polygon.io Fundamental API？ | T04 | market-data-engineer | ⏳ **待确认** |
-| 3 | 中文公司名与拼音搜索的 Top 1000 美股数据是否已准备？ | T06 / T13 | market-data-engineer | ⏳ **待确认** |
-| 4 | 访客升级为注册用户后，WebSocket reauth 是否需要重新订阅 symbols？ | T16 | market-data-engineer | ⏳ **待确认**（推测：不需要，服务端自动切换流） |
-| 5 | K线图"分时"显示范围是否仅常规交易时段（09:30-16:00 ET），还是包含盘前盘后？ | T05 | PM | ⏳ **待确认**（PRD §5.2 表格说明"仅常规交易时段"） |
+| 1 | Polygon.io Poly.feed+ 授权是否已完成？当前使用标准 API Key 向用户展示行情违反服务条款 | T16 | PM + Legal | ✅ **不阻塞开发**，阻塞生产上线，已转交 PM + Legal 跟进 |
+| 2 | 换手率计算所需的"流通股数"数据源是否已接入 Polygon.io Fundamental API？ | T04 | market-data-engineer | ✅ **已解决**：服务端预计算 `turnover_rate` 字段直接返回，移动端无需关心数据源 |
+| 3 | 中文公司名与拼音搜索的 Top 1000 美股数据是否已准备？ | T06 / T13 | market-data-engineer | ✅ **不阻塞开发**：接口合约已定，先用英文数据联调，最终验收时确认中文/拼音结果 |
+| 4 | 访客升级为注册用户后，WebSocket reauth 是否需要重新订阅 symbols？ | T16 | market-data-engineer | ✅ **已明确**：不需要重新订阅。websocket-spec v2.1 §Step5：服务端自动将连接切换至 LiveQuoteGroup 并推送 SNAPSHOT 帧 |
+| 5 | K线图"分时"显示范围是否仅常规交易时段（09:30-16:00 ET），还是包含盘前盘后？ | T05 | PM | ✅ **已明确**：仅常规交易时段（09:30–16:00 ET，约 390 根），API 直接返回，客户端无需过滤（market-api-spec §4.6） |
 
 ---
 

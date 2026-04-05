@@ -1,0 +1,429 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:web_socket_channel/web_socket_channel.dart';
+
+import '../../../../core/errors/app_exception.dart';
+import '../../../../core/logging/app_logger.dart';
+import '../../domain/entities/quote.dart';
+import '../mappers/market_mappers.dart';
+import '../proto/market_data.pb.dart' as proto;
+import '../remote/market_response_models.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Public surface types
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A single quote update received from the WebSocket server.
+///
+/// Covers all three Protobuf frame types:
+///   - SNAPSHOT — full quote; pushed right after subscribe_ack per symbol
+///   - TICK     — partial patch (only changed fields are non-zero)
+///   - DELAYED  — T-15 min full snapshot (guest, every 5 s)
+class WsQuoteUpdate {
+  const WsQuoteUpdate({
+    required this.frameType,
+    required this.symbol,
+    required this.quote,
+  });
+
+  final WsFrameType frameType;
+  final String symbol;
+  final Quote quote;
+}
+
+enum WsFrameType { snapshot, tick, delayed }
+
+/// Authentication mode after a successful auth/reauth handshake.
+enum WsUserType { registered, guest }
+
+enum _WsState { disconnected, connecting, authenticating, connected, closed }
+
+/// Factory signature for creating a [WebSocketChannel].
+/// Injected at construction time; defaults to [WebSocketChannel.connect].
+typedef WsChannelFactory = WebSocketChannel Function(
+  Uri uri, {
+  Iterable<String>? protocols,
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QuoteWebSocketClient
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// WebSocket client that manages the full lifecycle of a market-data
+/// connection per the WebSocket protocol spec v2.1.
+///
+/// ## Frame protocol
+/// - Control messages  : JSON text frames  (`action` / `type` fields)
+/// - Quote data        : Protobuf binary frames (`WsQuoteFrame`)
+///
+/// ## Error surface
+/// - [AuthException]            : auth or reauth rejected by server
+/// - [BusinessException]        : server `error` frame (e.g. symbol limit)
+/// - [NetworkException]         : connection failure or unexpected close
+/// - [WsTokenExpiringException] : server `token_expiring` notification
+///   → caller should call `reauth(newToken)` before the token expires
+class QuoteWebSocketClient {
+  QuoteWebSocketClient({
+    required String wsUrl,
+    this.authTimeoutSeconds = 5,
+    this.pingIntervalSeconds = 30,
+    @visibleForTesting WsChannelFactory? channelFactory,
+  })  : _wsUrl = wsUrl,
+        _channelFactory = channelFactory ?? WebSocketChannel.connect;
+
+  final String _wsUrl;
+  final int authTimeoutSeconds;
+  final int pingIntervalSeconds;
+  final WsChannelFactory _channelFactory;
+
+  WebSocketChannel? _channel;
+  StreamSubscription<dynamic>? _subscription;
+  Timer? _pingTimer;
+  Timer? _authTimeoutTimer;
+  _WsState _state = _WsState.disconnected;
+
+  final _quoteController = StreamController<WsQuoteUpdate>.broadcast();
+
+  /// Pending auth / reauth completers (FIFO — at most 1 at a time in practice).
+  final _pendingAuth = <Completer<WsUserType>>[];
+
+  Set<String> _subscribedSymbols = {};
+
+  // ─── Public API ───────────────────────────────────────────────────────────
+
+  /// Live stream of quote updates from all subscribed symbols.
+  Stream<WsQuoteUpdate> get quoteStream => _quoteController.stream;
+
+  /// Connect to the server and authenticate.
+  ///
+  /// [token]: valid JWT for registered users, null/empty for guest mode.
+  /// Returns [WsUserType.registered] or [WsUserType.guest] on success.
+  /// Throws [AuthException] or [NetworkException] on failure.
+  Future<WsUserType> connect({String? token}) async {
+    if (_state != _WsState.disconnected) {
+      throw StateError('QuoteWebSocketClient: already connected');
+    }
+    _state = _WsState.connecting;
+
+    try {
+      _channel = _channelFactory(
+        Uri.parse(_wsUrl),
+        protocols: const ['brokerage-market-v1'],
+      );
+      await _channel!.ready;
+    } catch (e) {
+      _state = _WsState.disconnected;
+      throw NetworkException(message: 'WS 连接失败: $e', cause: e);
+    }
+
+    _state = _WsState.authenticating;
+
+    // Register auth completer before starting to listen (to avoid a race where
+    // the auth_result arrives before the completer is registered).
+    final authCompleter = Completer<WsUserType>();
+    _pendingAuth.add(authCompleter);
+
+    // 5-second auth timeout — server closes with code 4001 if no auth received
+    _authTimeoutTimer = Timer(Duration(seconds: authTimeoutSeconds), () {
+      if (!authCompleter.isCompleted) {
+        authCompleter.completeError(
+          const AuthException(message: '行情 WS 认证超时，请重新连接'),
+        );
+      }
+    });
+
+    _subscription = _channel!.stream.listen(
+      _onFrame,
+      onError: _onError,
+      onDone: _onDone,
+      cancelOnError: false,
+    );
+
+    _sendJson({'action': 'auth', 'token': token ?? ''});
+
+    final userType = await authCompleter.future;
+    _authTimeoutTimer?.cancel();
+    _authTimeoutTimer = null;
+
+    _state = _WsState.connected;
+    _startPingTimer();
+
+    AppLogger.info('WS auth succeeded: userType=$userType');
+    return userType;
+  }
+
+  /// Subscribe to quote pushes for [symbols] (max 50 per call).
+  ///
+  /// After subscribe_ack, the server immediately sends one SNAPSHOT frame
+  /// per symbol as a Protobuf binary frame.
+  Future<void> subscribe(List<String> symbols) async {
+    assert(symbols.isNotEmpty && symbols.length <= 50,
+        'subscribe: 1–50 symbols required');
+    _requireConnected();
+    _sendJson({'action': 'subscribe', 'symbols': symbols});
+    _subscribedSymbols.addAll(symbols);
+    AppLogger.debug('WS subscribe: ${symbols.join(",")}');
+  }
+
+  /// Stop receiving pushes for [symbols].
+  /// No server acknowledgement is sent for unsubscribe.
+  void unsubscribe(List<String> symbols) {
+    _requireConnected();
+    _sendJson({'action': 'unsubscribe', 'symbols': symbols});
+    _subscribedSymbols.removeAll(symbols);
+    AppLogger.debug('WS unsubscribe: ${symbols.join(",")}');
+  }
+
+  /// Re-authenticate with [newToken] (token renewal or guest → registered).
+  ///
+  /// The server migrates the connection to the appropriate quote group without
+  /// dropping existing subscriptions.
+  Future<WsUserType> reauth(String newToken) async {
+    _requireConnected();
+
+    final reauthCompleter = Completer<WsUserType>();
+    _pendingAuth.add(reauthCompleter);
+
+    _sendJson({'action': 'reauth', 'token': newToken});
+    AppLogger.debug('WS reauth sent');
+
+    return reauthCompleter.future;
+  }
+
+  /// Gracefully close the connection (WebSocket code 1000).
+  Future<void> close() async {
+    _state = _WsState.closed;
+    _cleanup();
+    await _channel?.sink.close(1000);
+    AppLogger.info('WS connection closed');
+  }
+
+  /// Release all resources including the quote stream.
+  Future<void> dispose() async {
+    await close();
+    await _quoteController.close();
+  }
+
+  // ─── Incoming frame dispatch ──────────────────────────────────────────────
+
+  void _onFrame(dynamic raw) {
+    if (raw is String) {
+      _handleTextFrame(raw);
+    } else if (raw is List<int>) {
+      _handleBinaryFrame(Uint8List.fromList(raw));
+    }
+  }
+
+  // ─── JSON text frames (control plane) ─────────────────────────────────────
+
+  void _handleTextFrame(String text) {
+    Map<String, dynamic> msg;
+    try {
+      msg = jsonDecode(text) as Map<String, dynamic>;
+    } catch (_) {
+      AppLogger.warning('WS: malformed text frame: $text');
+      return;
+    }
+
+    switch (msg['type'] as String?) {
+      case 'auth_result':
+        _onAuthResult(msg, isReauth: false);
+      case 'reauth_result':
+        _onAuthResult(msg, isReauth: true);
+      case 'subscribe_ack':
+        final syms = (msg['symbols'] as List?)?.cast<String>() ?? [];
+        AppLogger.debug('WS subscribe_ack: ${syms.join(",")}');
+      case 'pong':
+        // heartbeat acknowledged — no action needed
+        break;
+      case 'token_expiring':
+        final expiresIn = msg['expires_in'] as int? ?? 0;
+        AppLogger.warning('WS token_expiring: ${expiresIn}s');
+        _quoteController.addError(
+          WsTokenExpiringException(expiresInSeconds: expiresIn),
+        );
+      case 'market_status':
+        AppLogger.info(
+          'WS market_status: symbol=${msg['symbol']} '
+          'status=${msg['market_status']}',
+        );
+      case 'error':
+        final code = msg['code'] as String? ?? 'UNKNOWN';
+        final message = msg['message'] as String? ?? '';
+        AppLogger.warning('WS server error: code=$code message=$message');
+        _quoteController.addError(
+          BusinessException(message: message, errorCode: code),
+        );
+      default:
+        AppLogger.warning('WS: unknown message type: ${msg['type']}');
+    }
+  }
+
+  void _onAuthResult(Map<String, dynamic> msg, {required bool isReauth}) {
+    final success = msg['success'] as bool? ?? false;
+    final completer =
+        _pendingAuth.isNotEmpty ? _pendingAuth.removeAt(0) : null;
+
+    if (!success) {
+      final err = AuthException(
+        message: isReauth ? 'Token 续期失败，请重新登录' : '行情 WS 认证失败，请重新登录',
+      );
+      completer?.completeError(err);
+      _quoteController.addError(err);
+      return;
+    }
+
+    final rawType = msg['user_type'] as String?;
+    final userType =
+        rawType == 'registered' ? WsUserType.registered : WsUserType.guest;
+    completer?.complete(userType);
+
+    if (isReauth) {
+      AppLogger.info('WS reauth succeeded: userType=$userType');
+    }
+  }
+
+  // ─── Protobuf binary frames (data plane) ──────────────────────────────────
+
+  void _handleBinaryFrame(Uint8List bytes) {
+    try {
+      final frame = proto.WsQuoteFrame.fromBuffer(bytes);
+      final protoQuote = frame.quote;
+
+      final frameType = switch (frame.frameType) {
+        proto.WsQuoteFrame_FrameType.FRAME_TYPE_SNAPSHOT =>
+          WsFrameType.snapshot,
+        proto.WsQuoteFrame_FrameType.FRAME_TYPE_DELAYED => WsFrameType.delayed,
+        _ => WsFrameType.tick,
+      };
+
+      final dto = _protoQuoteToDto(protoQuote);
+      final quote = dto.toDomain();
+
+      _quoteController.add(WsQuoteUpdate(
+        frameType: frameType,
+        symbol: protoQuote.symbol,
+        quote: quote,
+      ));
+    } catch (e) {
+      AppLogger.warning('WS: failed to decode Protobuf binary frame: $e');
+    }
+  }
+
+  // ─── Heartbeat ────────────────────────────────────────────────────────────
+
+  void _startPingTimer() {
+    _pingTimer = Timer.periodic(
+      Duration(seconds: pingIntervalSeconds),
+      (_) {
+        if (_state == _WsState.connected) {
+          _sendJson({'action': 'ping'});
+        }
+      },
+    );
+  }
+
+  // ─── Connection lifecycle events ──────────────────────────────────────────
+
+  void _onError(Object error) {
+    AppLogger.warning('WS socket error: $error');
+    _quoteController.addError(
+      NetworkException(message: 'WS 连接错误: $error', cause: error),
+    );
+    _cleanup();
+  }
+
+  void _onDone() {
+    final code = _channel?.closeCode;
+    AppLogger.info('WS connection done: code=$code');
+
+    if (_state != _WsState.closed) {
+      _quoteController.addError(_mapCloseCode(code));
+      _cleanup();
+    }
+  }
+
+  AppException _mapCloseCode(int? code) {
+    return switch (code) {
+      4001 => const AuthException(message: '认证超时，连接被服务端关闭（code 4001）'),
+      4002 => const AuthException(message: 'Token 无效或已过期（code 4002），请重新登录'),
+      4003 => const BusinessException(
+          message: 'symbols 数量超过限制（code 4003）',
+          errorCode: 'SYMBOL_LIMIT_EXCEEDED',
+        ),
+      4004 => const NetworkException(message: '服务端主动关闭连接（维护中，code 4004），请稍后重连'),
+      _ => NetworkException(
+          message: '连接意外断开（code=${code ?? "none"}），将自动重连',
+        ),
+    };
+  }
+
+  // ─── Helpers ──────────────────────────────────────────────────────────────
+
+  void _sendJson(Map<String, dynamic> payload) {
+    _channel?.sink.add(jsonEncode(payload));
+  }
+
+  void _requireConnected() {
+    if (_state != _WsState.connected) {
+      throw StateError('QuoteWebSocketClient: not connected (state=$_state)');
+    }
+  }
+
+  void _cleanup() {
+    _pingTimer?.cancel();
+    _authTimeoutTimer?.cancel();
+    _subscription?.cancel();
+    _pingTimer = null;
+    _authTimeoutTimer = null;
+    _subscribedSymbols = {};
+    _state = _WsState.disconnected;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Proto → QuoteDto bridge
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Convert a proto [Quote] to a [QuoteDto] so that the shared
+/// [QuoteDtoMapper.toDomain()] logic handles Decimal parsing.
+///
+/// Fields absent from TICK frames arrive as proto3 zero-values (empty string /
+/// 0). Callers that patch a cached Quote must handle zero-value fields.
+QuoteDto _protoQuoteToDto(proto.Quote q) {
+  final marketStatusStr = switch (q.marketStatus) {
+    proto.MarketStatus.MARKET_STATUS_REGULAR => 'REGULAR',
+    proto.MarketStatus.MARKET_STATUS_PRE_MARKET => 'PRE_MARKET',
+    proto.MarketStatus.MARKET_STATUS_AFTER_HOURS => 'AFTER_HOURS',
+    proto.MarketStatus.MARKET_STATUS_HALTED => 'HALTED',
+    _ => 'CLOSED',
+  };
+
+  return QuoteDto(
+    symbol: q.symbol,
+    // name / nameZh / marketCap are not in WsQuoteFrame.
+    // The caller should merge these from the cached REST QuoteDto when patching.
+    name: '',
+    nameZh: '',
+    market: q.market == proto.Market.MARKET_HK ? 'HK' : 'US',
+    price: q.price,
+    change: q.change,
+    changePct: q.changePct,
+    volume: q.volume.toInt(),
+    bid: q.bid.isEmpty ? null : q.bid,
+    ask: q.ask.isEmpty ? null : q.ask,
+    turnover: q.turnover,
+    prevClose: q.prevClose,
+    open: q.open,
+    high: q.high,
+    low: q.low,
+    marketCap: '',
+    delayed: q.delayed,
+    marketStatus: marketStatusStr,
+    isStale: q.isStale,
+    staleSinceMs: q.staleSinceMs.toInt(),
+  );
+}
