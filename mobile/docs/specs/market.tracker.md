@@ -156,15 +156,18 @@
   - 错误处理：4001-4004 关闭码
   - ✅ 单元测试：`test/features/market/data/websocket/quote_websocket_client_test.dart`（34 tests, all passing）
 
-- [ ] **T17** — `WatchlistRepository`（abstract）+ `WatchlistRepositoryImpl`
+- [x] **T17** — `WatchlistRepository`（abstract）+ `WatchlistRepositoryImpl`
   - 接口：`getWatchlist` / `addToWatchlist` / `removeFromWatchlist` / `reorderWatchlist`
-  - 本地缓存（Hive）+ 服务端同步（注册用户）
-  - 访客模式：仅本地存储，不调用服务端API
+  - 本地缓存（Hive `market_watchlist` box）+ 服务端同步（注册用户）
+  - 访客模式：仅本地存储，quotes 通过 REST `/v1/market/quotes` 获取
+  - reorderWatchlist：local-only（服务端无排序接口）
+  - `WatchlistLocalDataSource`：Hive JSON 序列化，存储 symbol+market 有序列表
 
-- [ ] **T18** — `QuoteLocalCache`：行情本地缓存
-  - Hive key-value 存储
+- [x] **T18** — `QuoteLocalCache`：行情本地缓存
+  - Hive key-value 存储（`market_quotes` + `market_kline` 两个 box）
   - 缓存策略：最新报价缓存5分钟，K线缓存1小时
-  - 离线模式：显示缓存数据 + "离线"标识
+  - 离线模式：`getQuoteStale` / `getKlineStale` 返回过期缓存供离线展示
+  - 序列化：QuoteDto / CandleDto JSON（json_serializable 生成）
 
 ### Cross-Cutting Concerns
 
