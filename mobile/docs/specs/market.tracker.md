@@ -162,12 +162,14 @@
   - 访客模式：仅本地存储，quotes 通过 REST `/v1/market/quotes` 获取
   - reorderWatchlist：local-only（服务端无排序接口）
   - `WatchlistLocalDataSource`：Hive JSON 序列化，存储 symbol+market 有序列表
+  - ✅ 单元测试：`watchlist_local_datasource_test.dart`（8 tests）+ `watchlist_repository_impl_test.dart`（19 tests）
 
 - [x] **T18** — `QuoteLocalCache`：行情本地缓存
   - Hive key-value 存储（`market_quotes` + `market_kline` 两个 box）
   - 缓存策略：最新报价缓存5分钟，K线缓存1小时
   - 离线模式：`getQuoteStale` / `getKlineStale` 返回过期缓存供离线展示
   - 序列化：QuoteDto / CandleDto JSON（json_serializable 生成）
+  - ✅ 单元测试：`quote_local_cache_test.dart`（19 tests，含 TTL 过期 + stale 降级）
 
 ### Cross-Cutting Concerns
 
