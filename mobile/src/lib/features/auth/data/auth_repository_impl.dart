@@ -194,7 +194,11 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<void> logout() async {
     final deviceInfo = await _deviceInfoService.getDeviceInfo();
-    await _remote.logout(deviceId: deviceInfo.deviceId);
+    try {
+      await _remote.logout(deviceId: deviceInfo.deviceId);
+    } on DioException catch (e) {
+      AppLogger.warning('Logout server call failed — clearing local state anyway: $e');
+    }
     await _tokenService.clearTokens();
     await _secureStorage.delete(_biometricRegisteredKey);
     AppLogger.info('Logout complete — tokens cleared');

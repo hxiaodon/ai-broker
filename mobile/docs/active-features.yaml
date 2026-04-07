@@ -12,7 +12,7 @@
 #   shipped     — 审核通过，合并至 main
 
 domain: mobile
-last_updated: 2026-04-04
+last_updated: 2026-04-07
 current_focus: market
 
 development_order:
@@ -38,14 +38,18 @@ modules:
 
   - id: market
     name: 行情模块
-    status: in_progress
-    phase1_tasks: "0/22"
+    status: review
+    phase1_tasks: "20/22"
     prd: mobile/docs/prd/03-market.md
     tracker: mobile/docs/specs/market.tracker.md
     hifi: mobile/prototypes/03-market/
     contracts:
       - docs/contracts/market-data-to-mobile.md
-    notes: "Tracker 已创建；WebSocket 双轨推送（实时/延迟）；Syncfusion Charts K线图；Protobuf 二进制帧"
+    notes: >
+      Phase 1 实现 20/22（T21 性能优化延迟至 Syncfusion 接入后）。
+      flutter analyze 0 issues，191 单元测试全部通过。
+      T19 路由已接入真实 screens；T20 港股搜索检测已实现。
+      待 security-engineer + code-reviewer 审核。
 
   - id: trading
     name: 交易模块

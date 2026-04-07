@@ -7,6 +7,7 @@ import '../../../../core/errors/app_exception.dart';
 import '../../../../core/logging/app_logger.dart';
 import '../../../../core/routing/route_names.dart';
 import '../../../../shared/theme/color_tokens.dart';
+import '../../application/auth_notifier.dart';
 import '../../application/otp_timer_notifier.dart';
 import '../../data/auth_repository_impl.dart';
 import '../widgets/country_code_picker.dart';
@@ -266,6 +267,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 12),
+              TextButton(
+                onPressed: () {
+                  ref.read(authProvider.notifier).enterGuestMode();
+                  context.go(RouteNames.market);
+                },
+                child: const Text('先逛逛'),
+              ),
+              const SizedBox(height: 4),
               _buildFooterNote(colors),
             ],
           ),

@@ -89,6 +89,7 @@ dev_dependencies:
     sdk: flutter
   integration_test:
     sdk: flutter
+  riverpod: ^3.0.0  # direct dep for test imports (riverpod/misc.dart)
 
   # Code generation
   # analyzer version ceiling imposed by riverpod_generator 4.x (requires ^9.0.0):

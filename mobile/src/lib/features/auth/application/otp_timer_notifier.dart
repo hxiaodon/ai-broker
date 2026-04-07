@@ -71,13 +71,13 @@ class OtpTimerNotifier extends _$OtpTimerNotifier {
     DateTime? lockoutUntil,
   }) {
     final newErrorCount = state.errorCount + 1;
+    state = state.copyWith(errorCount: newErrorCount);
 
     if (remainingAttempts <= 0 || newErrorCount >= 5) {
       _startLockout(lockoutUntil: lockoutUntil);
       return;
     }
 
-    state = state.copyWith(errorCount: newErrorCount);
     AppLogger.debug('OTP error $newErrorCount/5 — remaining: $remainingAttempts');
   }
 

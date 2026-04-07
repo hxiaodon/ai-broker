@@ -5,9 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:trading_app/core/auth/token_service.dart';
 import 'package:trading_app/features/auth/application/auth_notifier.dart';
-import 'package:trading_app/features/auth/data/auth_repository_impl.dart';
-import 'package:trading_app/features/auth/domain/entities/auth_token.dart';
-import 'package:trading_app/features/auth/domain/repositories/auth_repository.dart';
 import 'package:trading_app/features/auth/presentation/screens/login_screen.dart';
 
 /// Integration test for Auth module end-to-end flows.
@@ -121,7 +118,7 @@ void main() {
         child: MaterialApp(
           home: Builder(
             builder: (context) {
-              final authState = container.read(authNotifierProvider);
+              final authState = container.read<AuthState>(authProvider);
               return Scaffold(
                 body: Center(
                   child: Text('Auth State: ${authState.runtimeType}'),

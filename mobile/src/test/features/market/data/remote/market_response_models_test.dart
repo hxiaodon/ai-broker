@@ -182,7 +182,7 @@ void main() {
       final json = {
         'symbol': 'AAPL',
         'period': '1min',
-        'candles': [],
+        'candles': <dynamic>[],
         'next_cursor': null,
         'total': 0,
       };

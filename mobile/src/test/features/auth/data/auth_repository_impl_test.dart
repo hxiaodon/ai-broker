@@ -4,6 +4,7 @@ import 'package:mocktail/mocktail.dart';
 
 import 'package:trading_app/core/auth/device_info_service.dart';
 import 'package:trading_app/core/auth/token_service.dart';
+import 'package:trading_app/core/logging/app_logger.dart';
 import 'package:trading_app/core/storage/secure_storage_service.dart';
 import 'package:trading_app/features/auth/data/auth_repository_impl.dart';
 import 'package:trading_app/features/auth/data/remote/auth_remote_data_source.dart';
@@ -32,6 +33,7 @@ void main() {
   late MockSecureStorageService mockSecureStorage;
 
   setUpAll(() {
+    AppLogger.init();
     registerFallbackValue(FakeSendOtpRequest());
     registerFallbackValue(FakeVerifyOtpRequest());
     registerFallbackValue(FakeRefreshTokenRequest());
@@ -56,8 +58,8 @@ void main() {
     when(() => mockDeviceInfoService.getDeviceInfo()).thenAnswer(
       (_) async => DeviceInfo(
         deviceId: 'test_device_id',
-        deviceName: 'Test Device',
-        osType: 'iOS',
+        model: 'Test Device',
+        platform: 'iOS',
         osVersion: '17.0',
         appVersion: '1.0.0',
       ),
@@ -69,6 +71,7 @@ void main() {
       final response = SendOtpResponse(
         requestId: 'req_123',
         phoneNumber: '138****8888',
+        deliveryMethod: 'SMS',
         expiresInSeconds: 300,
         retryAfterSeconds: 60,
       );
@@ -220,6 +223,7 @@ void main() {
         accessToken: 'new_access_token',
         refreshToken: 'new_refresh_token',
         expiresInSeconds: 900,
+        deviceStatus: 'ACTIVE',
       );
 
       when(() => mockRemoteDataSource.refreshToken(
@@ -276,7 +280,12 @@ void main() {
       when(() => mockRemoteDataSource.registerBiometric(
             request: any(named: 'request'),
             deviceId: any(named: 'deviceId'),
-          )).thenAnswer((_) async {});
+          )).thenAnswer((_) async => RegisterBiometricResponse(
+            deviceId: 'test_device_id',
+            biometricType: 'FACE_ID',
+            registeredAt: '2024-01-15T10:00:00Z',
+            status: 'REGISTERED',
+          ));
 
       when(() => mockSecureStorage.write(any(), any()))
           .thenAnswer((_) async {});
@@ -300,8 +309,9 @@ void main() {
   group('AuthRepositoryImpl - verifyBiometric', () {
     test('verifyBiometric success returns verification token', () async {
       final response = VerifyBiometricResponse(
+        operation: 'DEVICE_REVOKE',
+        verified: true,
         verificationToken: 'verify_token_123',
-        expiresInSeconds: 300,
       );
 
       when(() => mockRemoteDataSource.verifyBiometric(
@@ -360,7 +370,7 @@ void main() {
 
   group('AuthRepositoryImpl - getDevices', () {
     test('getDevices returns list of devices', () async {
-      final response = GetDevicesResponse(
+      final response = DevicesListResponse(
         devices: [
           DeviceInfoDto(
             deviceId: 'device_1',
@@ -407,7 +417,11 @@ void main() {
             targetDeviceId: any(named: 'targetDeviceId'),
             currentDeviceId: any(named: 'currentDeviceId'),
             biometricSignature: any(named: 'biometricSignature'),
-          )).thenAnswer((_) async {});
+          )).thenAnswer((_) async => RevokeDeviceResponse(
+            deviceId: 'device_to_revoke',
+            status: 'REVOKED',
+            kickedAt: '2024-01-15T10:00:00Z',
+          ));
 
       await repository.revokeDevice(
         targetDeviceId: 'device_to_revoke',

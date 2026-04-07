@@ -143,7 +143,7 @@ class MarketDataRepositoryImpl implements MarketDataRepository {
 /// Uses a dedicated Dio instance for the market-data service.
 /// JWT is injected by the global auth interceptor on [DioClient.create].
 @Riverpod(keepAlive: true)
-MarketDataRepositoryImpl marketDataRepository(Ref ref) {
+MarketDataRepository marketDataRepository(Ref ref) {
   final dio = DioClient.create(baseUrl: _kMarketBaseUrl);
   return MarketDataRepositoryImpl(
     remoteDataSource: MarketRemoteDataSource(dio),

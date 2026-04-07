@@ -10,6 +10,9 @@ import '../../features/auth/presentation/screens/device_management_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/otp_input_screen.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
+import '../../features/market/presentation/screens/market_home_screen.dart';
+import '../../features/market/presentation/screens/search_screen.dart';
+import '../../features/market/presentation/screens/stock_detail_screen.dart';
 import 'route_names.dart';
 import 'scaffold_with_nav.dart';
 
@@ -85,17 +88,17 @@ GoRouter appRouter(Ref ref) {
             routes: [
               GoRoute(
                 path: RouteNames.market,
-                builder: (_, _) => const _Placeholder('Market'),
+                builder: (_, _) => const MarketHomeScreen(),
                 routes: [
                   GoRoute(
                     path: 'stock/:symbol',
-                    builder: (_, state) => _Placeholder(
-                      'Stock Detail — ${state.pathParameters['symbol']}',
+                    builder: (_, state) => StockDetailScreen(
+                      symbol: state.pathParameters['symbol']!,
                     ),
                   ),
                   GoRoute(
                     path: 'search',
-                    builder: (_, _) => const _Placeholder('Search'),
+                    builder: (_, _) => const SearchScreen(),
                   ),
                 ],
               ),
@@ -187,8 +190,9 @@ String? _redirect(AuthState authState, GoRouterState state) {
     guest: () {
       // Guests may use splash and auth routes
       if (isAuthPath || isSplash) return null;
-      // Guests may browse market; restricted tabs get placeholder inline
-      // (We do not redirect — each tab builder shows GuestPlaceholderScreen)
+      // Order entry requires authentication — redirect guests to login for deep links
+      if (path.startsWith('/trading/order')) return RouteNames.authLogin;
+      // Guests may browse market; restricted tabs show GuestPlaceholderScreen inline
       return null;
     },
   );

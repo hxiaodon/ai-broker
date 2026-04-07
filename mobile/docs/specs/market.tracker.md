@@ -2,7 +2,7 @@
 
 **模块**: 行情（Market）  
 **状态**: 🟡 in_progress  
-**Phase 1 进度**: 4 / 22
+**Phase 1 进度**: 20 / 22
 
 ---
 
@@ -40,96 +40,106 @@
 
 ### Presentation 层（Screens & Widgets）
 
-- [ ] **T01** — `MarketHomeScreen`：行情首页（4 tabs + 搜索栏 + 大盘指数）
+- [x] **T01** — `MarketHomeScreen`：行情首页（4 tabs + 搜索栏 + 大盘指数）
   - Tab 栏：自选 | 热门 | 涨幅榜 | 跌幅榜（港股 Tab 显示"敬请期待"占位）
-  - 顶部搜索栏（点击跳转 SearchScreen）
-  - 大盘指数横向滚动卡片（SPY/QQQ/DIA，标注"追踪 XXX"）
-  - 访客模式顶部显示"延迟15分钟"横幅
+  - 顶部 `DelayedQuoteBanner`（访客）
+  - 大盘指数横向滚动卡片（SPY/QQQ/DIA，从 watchlistProvider 取实时价格）
+  - `presentation/screens/market_home_screen.dart`
 
-- [ ] **T02** — `WatchlistTab`：自选股列表
-  - 股票卡片（symbol/名称/价格/涨跌幅，红涨绿跌可配置）
-  - 编辑模式（长按拖拽排序、左滑删除）
-  - 空状态（"去搜索添加"引导按钮）
-  - 实时 WebSocket 报价更新（注册用户）/ 延迟快照（访客）
-  - 访客点击收藏 → 登录引导 Sheet
+- [x] **T02** — `WatchlistTab` widget：自选股列表
+  - 股票卡片（StockRowTile）含延迟徽标
+  - 加载/错误/空状态 skeleton
+  - 空状态"去搜索添加"引导按钮
+  - 访客编辑 → 登录引导 Sheet
+  - `presentation/widgets/watchlist_tab.dart`
 
-- [ ] **T03** — `MoversTab`：涨跌幅榜/热门榜
-  - 筛选条件：成交量 > 100万股
-  - 实时排序（按涨跌幅）
-  - 股票卡片布局（同 WatchlistTab）
+- [x] **T03** — `MoversTab` widget + `moversProvider`：涨跌幅榜/热门榜
+  - `moversProvider(type:, market:)` FutureProvider.family
+  - 加载/错误/空状态 skeleton
+  - `presentation/widgets/movers_tab.dart` + `application/movers_provider.dart`
 
-- [ ] **T04** — `StockDetailScreen`：股票详情页
-  - 导航栏（symbol + 收藏按钮⭐）
-  - 价格英雄区（当前价/涨跌/交易时段标识：盘前/盘中/盘后/休市/暂停）
-  - K线图区域（Syncfusion Charts，见 T05）
-  - 关键数据网格（今开/昨收/最高/最低/成交量/成交额/市值/换手率）
-  - 最优买卖价（Level 1：买一价/卖一价）
-  - 我的持仓快速查看（仅已登录且有持仓时显示）
-  - 公司简介（可展开）
-  - 底部买入/卖出按钮（访客显示登录引导）
-  - Stale Quote 警告横幅（is_stale=true + stale_since_ms ≥ 5000）
+- [x] **T04** — `StockDetailScreen`：股票详情页
+  - 导航栏（symbol + 收藏按钮 ⭐，访客触发登录 Sheet）
+  - 价格英雄区（price/change/changePct/session，MarketStatusIndicator）
+  - K线图区域（KLineChartWidget，见 T05）
+  - 今日行情数据网格（今开/昨收/最高/最低/成交量/成交额/买一价/卖一价）
+  - 基本面数据网格（市值/PE/PB/股息率/52周高低/换手率/板块）
+  - 买入/卖出按钮（暂停交易时 disabled；访客触发登录 Sheet）
+  - StaleQuoteWarningBanner（is_stale + staleSinceMs ≥ 5000）
+  - 加载 skeleton + 错误重试
+  - `presentation/screens/stock_detail_screen.dart`
 
-- [ ] **T05** — `KLineChartWidget`：K线图表（Syncfusion Charts）
-  - 时间轴选择器（分时/5日/1月/3月/1年/全部，对应 1min/5min/1d/1d/1d/1d）
-  - Candlestick/OHLC 图表
-  - 成交量柱状图（底部）
-  - 缩放、十字线、长按显示指标
-  - 分时图仅显示常规交易时段（09:30-16:00 ET，约390条）
-  - 历史K线使用后复权数据
+- [x] **T05** — `KLineChartWidget`：K线图表（Syncfusion 占位）
+  - 时间轴选择器：分时 / 1W / 1M / 3M / 1Y / All
+  - `_klineDataProvider(KlineParams)` FutureProvider.family 拉取 K 线数据
+  - Syncfusion TODO 注释（含完整实现规格：CandleSeries + ColumnSeries + CrosshairBehavior + ZoomPan）
+  - 当前显示 sparkline 占位符 + 条数提示
+  - `presentation/widgets/kline_chart_widget.dart`
 
-- [ ] **T06** — `SearchScreen`：全局搜索
-  - 搜索输入框（debounce 300ms）
-  - 3个状态：empty（历史搜索 + 热门搜索）/ results / empty-result
-  - 搜索匹配：symbol（≥1字符）/ 英文名 / 中文名（≥2字符）/ 拼音首字母
-  - 搜索历史管理（本地存储最近10条，可一键清除）
-  - 访客模式搜索结果价格旁显示"延迟"徽标
+- [x] **T06** — `SearchScreen`：全局搜索
+  - 3 状态：empty（历史 + 热门）/ results / no-results
+  - 300ms debounce 通过 searchProvider 驱动
+  - 搜索历史行（含单条删除、一键清空）
+  - 访客模式结果显示"延迟"(D) 徽标
+  - `presentation/screens/search_screen.dart`
 
-- [ ] **T07** — `DelayedQuoteBanner`：访客模式延迟提示横幅
-  - 显示"当前为延迟行情（15分钟），登录后查看实时数据"
+- [x] **T07** — `DelayedQuoteBanner`：访客模式延迟提示横幅
+  - 监听 `authProvider`，`guest` 状态时显示，其余自动隐藏
   - 点击跳转登录页
-  - 用户登录后自动隐藏
+  - `presentation/widgets/delayed_quote_banner.dart`
 
-- [ ] **T08** — `MarketStatusIndicator`：市场状态指示器
-  - 5种状态：盘前/盘中/盘后/休市/暂停交易
-  - 盘前/盘后显示相对昨收涨跌幅
-  - 暂停交易时禁用买入/卖出按钮，显示提示
+- [x] **T08** — `MarketStatusIndicator`：市场状态指示器
+  - 5种状态 chip（盘前/盘中/盘后/休市/暂停交易）+ 颜色编码
+  - `presentation/widgets/market_status_indicator.dart`
 
-- [ ] **T09** — `StaleQuoteWarningBanner`：陈旧行情警告横幅
-  - 条件：is_stale=true + stale_since_ms ≥ 5000
-  - 显示"行情数据可能存在延迟，请谨慎交易"
-  - 黄色背景，警告图标
+- [x] **T09** — `StaleQuoteWarningBanner`：陈旧行情警告横幅
+  - 黄色背景 + 警告图标
+  - `StockDetail.showStaleWarning` 控制显示
+  - `presentation/widgets/stale_quote_warning_banner.dart`
+
+> **Shared widget**: `StockRowTile` (`presentation/widgets/stock_row_tile.dart`) — 自选/榜单/搜索结果共用行组件，含 symbol badge / rank 模式 / delayed 徽标
 
 ### Application 层（State Management）
 
-- [ ] **T10** — `QuoteStreamProvider`：WebSocket 实时报价流
-  - Riverpod StreamProvider，订阅 quote.realtime 频道
-  - 连接管理：认证（消息级JWT）、订阅/退订、心跳（30s ping）
-  - 双轨推送：注册用户实时tick / 访客T-15min快照（每5s）
-  - 自动重连（Riverpod 3.0 auto-retry）
-  - Pause/Resume（App后台时暂停，前台恢复）
-  - Protobuf 二进制帧解析（WsQuoteFrame）
-  - 错误处理：断线重连、认证失败、订阅超限（50 symbols）
+- [x] **T10** — `QuoteWebSocketNotifier` + `quoteUpdateProvider`：WebSocket 实时报价流
+  - `AsyncNotifier<WsUserType>`（`keepAlive: true`），管理 `QuoteWebSocketClient` 生命周期
+  - 持久 broadcast stream（`_outputController`），跨重连保持流稳定
+  - 连接管理：`wsClientFactoryProvider` 可注入工厂，便于测试
+  - 双轨推送：注册用户实时TICK/SNAPSHOT / 访客T-15min DELAYED（共享同一 quoteStream）
+  - 自动重连：指数退避（1/2/4s），最多3次，超限后 `AsyncError`
+  - Pause/Resume：`pause()` 关闭 WS 保存 subscriptions；`resume()` 重连并重新订阅
+  - `subscribe()`：自动分批（每50个），保留已订阅 symbols 用于重连后重订阅
+  - `reauthWithToken()`：guest→registered 升级或 JWT 续期
+  - `quoteUpdateProvider(symbol)`：`StreamProvider.family`，过滤单个 symbol 更新
+  - ✅ 单元测试：`test/features/market/application/quote_websocket_notifier_test.dart`（19 tests, all passing）
 
-- [ ] **T11** — `WatchlistNotifier`：自选股状态管理
-  - AsyncNotifier<List<Quote>>
-  - CRUD 操作：add / remove / reorder
-  - 本地缓存（Hive，访客模式临时存储）
-  - 服务端同步（注册用户，调用 /v1/watchlist）
-  - 最多100只限制检查
-  - 登录后提示"是否导入访客自选股"
+- [x] **T11** — `WatchlistNotifier`：自选股状态管理
+  - `AsyncNotifier<List<Quote>>`（`keepAlive: true`），订阅 `watchlistRepositoryProvider`
+  - Live WS 报价 patch：SNAPSHOT/DELAYED = 全字段替换（保留静态 metadata）；TICK = 仅更新非零数值字段
+  - 通过 `_subscribeWhenReady` + `ref.listen(quoteWebSocketProvider, fireImmediately: true)` 处理 WS 重连后自动重订阅
+  - `add()`：调用 repo + WS 订阅 + `ref.invalidateSelf()`；100只限制抛 `ValidationException`
+  - `remove()`：调用 repo + `unsubscribe` + `ref.invalidateSelf()`
+  - `reorder()`：调用 repo + 乐观更新（无需重载）
+  - `importGuestItems()`：逐条导入，静默跳过失败项，完成后刷新
+  - ✅ 单元测试：`test/features/market/application/watchlist_notifier_test.dart`（15 tests, all passing）
 
-- [ ] **T12** — `StockDetailNotifier`：股票详情状态
-  - AsyncNotifier<StockDetail>
-  - 聚合数据：报价（WebSocket）+ K线（REST）+ 基本面（REST）
-  - 状态：loading / data / error
-  - 缓存策略：基本面数据缓存1小时，K线缓存5分钟
+- [x] **T12** — `StockDetailNotifier`：股票详情状态
+  - `@riverpod` (autoDispose) family notifier `build(String symbol)` → `AsyncValue<StockDetail>`
+  - Initial load via `MarketDataRepository.getStockDetail(symbol)`
+  - Live WS patches via `ref.listen(quoteUpdateProvider(symbol), ...)` — same SNAPSHOT/TICK merge rules as `WatchlistNotifier`
+  - WS subscription: subscribe on build (via `ref.listen(quoteWebSocketProvider, fireImmediately: true)`); unsubscribe on dispose
+  - `KlineParams` value object added for future `klineProvider` family
+  - ✅ 单元测试：`test/features/market/application/stock_detail_notifier_test.dart`（9 tests, all passing）
 
-- [ ] **T13** — `SearchNotifier`：搜索状态管理
-  - AsyncNotifier<List<SearchResult>>
-  - 防抖（300ms）
-  - 搜索历史管理（本地存储，最近10条）
-  - 热门搜索（从服务端获取）
-  - 最少输入字符检查（symbol ≥1，中文/拼音 ≥2）
+- [x] **T13** — `SearchNotifier`：搜索状态管理
+  - `Notifier<SearchState>`（同步 build，防抖通过 `dart:async` Timer 实现）
+  - `SearchState` (`@freezed`): query / results / hotStocks / history / isLoading / error
+  - 防抖（300ms），stale-query guard 防止过期结果覆盖
+  - 搜索历史管理（SharedPreferences，最近10条，去重，最新在前）
+  - 热门股从 `getMovers(type: 'most_active', market: 'US')` 加载；失败静默处理
+  - 最少输入字符检查（ASCII ≥1，含非ASCII字符 ≥2）
+  - `sharedPreferencesProvider` 可注入（测试可 override）
+  - ✅ 单元测试：`test/features/market/application/search_notifier_test.dart`（23 tests, all passing）
 
 ### Data 层（Repository / DataSource）
 
@@ -173,25 +183,28 @@
 
 ### Cross-Cutting Concerns
 
-- [ ] **T19** — Route Guards：访客模式限制
-  - 自选股功能需登录（点击收藏 → 登录引导 Sheet）
-  - 买入/卖出按钮需登录（点击 → 登录引导 Sheet）
-  - 访客可查看行情、搜索、股票详情（延迟数据）
+- [x] **T19** — Route Guards：访客模式限制
+  - 自选股收藏按钮：`_WatchlistToggleButton` 检测 guest → `showLoginGuidanceSheet(context, trigger: '添加自选')`
+  - 买入/卖出按钮：`_ActionButtons` 检测 guest → `showLoginGuidanceSheet(context, trigger: '买入/卖出')`
+  - 访客编辑自选：`WatchlistTab` onEditTap → `showLoginGuidanceSheet(context, trigger: '编辑自选股')`
+  - 访客直接导航 `/trading/order`（deep link）→ `_redirect` 重定向至 `/auth/login`
+  - 市场路由（MarketHomeScreen / StockDetailScreen / SearchScreen）已接入 `app_router.dart`，替换所有 _Placeholder
+  - `core/routing/app_router.dart`
 
-- [ ] **T20** — Error Handling：网络错误与异常场景
-  - WebSocket 断线重连（自动，最多3次，指数退避）
-  - REST API 错误（400/401/429/500）统一处理
-  - Stale Quote 警告（is_stale=true + stale_since_ms ≥ 5000）
-  - 数据源异常（显示最后已知数据 + "行情数据更新中断"提示）
-  - 搜索无结果（美股范围）："未找到相关美股股票"
-  - 搜索港股标的（如"腾讯"/"0700"）："港股行情即将开放，您可先浏览美股行情"
-  - 股票停牌（HALTED）：价格区显示"停牌"，买入/卖出按钮禁用
+- [x] **T20** — Error Handling：网络错误与异常场景
+  - WebSocket 断线重连：已在 T10 `QuoteWebSocketNotifier`（指数退避，最多3次）
+  - REST API 错误：各 widget 已有 error 状态 + `ErrorView(onRetry:)` 回调
+  - Stale Quote 警告：`StaleQuoteWarningBanner`（T09）+ `StockDetail.showStaleWarning`（T12）
+  - 搜索无结果（US 范围）：`_NoResultsView` 显示"未找到与 '$query' 相关的股票"
+  - **搜索港股标的**：`SearchState.isHkQuery`（1-5位纯数字 or 含中文字符）→ `_NoResultsView` 显示"港股行情即将开放，您可先浏览美股行情"
+  - 股票停牌（HALTED）：`_ActionButtons` 检测 `isHalted` → 买入/卖出按钮 `onPressed: null`（disabled）
+  - `application/search_notifier.dart` + `presentation/screens/search_screen.dart`
 
-- [ ] **T21** — Performance：K线图渲染与列表滚动优化
-  - K线图：Syncfusion Charts 配置优化（避免不必要的rebuild）
-  - 行情列表：ListView.builder + AutomaticKeepAliveClientMixin
-  - WebSocket 高频更新：RxDart throttle（100ms）避免过度rebuild
-  - 内存泄漏检测（leak_tracker，CI检查）
+- [~] **T21** — Performance：K线图渲染与列表滚动优化
+  - K线图 Syncfusion 优化：延迟至 T05 Syncfusion 正式接入后实施
+  - WebSocket 高频更新 RxDart throttle：延迟至负载测试后按需接入
+  - ListView：当前使用 `ListView.separated`（Phase 1 数据量可接受）
+  - 内存泄漏检测：延迟至集成测试阶段
 
 - [x] **T22** — Data Models：Domain Entities + DTOs
   - Domain Entities（纯Dart，不依赖框架）：

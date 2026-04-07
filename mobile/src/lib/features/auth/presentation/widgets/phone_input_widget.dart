@@ -71,6 +71,7 @@ class _PhoneInputWidgetState extends State<PhoneInputWidget> {
       children: [
         // Region button — hifi: "🌐 +86 ▾"
         GestureDetector(
+          key: const Key('country_code_button'),
           onTap: _pickCountry,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),

@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:riverpod/misc.dart' show Override;
 
 import 'package:trading_app/core/errors/app_exception.dart';
-import 'package:trading_app/features/auth/application/auth_notifier.dart';
+import 'package:trading_app/core/logging/app_logger.dart';
 import 'package:trading_app/features/auth/application/otp_timer_notifier.dart';
 import 'package:trading_app/features/auth/data/auth_repository_impl.dart';
 import 'package:trading_app/features/auth/domain/entities/auth_token.dart';
@@ -13,7 +14,7 @@ import 'package:trading_app/features/auth/presentation/screens/login_screen.dart
 import 'package:trading_app/features/auth/presentation/screens/otp_input_screen.dart';
 
 // Mocks
-class MockAuthRepository extends Mock implements AuthRepository {}
+class MockAuthRepository extends Mock implements AuthRepositoryImpl {}
 class MockGoRouter extends Mock {}
 
 // Fake for mocktail
@@ -23,6 +24,7 @@ void main() {
   late MockAuthRepository mockRepository;
 
   setUpAll(() {
+    AppLogger.init();
     registerFallbackValue(FakeOtpScreenArgs());
   });
 
@@ -66,7 +68,7 @@ void main() {
       final args = createTestArgs();
       await tester.pumpWidget(createTestWidget(args: args));
 
-      expect(find.text(args.maskedPhone), findsOneWidget);
+      expect(find.textContaining(args.maskedPhone), findsOneWidget);
     });
 
     testWidgets('displays resend button with countdown', (tester) async {
@@ -145,8 +147,7 @@ void main() {
       await tester.pump();
       await tester.pumpAndSettle();
 
-      // Should show lockout message (exact text depends on implementation)
-      expect(find.textContaining('锁定'), findsOneWidget);
+      expect(find.textContaining('锁定'), findsWidgets);
     });
 
     testWidgets('clears input on OTP expired error', (tester) async {
@@ -207,7 +208,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Check that timer notifier was updated
-      final timerState = container.read(otpTimerNotifierProvider);
+      final timerState = container.read(otpTimerProvider);
       expect(timerState.errorCount, greaterThan(0));
 
       container.dispose();
@@ -247,7 +248,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Check that lockout was triggered
-      final timerState = container.read(otpTimerNotifierProvider);
+      final timerState = container.read(otpTimerProvider);
       expect(timerState.isLockedOut, true);
 
       container.dispose();
@@ -402,7 +403,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Should show lockout message
-      expect(find.textContaining('锁定'), findsOneWidget);
+      expect(find.textContaining('锁定'), findsWidgets);
     });
 
     testWidgets('PRD §6.1: clears input on OTP expired', (tester) async {

@@ -1,21 +1,25 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:riverpod/riverpod.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:trading_app/core/auth/token_service.dart';
+import 'package:trading_app/core/logging/app_logger.dart';
 import 'package:trading_app/features/auth/application/auth_notifier.dart';
 import 'package:trading_app/features/auth/data/auth_repository_impl.dart';
 import 'package:trading_app/features/auth/domain/entities/auth_token.dart';
-import 'package:trading_app/features/auth/domain/repositories/auth_repository.dart';
 
 // Mocks
-class MockAuthRepository extends Mock implements AuthRepository {}
+class MockAuthRepository extends Mock implements AuthRepositoryImpl {}
 class MockTokenService extends Mock implements TokenService {}
 
 void main() {
   late MockAuthRepository mockRepository;
   late MockTokenService mockTokenService;
   late ProviderContainer container;
+
+  setUpAll(() {
+    AppLogger.init();
+  });
 
   setUp(() {
     mockRepository = MockAuthRepository();
@@ -35,7 +39,7 @@ void main() {
 
   group('AuthNotifier State Machine', () {
     test('initial state is unauthenticated', () {
-      final state = container.read(authNotifierProvider);
+      final state = container.read(authProvider);
       expect(state, const AuthState.unauthenticated());
     });
 
@@ -43,7 +47,7 @@ void main() {
       when(() => mockRepository.isBiometricRegistered())
           .thenAnswer((_) async => false);
 
-      final notifier = container.read(authNotifierProvider.notifier);
+      final notifier = container.read(authProvider.notifier);
       final token = AuthToken(
         accessToken: 'test_access_token',
         refreshToken: 'test_refresh_token',
@@ -54,19 +58,18 @@ void main() {
 
       await notifier.loginWithToken(token: token);
 
-      final state = container.read(authNotifierProvider);
-      expect(state, isA<_Authenticated>());
-      final authenticated = state as _Authenticated;
-      expect(authenticated.accountId, 'acc_123');
-      expect(authenticated.accountStatus, 'ACTIVE');
-      expect(authenticated.biometricEnabled, false);
+      final state = container.read(authProvider);
+      expect(state.maybeWhen(authenticated: (_, _, _) => true, orElse: () => false), isTrue);
+      expect(state.maybeWhen(authenticated: (id, _, _) => id, orElse: () => null), 'acc_123');
+      expect(state.maybeWhen(authenticated: (_, status, _) => status, orElse: () => null), 'ACTIVE');
+      expect(state.maybeWhen(authenticated: (_, _, bio) => bio, orElse: () => null), false);
     });
 
     test('enterGuestMode transitions to guest', () {
-      final notifier = container.read(authNotifierProvider.notifier);
+      final notifier = container.read(authProvider.notifier);
       notifier.enterGuestMode();
 
-      final state = container.read(authNotifierProvider);
+      final state = container.read(authProvider);
       expect(state, const AuthState.guest());
     });
 
@@ -76,7 +79,7 @@ void main() {
           .thenAnswer((_) async => false);
       when(() => mockRepository.logout()).thenAnswer((_) async {});
 
-      final notifier = container.read(authNotifierProvider.notifier);
+      final notifier = container.read(authProvider.notifier);
       final token = AuthToken(
         accessToken: 'test_access_token',
         refreshToken: 'test_refresh_token',
@@ -86,12 +89,15 @@ void main() {
       );
 
       await notifier.loginWithToken(token: token);
-      expect(container.read(authNotifierProvider), isA<_Authenticated>());
+      expect(
+        container.read(authProvider).maybeWhen(authenticated: (_, _, _) => true, orElse: () => false),
+        isTrue,
+      );
 
       // Logout
       await notifier.logout();
 
-      final state = container.read(authNotifierProvider);
+      final state = container.read(authProvider);
       expect(state, const AuthState.unauthenticated());
       verify(() => mockRepository.logout()).called(1);
     });
@@ -110,25 +116,24 @@ void main() {
       when(() => mockRepository.isBiometricRegistered())
           .thenAnswer((_) async => true);
 
-      final notifier = container.read(authNotifierProvider.notifier);
+      final notifier = container.read(authProvider.notifier);
       final success = await notifier.loginWithBiometric();
 
       expect(success, true);
-      final state = container.read(authNotifierProvider);
-      expect(state, isA<_Authenticated>());
-      final authenticated = state as _Authenticated;
-      expect(authenticated.biometricEnabled, true);
+      final state = container.read(authProvider);
+      expect(state.maybeWhen(authenticated: (_, _, _) => true, orElse: () => false), isTrue);
+      expect(state.maybeWhen(authenticated: (_, _, bio) => bio, orElse: () => null), true);
     });
 
     test('loginWithBiometric fails when refresh token is missing', () async {
       when(() => mockTokenService.getRefreshToken())
           .thenAnswer((_) async => null);
 
-      final notifier = container.read(authNotifierProvider.notifier);
+      final notifier = container.read(authProvider.notifier);
       final success = await notifier.loginWithBiometric();
 
       expect(success, false);
-      final state = container.read(authNotifierProvider);
+      final state = container.read(authProvider);
       expect(state, const AuthState.unauthenticated());
     });
 
@@ -138,11 +143,11 @@ void main() {
       when(() => mockRepository.refreshToken(refreshToken: any(named: 'refreshToken')))
           .thenThrow(Exception('Token expired'));
 
-      final notifier = container.read(authNotifierProvider.notifier);
+      final notifier = container.read(authProvider.notifier);
       final success = await notifier.loginWithBiometric();
 
       expect(success, false);
-      final state = container.read(authNotifierProvider);
+      final state = container.read(authProvider);
       expect(state, const AuthState.unauthenticated());
     });
 
@@ -152,7 +157,7 @@ void main() {
           .thenAnswer((_) async => false);
       when(() => mockTokenService.clearTokens()).thenAnswer((_) async {});
 
-      final notifier = container.read(authNotifierProvider.notifier);
+      final notifier = container.read(authProvider.notifier);
       final token = AuthToken(
         accessToken: 'test_access_token',
         refreshToken: 'test_refresh_token',
@@ -162,12 +167,15 @@ void main() {
       );
 
       await notifier.loginWithToken(token: token);
-      expect(container.read(authNotifierProvider), isA<_Authenticated>());
+      expect(
+        container.read(authProvider).maybeWhen(authenticated: (_, _, _) => true, orElse: () => false),
+        isTrue,
+      );
 
       // Remote kick
       await notifier.handleRemoteKick();
 
-      final state = container.read(authNotifierProvider);
+      final state = container.read(authProvider);
       expect(state, const AuthState.unauthenticated());
       verify(() => mockTokenService.clearTokens()).called(1);
     });
@@ -193,13 +201,13 @@ void main() {
       );
 
       // Read provider to trigger build
-      newContainer.read(authNotifierProvider);
+      newContainer.read(authProvider);
 
       // Wait for async session restore
-      await Future.delayed(const Duration(milliseconds: 100));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
 
-      final state = newContainer.read(authNotifierProvider);
-      expect(state, isA<_Authenticated>());
+      final state = newContainer.read(authProvider);
+      expect(state.maybeWhen(authenticated: (_, _, _) => true, orElse: () => false), isTrue);
 
       newContainer.dispose();
     });
@@ -229,11 +237,11 @@ void main() {
         ],
       );
 
-      newContainer.read(authNotifierProvider);
-      await Future.delayed(const Duration(milliseconds: 100));
+      newContainer.read(authProvider);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
 
-      final state = newContainer.read(authNotifierProvider);
-      expect(state, isA<_Authenticated>());
+      final state = newContainer.read(authProvider);
+      expect(state.maybeWhen(authenticated: (_, _, _) => true, orElse: () => false), isTrue);
       verify(() => mockRepository.refreshToken(refreshToken: 'valid_refresh_token')).called(1);
 
       newContainer.dispose();
@@ -252,10 +260,10 @@ void main() {
         ],
       );
 
-      newContainer.read(authNotifierProvider);
-      await Future.delayed(const Duration(milliseconds: 100));
+      newContainer.read(authProvider);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
 
-      final state = newContainer.read(authNotifierProvider);
+      final state = newContainer.read(authProvider);
       expect(state, const AuthState.unauthenticated());
 
       newContainer.dispose();
@@ -279,10 +287,10 @@ void main() {
         ],
       );
 
-      newContainer.read(authNotifierProvider);
-      await Future.delayed(const Duration(milliseconds: 100));
+      newContainer.read(authProvider);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
 
-      final state = newContainer.read(authNotifierProvider);
+      final state = newContainer.read(authProvider);
       expect(state, const AuthState.unauthenticated());
       verify(() => mockTokenService.clearTokens()).called(1);
 
@@ -296,7 +304,7 @@ void main() {
       when(() => mockRepository.isBiometricRegistered())
           .thenAnswer((_) async => false);
 
-      final notifier = container.read(authNotifierProvider.notifier);
+      final notifier = container.read(authProvider.notifier);
       final token = AuthToken(
         accessToken: 'test_access_token',
         refreshToken: 'test_refresh_token',
@@ -329,7 +337,7 @@ void main() {
     });
 
     test('checkAndRefreshIfNeeded does nothing when not authenticated', () async {
-      final notifier = container.read(authNotifierProvider.notifier);
+      final notifier = container.read(authProvider.notifier);
       await notifier.checkAndRefreshIfNeeded();
 
       verifyNever(() => mockTokenService.isAccessTokenValid());
@@ -340,7 +348,7 @@ void main() {
       when(() => mockRepository.isBiometricRegistered())
           .thenAnswer((_) async => false);
 
-      final notifier = container.read(authNotifierProvider.notifier);
+      final notifier = container.read(authProvider.notifier);
       final token = AuthToken(
         accessToken: 'test_access_token',
         refreshToken: 'test_refresh_token',

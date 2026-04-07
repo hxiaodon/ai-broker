@@ -345,7 +345,7 @@ void main() {
   // WatchlistResponseDto → Watchlist  (ordered List<Quote>)
   // ───────────────────────────────────────────────────────────────────────────
   group('WatchlistResponseDtoMapper.toDomain', () {
-    QuoteDto _q(String symbol, String price) => QuoteDto(
+    QuoteDto q(String symbol, String price) => QuoteDto(
           symbol: symbol,
           name: '$symbol Inc.',
           nameZh: symbol,
@@ -368,9 +368,9 @@ void main() {
       final dto = WatchlistResponseDto(
         symbols: ['TSLA', 'AAPL', 'NVDA'],
         quotes: {
-          'AAPL': _q('AAPL', '182.5200'),
-          'NVDA': _q('NVDA', '865.2100'),
-          'TSLA': _q('TSLA', '241.3800'),
+          'AAPL': q('AAPL', '182.5200'),
+          'NVDA': q('NVDA', '865.2100'),
+          'TSLA': q('TSLA', '241.3800'),
         },
         asOf: '2026-03-13T14:30:00.000Z',
       );
@@ -382,7 +382,7 @@ void main() {
     test('skips symbols missing from quotes map', () {
       final dto = WatchlistResponseDto(
         symbols: ['AAPL', 'MISSING'],
-        quotes: {'AAPL': _q('AAPL', '182.5200')},
+        quotes: {'AAPL': q('AAPL', '182.5200')},
         asOf: '2026-03-13T14:30:00.000Z',
       );
 

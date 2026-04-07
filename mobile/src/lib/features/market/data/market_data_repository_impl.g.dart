@@ -24,11 +24,11 @@ final marketDataRepositoryProvider = MarketDataRepositoryProvider._();
 final class MarketDataRepositoryProvider
     extends
         $FunctionalProvider<
-          MarketDataRepositoryImpl,
-          MarketDataRepositoryImpl,
-          MarketDataRepositoryImpl
+          MarketDataRepository,
+          MarketDataRepository,
+          MarketDataRepository
         >
-    with $Provider<MarketDataRepositoryImpl> {
+    with $Provider<MarketDataRepository> {
   /// Wires up [MarketDataRepositoryImpl] with its [MarketRemoteDataSource].
   ///
   /// Uses a dedicated Dio instance for the market-data service.
@@ -49,23 +49,23 @@ final class MarketDataRepositoryProvider
 
   @$internal
   @override
-  $ProviderElement<MarketDataRepositoryImpl> $createElement(
+  $ProviderElement<MarketDataRepository> $createElement(
     $ProviderPointer pointer,
   ) => $ProviderElement(pointer);
 
   @override
-  MarketDataRepositoryImpl create(Ref ref) {
+  MarketDataRepository create(Ref ref) {
     return marketDataRepository(ref);
   }
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(MarketDataRepositoryImpl value) {
+  Override overrideWithValue(MarketDataRepository value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<MarketDataRepositoryImpl>(value),
+      providerOverride: $SyncValueProvider<MarketDataRepository>(value),
     );
   }
 }
 
 String _$marketDataRepositoryHash() =>
-    r'6e96db38ecb9451e7a8931966282837fc4c79f1c';
+    r'eb81274a2f097284215fa05bd42d0b10837078f6';

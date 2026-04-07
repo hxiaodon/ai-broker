@@ -149,7 +149,7 @@ class WatchlistRepositoryImpl implements WatchlistRepository {
 // ─────────────────────────────────────────────────────────────────────────────
 
 @Riverpod(keepAlive: true)
-WatchlistRepositoryImpl watchlistRepository(Ref ref) {
+WatchlistRepository watchlistRepository(Ref ref) {
   final dio = DioClient.create(baseUrl: _kMarketBaseUrl);
   final tokenService = ref.watch(tokenServiceProvider);
   return WatchlistRepositoryImpl(
