@@ -155,7 +155,7 @@ class WatchlistNotifier extends _$WatchlistNotifier {
   Future<void> add({required String symbol, required String market}) async {
     final count = state.value?.length ?? 0;
     if (count >= _kMaxWatchlistSize) {
-      throw const ValidationException(message: '自选股最多 $_kMaxWatchlistSize 只');
+      throw ValidationException(message: '自选股最多 $_kMaxWatchlistSize 只');
     }
 
     AppLogger.debug('WatchlistNotifier: add $symbol ($market)');

@@ -16,6 +16,9 @@ class _CacheEntry {
   const _CacheEntry({required this.json, required this.cachedAtMs});
 
   final String json;
+
+  /// Timestamp in milliseconds since Unix epoch (UTC).
+  /// Using millisecondsSinceEpoch ensures timezone-agnostic storage.
   final int cachedAtMs;
 
   factory _CacheEntry.fromMap(Map<String, dynamic> m) => _CacheEntry(
@@ -79,7 +82,7 @@ class QuoteLocalCache {
   Future<void> putQuote(String symbol, QuoteDto dto) async {
     final entry = _CacheEntry(
       json: jsonEncode(dto.toJson()),
-      cachedAtMs: DateTime.now().millisecondsSinceEpoch,
+      cachedAtMs: DateTime.now().toUtc().millisecondsSinceEpoch,
     );
     await _writeEntry(_quoteBoxName, symbol, entry);
     AppLogger.debug('QuoteLocalCache: put quote $symbol');
@@ -126,7 +129,7 @@ class QuoteLocalCache {
     final key = klineKey(symbol, period);
     final entry = _CacheEntry(
       json: jsonEncode(candles.map((c) => c.toJson()).toList()),
-      cachedAtMs: DateTime.now().millisecondsSinceEpoch,
+      cachedAtMs: DateTime.now().toUtc().millisecondsSinceEpoch,
     );
     await _writeEntry(_klineBoxName, key, entry);
     AppLogger.debug('QuoteLocalCache: put kline $symbol $period '
@@ -169,7 +172,7 @@ class QuoteLocalCache {
   }
 
   bool _isExpired(int cachedAtMs, Duration ttl) {
-    final age = DateTime.now().millisecondsSinceEpoch - cachedAtMs;
+    final age = DateTime.now().toUtc().millisecondsSinceEpoch - cachedAtMs;
     return age > ttl.inMilliseconds;
   }
 
