@@ -73,6 +73,12 @@ HttpClient createPinnedHttpClient() {
 }
 
 bool _spkiBadCertCallback(X509Certificate cert, String host, int port) {
+  // Allow localhost for testing/development (mock server)
+  if (host == 'localhost' || host == '127.0.0.1' || host == '::1') {
+    AppLogger.debug('SSL pinning: allowing localhost connection for testing');
+    return true;
+  }
+
   final pins = _spkiPins[host];
   if (pins == null) {
     // No pin configured for this host — block by default (fail-closed).

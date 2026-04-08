@@ -111,31 +111,47 @@ class WatchlistRepositoryImpl implements WatchlistRepository {
 
   /// Fetch quotes for locally-stored symbols (guest mode).
   Future<Watchlist> _guestWatchlist() async {
-    final items = await _local.getItems();
-    AppLogger.debug('WatchlistRepo: _guestWatchlist got ${items.length} items');
-    if (items.isEmpty) return const [];
+    try {
+      AppLogger.debug('WatchlistRepo: _guestWatchlist START');
 
-    // Fetch quotes in batches of 50 (REST limit).
-    final symbols = items.map((e) => e.symbol).toList();
-    AppLogger.debug('WatchlistRepo: fetching quotes for symbols: $symbols');
-    final Watchlist result = [];
-    for (var i = 0; i < symbols.length; i += 50) {
-      final batch = symbols.sublist(
-        i,
-        (i + 50).clamp(0, symbols.length),
-      );
-      AppLogger.debug('WatchlistRepo: calling getQuotes with batch: $batch');
-      final dto = await _remote.getQuotes(batch);
-      final quoteMap = dto.quotes;
-      // Preserve local order.
-      for (final sym in batch) {
-        if (quoteMap.containsKey(sym)) {
-          result.add(quoteMap[sym]!.toDomain());
+      final items = await _local.getItems();
+      AppLogger.debug('WatchlistRepo: _guestWatchlist got ${items.length} items');
+      if (items.isEmpty) {
+        AppLogger.debug('WatchlistRepo: no items, returning empty list');
+        return const [];
+      }
+
+      // Fetch quotes in batches of 50 (REST limit).
+      final symbols = items.map((e) => e.symbol).toList();
+      AppLogger.debug('WatchlistRepo: fetching quotes for symbols: $symbols');
+      final Watchlist result = [];
+      for (var i = 0; i < symbols.length; i += 50) {
+        final batch = symbols.sublist(
+          i,
+          (i + 50).clamp(0, symbols.length),
+        );
+        AppLogger.debug('WatchlistRepo: calling getQuotes with batch: $batch');
+        try {
+          final dto = await _remote.getQuotes(batch);
+          AppLogger.debug('WatchlistRepo: got response with ${dto.quotes.length} quotes');
+          final quoteMap = dto.quotes;
+          // Preserve local order.
+          for (final sym in batch) {
+            if (quoteMap.containsKey(sym)) {
+              result.add(quoteMap[sym]!.toDomain());
+            }
+          }
+        } catch (e, stack) {
+          AppLogger.error('WatchlistRepo: getQuotes failed for batch $batch: $e', error: e, stackTrace: stack);
+          rethrow;
         }
       }
+      AppLogger.debug('WatchlistRepo: returning ${result.length} quotes');
+      return result;
+    } catch (e, stack) {
+      AppLogger.error('WatchlistRepo: _guestWatchlist failed: $e', error: e, stackTrace: stack);
+      rethrow;
     }
-    AppLogger.debug('WatchlistRepo: returning ${result.length} quotes');
-    return result;
   }
 
   /// Overwrite the local mirror with the server-authoritative symbol list.

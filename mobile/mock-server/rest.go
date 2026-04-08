@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func handleSearch(w http.ResponseWriter, r *http.Request) {
@@ -75,5 +76,6 @@ func handleQuotes(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"quotes": quotes,
+		"as_of":  time.Now().UTC().Format(time.RFC3339),
 	})
 }
