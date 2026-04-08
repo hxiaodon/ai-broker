@@ -44,10 +44,36 @@ func handleMovers(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleStockDetail(w http.ResponseWriter, r *http.Request) {
+	// Support both /api/market/detail/{symbol} and /v1/market/stocks/{symbol}
 	symbol := strings.TrimPrefix(r.URL.Path, "/api/market/detail/")
+	symbol = strings.TrimPrefix(symbol, "/v1/market/stocks/")
+	symbol = strings.TrimPrefix(symbol, "/v1/market/detail/")
 
-	quote := generateQuote(symbol, "registered")
+	quote := generateQuote(symbol, currentStrategy.Name())
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(quote)
+}
+
+func handleQuotes(w http.ResponseWriter, r *http.Request) {
+	symbolsParam := r.URL.Query().Get("symbols")
+	if symbolsParam == "" {
+		http.Error(w, "Missing symbols parameter", http.StatusBadRequest)
+		return
+	}
+
+	symbols := strings.Split(symbolsParam, ",")
+	quotes := make(map[string]interface{})
+
+	for _, symbol := range symbols {
+		symbol = strings.TrimSpace(symbol)
+		if symbol != "" {
+			quotes[symbol] = generateQuote(symbol, currentStrategy.Name())
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"quotes": quotes,
+	})
 }

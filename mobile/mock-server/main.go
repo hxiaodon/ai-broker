@@ -28,6 +28,11 @@ func main() {
 
 	// Routes
 	http.HandleFunc("/ws/market-data", handleWebSocket)
+	http.HandleFunc("/v1/market/quotes", handleQuotes)
+	http.HandleFunc("/v1/market/search", handleSearch)
+	http.HandleFunc("/v1/market/movers", handleMovers)
+	http.HandleFunc("/v1/market/stocks/", handleStockDetail)
+	http.HandleFunc("/v1/market/detail/", handleStockDetail)
 	http.HandleFunc("/api/market/search", handleSearch)
 	http.HandleFunc("/api/market/movers", handleMovers)
 	http.HandleFunc("/api/market/detail/", handleStockDetail)

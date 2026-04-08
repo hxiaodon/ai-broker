@@ -7,9 +7,9 @@ PODS:
   - flutter_secure_storage_darwin (10.0.0):
     - Flutter
     - FlutterMacOS
-  - image_cropper (0.0.4):
+  - image_cropper (0.0.5):
     - Flutter
-    - TOCropViewController (~> 2.8.0)
+    - TOCropViewController (~> 3.1.1)
   - image_picker_ios (0.0.1):
     - Flutter
   - integration_test (0.0.1):
@@ -23,6 +23,8 @@ PODS:
     - Flutter
   - permission_handler_apple (9.3.0):
     - Flutter
+  - rive_common (0.0.1):
+    - Flutter
   - screen_protector (1.5.1):
     - Flutter
     - ScreenProtectorKit (= 1.5.1)
@@ -33,7 +35,7 @@ PODS:
   - sqflite_darwin (0.0.4):
     - Flutter
     - FlutterMacOS
-  - TOCropViewController (2.8.0)
+  - TOCropViewController (3.1.1)
   - webview_flutter_wkwebview (0.0.1):
     - Flutter
     - FlutterMacOS
@@ -50,6 +52,7 @@ DEPENDENCIES:
   - package_info_plus (from `.symlinks/plugins/package_info_plus/ios`)
   - pdfx (from `.symlinks/plugins/pdfx/ios`)
   - permission_handler_apple (from `.symlinks/plugins/permission_handler_apple/ios`)
+  - rive_common (from `.symlinks/plugins/rive_common/ios`)
   - screen_protector (from `.symlinks/plugins/screen_protector/ios`)
   - shared_preferences_foundation (from `.symlinks/plugins/shared_preferences_foundation/darwin`)
   - sqflite_darwin (from `.symlinks/plugins/sqflite_darwin/darwin`)
@@ -83,6 +86,8 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/pdfx/ios"
   permission_handler_apple:
     :path: ".symlinks/plugins/permission_handler_apple/ios"
+  rive_common:
+    :path: ".symlinks/plugins/rive_common/ios"
   screen_protector:
     :path: ".symlinks/plugins/screen_protector/ios"
   shared_preferences_foundation:
@@ -97,18 +102,19 @@ SPEC CHECKSUMS:
   device_info_plus: 21fcca2080fbcd348be798aa36c3e5ed849eefbe
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
   flutter_secure_storage_darwin: acdb3f316ed05a3e68f856e0353b133eec373a23
-  image_cropper: 64567491beea6cd1bc4b11948e2babb590de5826
+  image_cropper: e405d3e44183f8e8edbec2e49b01ff9c819c7ac8
   image_picker_ios: e0ece4aa2a75771a7de3fa735d26d90817041326
   integration_test: 4a889634ef21a45d28d50d622cf412dc6d9f586e
   local_auth_darwin: c3ee6cce0a8d56be34c8ccb66ba31f7f180aaebb
   package_info_plus: af8e2ca6888548050f16fa2f1938db7b5a5df499
   pdfx: 77f4dddc48361fbb01486fa2bdee4532cbb97ef3
   permission_handler_apple: 4ed2196e43d0651e8ff7ca3483a069d469701f2d
+  rive_common: dd421daaf9ae69f0125aa761dd96abd278399952
   screen_protector: 18c6aca2dc5d2a832f6787a5318f97f03e9d3150
   ScreenProtectorKit: 6ceb3e0808341a9bc15d175bff40dfdd4b32da71
   shared_preferences_foundation: 7036424c3d8ec98dfe75ff1667cb0cd531ec82bb
   sqflite_darwin: 20b2a3a3b70e43edae938624ce550a3cbf66a3d0
-  TOCropViewController: 797deaf39c90e6e9ddd848d88817f6b9a8a09888
+  TOCropViewController: 9002a9b12d8104d7478cdc306d80f0efea7fe2c5
   webview_flutter_wkwebview: 8ebf4fded22593026f7dbff1fbff31ea98573c8d
 
 PODFILE CHECKSUM: bd29822c3d5baf6b44b726f00ea3293a19339ef2

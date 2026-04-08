@@ -2,5 +2,6 @@ go 1.25.8
 
 use (
 	./api
+	./mobile/mock-server
 	./services/market-data/src
 )

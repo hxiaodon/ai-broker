@@ -45,11 +45,19 @@ class WatchlistLocalDataSource {
   Future<Box<dynamic>> _box() => Hive.openBox<dynamic>(_boxName);
 
   /// Returns the stored watchlist items in their saved order.
-  /// Returns an empty list if nothing has been saved yet.
+  /// Returns default guest watchlist if nothing has been saved yet.
   Future<List<WatchlistItem>> getItems() async {
     final box = await _box();
     final raw = box.get(_itemsKey) as String?;
-    if (raw == null || raw.isEmpty) return [];
+    if (raw == null || raw.isEmpty) {
+      // Return default watchlist for guest mode testing
+      return const [
+        WatchlistItem(symbol: 'AAPL', market: 'US'),
+        WatchlistItem(symbol: 'TSLA', market: 'US'),
+        WatchlistItem(symbol: '0700', market: 'HK'),
+        WatchlistItem(symbol: '9988', market: 'HK'),
+      ];
+    }
     final list = jsonDecode(raw) as List<dynamic>;
     return list
         .map((e) => WatchlistItem.fromJson(e as Map<String, dynamic>))

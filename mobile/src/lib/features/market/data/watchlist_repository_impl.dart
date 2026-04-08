@@ -112,16 +112,19 @@ class WatchlistRepositoryImpl implements WatchlistRepository {
   /// Fetch quotes for locally-stored symbols (guest mode).
   Future<Watchlist> _guestWatchlist() async {
     final items = await _local.getItems();
+    AppLogger.debug('WatchlistRepo: _guestWatchlist got ${items.length} items');
     if (items.isEmpty) return const [];
 
     // Fetch quotes in batches of 50 (REST limit).
     final symbols = items.map((e) => e.symbol).toList();
+    AppLogger.debug('WatchlistRepo: fetching quotes for symbols: $symbols');
     final Watchlist result = [];
     for (var i = 0; i < symbols.length; i += 50) {
       final batch = symbols.sublist(
         i,
         (i + 50).clamp(0, symbols.length),
       );
+      AppLogger.debug('WatchlistRepo: calling getQuotes with batch: $batch');
       final dto = await _remote.getQuotes(batch);
       final quoteMap = dto.quotes;
       // Preserve local order.
@@ -131,6 +134,7 @@ class WatchlistRepositoryImpl implements WatchlistRepository {
         }
       }
     }
+    AppLogger.debug('WatchlistRepo: returning ${result.length} quotes');
     return result;
   }
 
