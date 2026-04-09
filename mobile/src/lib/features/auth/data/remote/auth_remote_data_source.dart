@@ -41,10 +41,10 @@ class AuthRemoteDataSource {
           },
         ),
       );
-      AppLogger.info('Auth: OTP sent successfully (region=${request.region})');
+      AppLogger.info('Auth: OTP sent successfully (phone=${request.phoneNumber})');
       return SendOtpResponse.fromJson(response.data!);
     } on DioException catch (e) {
-      throw _mapDioException(e, 'sendOtp', context: {'region': request.region});
+      throw _mapDioException(e, 'sendOtp', context: {'phone': request.phoneNumber});
     }
   }
 
