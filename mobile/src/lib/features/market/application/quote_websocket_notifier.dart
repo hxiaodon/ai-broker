@@ -264,6 +264,7 @@ class QuoteWebSocketNotifier extends _$QuoteWebSocketNotifier {
       await _client!.subscribe(batch);
       _subscribedSymbols.addAll(batch);
     }
+    AppLogger.debug('QuoteWS: subscribed to ${symbols.length} symbols: ${symbols.join(", ")}');
   }
 
   /// Unsubscribe from [symbols].
@@ -271,6 +272,7 @@ class QuoteWebSocketNotifier extends _$QuoteWebSocketNotifier {
     if (symbols.isEmpty) return;
     _client?.unsubscribe(symbols);
     _subscribedSymbols.removeAll(symbols);
+    AppLogger.debug('QuoteWS: unsubscribed from ${symbols.length} symbols');
   }
 
   /// Re-authenticate with a refreshed [newToken].

@@ -58,6 +58,8 @@ class WatchlistNotifier extends _$WatchlistNotifier {
     final repo = ref.watch(watchlistRepositoryProvider);
     final watchlist = await repo.getWatchlist();
 
+    AppLogger.info('WatchlistNotifier: loaded ${watchlist.length} watchlist items');
+
     // Set up live WS patch stream once we have data.
     if (watchlist.isNotEmpty) {
       _subscribeWhenReady(watchlist.map((q) => q.symbol).toList());
@@ -159,7 +161,7 @@ class WatchlistNotifier extends _$WatchlistNotifier {
         throw ValidationException(message: '自选股最多 $_kMaxWatchlistSize 只');
       }
 
-      AppLogger.debug('WatchlistNotifier: add $symbol ($market)');
+      AppLogger.debug('WatchlistNotifier: adding $symbol ($market)');
       final repo = ref.read(watchlistRepositoryProvider);
       await repo.addToWatchlist(symbol: symbol, market: market);
 
@@ -170,6 +172,8 @@ class WatchlistNotifier extends _$WatchlistNotifier {
             .read(quoteWebSocketProvider.notifier)
             .subscribe([symbol]);
       }
+
+      AppLogger.info('WatchlistNotifier: $symbol added to watchlist');
 
       // Refresh from repository (preserves server ordering).
       ref.invalidateSelf();
@@ -186,11 +190,13 @@ class WatchlistNotifier extends _$WatchlistNotifier {
   /// Remove [symbol] from the watchlist.
   Future<void> remove(String symbol) async {
     try {
-      AppLogger.debug('WatchlistNotifier: remove $symbol');
+      AppLogger.debug('WatchlistNotifier: removing $symbol');
       final repo = ref.read(watchlistRepositoryProvider);
       await repo.removeFromWatchlist(symbol);
 
       ref.read(quoteWebSocketProvider.notifier).unsubscribe([symbol]);
+
+      AppLogger.info('WatchlistNotifier: $symbol removed from watchlist');
 
       ref.invalidateSelf();
     } catch (e, stack) {

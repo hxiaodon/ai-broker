@@ -78,20 +78,25 @@ class MarketRemoteDataSource {
       call: () => _withRateLimitRetry(
         operation: 'getKline',
         call: () async {
-        final params = <String, dynamic>{
-          'symbol': symbol,
-          'period': period,
-          'from': from,
-        };
-        if (to != null) params['to'] = to;
-        if (limit != null) params['limit'] = limit;
-        if (cursor != null) params['cursor'] = cursor;
+          final params = <String, dynamic>{
+            'symbol': symbol,
+            'period': period,
+            'from': from,
+          };
+          if (to != null) params['to'] = to;
+          if (limit != null) params['limit'] = limit;
+          if (cursor != null) params['cursor'] = cursor;
 
-        final response = await _dio.get<Map<String, dynamic>>(
-          '/v1/market/kline',
-          queryParameters: params,
-        );
-        return KlineResponseDto.fromJson(response.data!);
+          final startTime = DateTime.now();
+          final response = await _dio.get<Map<String, dynamic>>(
+            '/v1/market/kline',
+            queryParameters: params,
+          );
+          final duration = DateTime.now().difference(startTime).inMilliseconds;
+          AppLogger.debug(
+            'Market API: getKline $symbol/$period (from=$from, limit=$limit) — ${duration}ms',
+          );
+          return KlineResponseDto.fromJson(response.data!);
         },
       ),
     );
@@ -110,15 +115,18 @@ class MarketRemoteDataSource {
       call: () => _withRateLimitRetry(
         operation: 'searchStocks',
         call: () async {
-        final params = <String, dynamic>{'q': q};
-        if (market != null) params['market'] = market;
-        if (limit != null) params['limit'] = limit;
+          final params = <String, dynamic>{'q': q};
+          if (market != null) params['market'] = market;
+          if (limit != null) params['limit'] = limit;
 
-        final response = await _dio.get<Map<String, dynamic>>(
-          '/v1/market/search',
-          queryParameters: params,
-        );
-        return SearchResponseDto.fromJson(response.data!);
+          final startTime = DateTime.now();
+          final response = await _dio.get<Map<String, dynamic>>(
+            '/v1/market/search',
+            queryParameters: params,
+          );
+          final duration = DateTime.now().difference(startTime).inMilliseconds;
+          AppLogger.debug('Market API: searchStocks q="$q" (market=$market) — ${duration}ms');
+          return SearchResponseDto.fromJson(response.data!);
         },
       ),
     );
@@ -178,11 +186,12 @@ class MarketRemoteDataSource {
       call: () => _withRateLimitRetry(
         operation: 'getNews',
         call: () async {
-        final response = await _dio.get<Map<String, dynamic>>(
-          '/v1/market/news/$symbol',
-          queryParameters: {'page': page, 'page_size': pageSize},
-        );
-        return NewsResponseDto.fromJson(response.data!);
+          final response = await _dio.get<Map<String, dynamic>>(
+            '/v1/market/news/$symbol',
+            queryParameters: {'page': page, 'page_size': pageSize},
+          );
+          AppLogger.debug('Market API: getNews $symbol (page=$page) — success');
+          return NewsResponseDto.fromJson(response.data!);
         },
       ),
     );
@@ -197,10 +206,11 @@ class MarketRemoteDataSource {
       call: () => _withRateLimitRetry(
         operation: 'getFinancials',
         call: () async {
-        final response = await _dio.get<Map<String, dynamic>>(
-          '/v1/market/financials/$symbol',
-        );
-        return FinancialsResponseDto.fromJson(response.data!);
+          final response = await _dio.get<Map<String, dynamic>>(
+            '/v1/market/financials/$symbol',
+          );
+          AppLogger.debug('Market API: getFinancials $symbol — success');
+          return FinancialsResponseDto.fromJson(response.data!);
         },
       ),
     );
@@ -215,6 +225,7 @@ class MarketRemoteDataSource {
       call: () async {
         try {
           final response = await _dio.get<Map<String, dynamic>>('/v1/watchlist');
+          AppLogger.debug('Market API: getWatchlist — success');
           return WatchlistResponseDto.fromJson(response.data!);
         } on DioException catch (e) {
           throw _mapDioException(e, 'getWatchlist');
@@ -236,6 +247,7 @@ class MarketRemoteDataSource {
             '/v1/watchlist',
             data: {'symbol': symbol, 'market': market},
           );
+          AppLogger.info('Market API: added $symbol to watchlist');
         } on DioException catch (e) {
           throw _mapDioException(
             e,
@@ -254,6 +266,7 @@ class MarketRemoteDataSource {
       call: () async {
         try {
           await _dio.delete<dynamic>('/v1/watchlist/$symbol');
+          AppLogger.info('Market API: removed $symbol from watchlist');
         } on DioException catch (e) {
           throw _mapDioException(e, 'removeFromWatchlist', context: {'symbol': symbol});
         }

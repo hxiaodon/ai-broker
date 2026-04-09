@@ -204,6 +204,7 @@ class SearchNotifier extends _$SearchNotifier {
         .take(_kMaxHistory)
         .toList();
     state = state.copyWith(history: updated);
+    AppLogger.debug('SearchNotifier: added "$symbol" to history');
     await _persistHistory(updated);
   }
 
@@ -228,10 +229,12 @@ class SearchNotifier extends _$SearchNotifier {
 
     try {
       final repo = ref.read(marketDataRepositoryProvider);
+      AppLogger.debug('SearchNotifier: searching for "$query"');
       final results = await repo.searchStocks(q: query);
       // Guard again: don't overwrite state if query changed while awaiting.
       if (state.query == query) {
         state = state.copyWith(results: results, isLoading: false, error: null);
+        AppLogger.debug('SearchNotifier: search "$query" returned ${results.length} results');
       }
     } on Object catch (e) {
       if (state.query == query) {

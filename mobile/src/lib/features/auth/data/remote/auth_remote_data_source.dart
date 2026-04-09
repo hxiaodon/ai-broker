@@ -41,9 +41,10 @@ class AuthRemoteDataSource {
           },
         ),
       );
+      AppLogger.info('Auth: OTP sent successfully (region=${request.region})');
       return SendOtpResponse.fromJson(response.data!);
     } on DioException catch (e) {
-      throw _mapDioException(e, 'sendOtp');
+      throw _mapDioException(e, 'sendOtp', context: {'region': request.region});
     }
   }
 
@@ -64,6 +65,7 @@ class AuthRemoteDataSource {
           },
         ),
       );
+      AppLogger.info('Auth: OTP verified successfully');
       return response.data!;
     } on DioException catch (e) {
       throw _mapDioException(e, 'verifyOtp');
@@ -83,6 +85,7 @@ class AuthRemoteDataSource {
           headers: {'X-Device-ID': deviceId},
         ),
       );
+      AppLogger.info('Auth: token refresh succeeded');
       return RefreshTokenResponse.fromJson(response.data!);
     } on DioException catch (e) {
       throw _mapDioException(e, 'refreshToken');
@@ -102,6 +105,7 @@ class AuthRemoteDataSource {
           headers: {'X-Device-ID': deviceId},
         ),
       );
+      AppLogger.info('Auth: biometric registered successfully');
       return RegisterBiometricResponse.fromJson(response.data!);
     } on DioException catch (e) {
       throw _mapDioException(e, 'registerBiometric');
@@ -125,6 +129,7 @@ class AuthRemoteDataSource {
           },
         ),
       );
+      AppLogger.debug('Auth: biometric verified');
       return VerifyBiometricResponse.fromJson(response.data!);
     } on DioException catch (e) {
       throw _mapDioException(e, 'verifyBiometric');
@@ -192,7 +197,11 @@ class AuthRemoteDataSource {
     }
   }
 
-  AppException _mapDioException(DioException e, String operation) {
+  AppException _mapDioException(
+    DioException e,
+    String operation, {
+    Map<String, dynamic>? context,
+  }) {
     final statusCode = e.response?.statusCode;
     final data = e.response?.data;
 
@@ -216,8 +225,9 @@ class AuthRemoteDataSource {
       }
     }
 
+    final contextStr = context != null ? ' context=$context' : '';
     AppLogger.warning(
-      'Auth API error [$operation]: status=$statusCode, code=$errorCode',
+      'Auth API error [$operation]: status=$statusCode, code=$errorCode$contextStr',
     );
 
     switch (statusCode) {

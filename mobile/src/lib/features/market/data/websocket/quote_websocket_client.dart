@@ -321,9 +321,7 @@ class QuoteWebSocketClient {
         rawType == 'registered' ? WsUserType.registered : WsUserType.guest;
     completer?.complete(userType);
 
-    if (isReauth) {
-      AppLogger.info('WS reauth succeeded: userType=$userType');
-    }
+    AppLogger.info('WS ${isReauth ? "reauth" : "auth"} succeeded: userType=$userType');
   }
 
   // ─── Protobuf binary frames (data plane) ──────────────────────────────────
@@ -332,6 +330,11 @@ class QuoteWebSocketClient {
     try {
       final frame = proto.WsQuoteFrame.fromBuffer(bytes);
       _frameCount++;
+
+      // Log frame throughput every 1000 frames
+      if (_frameCount % 1000 == 0) {
+        AppLogger.debug('WS: processed $_frameCount frames');
+      }
 
       final protoQuote = frame.quote;
 

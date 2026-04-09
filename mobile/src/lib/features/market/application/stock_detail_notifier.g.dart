@@ -117,7 +117,7 @@ final class StockDetailNotifierProvider
 }
 
 String _$stockDetailNotifierHash() =>
-    r'cc19b47ad5374c7cd6a4de8ff27549fd29c01366';
+    r'3d2b73ce8918e780c9f5662e33312ab3a5a17aff';
 
 /// Manages the state for the `StockDetailScreen`.
 ///

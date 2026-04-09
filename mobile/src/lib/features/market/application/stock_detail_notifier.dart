@@ -47,10 +47,12 @@ class StockDetailNotifier extends _$StockDetailNotifier {
         wsNotifier.unsubscribe([symbol]);
       });
 
+      final startTime = DateTime.now();
       final repo = ref.read(marketDataRepositoryProvider);
       final detail = await repo.getStockDetail(symbol);
 
-      AppLogger.debug('StockDetailNotifier: loaded $symbol');
+      final duration = DateTime.now().difference(startTime).inMilliseconds;
+      AppLogger.info('StockDetailNotifier: loaded $symbol in ${duration}ms');
       _setupLiveUpdates(symbol);
 
       return detail;

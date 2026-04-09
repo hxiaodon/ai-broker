@@ -136,11 +136,16 @@ class OtpTimerNotifier extends _$OtpTimerNotifier {
       if (remaining <= 0) {
         t.cancel();
         state = state.copyWith(expiryCountdownSeconds: 0);
-        AppLogger.debug('OTP expired');
+        AppLogger.warning('OTP expired');
       } else {
         state = state.copyWith(expiryCountdownSeconds: remaining);
       }
     });
+  }
+
+  /// Called when user initiates OTP resend.
+  void onOtpResent() {
+    AppLogger.debug('OTP resend initiated');
   }
 
   void _cancelAll() {
