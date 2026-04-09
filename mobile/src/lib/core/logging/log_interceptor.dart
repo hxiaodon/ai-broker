@@ -22,9 +22,10 @@ class DioLogInterceptor extends Interceptor {
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    final requestId = options.headers['X-Request-ID'] ?? '-';
     final headers = _maskHeaders(options.headers);
     AppLogger.debug(
-      '[DIO →] ${options.method} ${options.path} '
+      '[DIO →] [$requestId] ${options.method} ${options.path} '
       'headers=$headers data=${_maskBody(options.data)}',
     );
     handler.next(options);
@@ -32,8 +33,9 @@ class DioLogInterceptor extends Interceptor {
 
   @override
   void onResponse(Response<dynamic> response, ResponseInterceptorHandler handler) {
+    final requestId = response.requestOptions.headers['X-Request-ID'] ?? '-';
     AppLogger.debug(
-      '[DIO ←] ${response.statusCode} ${response.requestOptions.path} '
+      '[DIO ←] [$requestId] ${response.statusCode} ${response.requestOptions.path} '
       'data=${_maskBody(response.data)}',
     );
     handler.next(response);
@@ -41,8 +43,9 @@ class DioLogInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
+    final requestId = err.requestOptions.headers['X-Request-ID'] ?? '-';
     AppLogger.warning(
-      '[DIO ✗] ${err.response?.statusCode} ${err.requestOptions.path} '
+      '[DIO ✗] [$requestId] ${err.response?.statusCode} ${err.requestOptions.path} '
       '${err.message}',
       error: err,
       stackTrace: err.stackTrace,

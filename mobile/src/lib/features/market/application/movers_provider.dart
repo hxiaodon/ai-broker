@@ -1,5 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/logging/app_logger.dart';
 import '../data/market_data_repository_impl.dart';
 import '../domain/entities/mover_item.dart';
 
@@ -34,6 +35,15 @@ Future<List<MoverItem>> movers(
   required String type,
   String market = 'US',
 }) async {
-  final repo = ref.read(marketDataRepositoryProvider);
-  return repo.getMovers(type: type, market: market);
+  try {
+    final repo = ref.read(marketDataRepositoryProvider);
+    return await repo.getMovers(type: type, market: market);
+  } catch (e, stack) {
+    AppLogger.error(
+      'MoversProvider: failed to load movers (type=$type, market=$market)',
+      error: e,
+      stackTrace: stack,
+    );
+    rethrow;
+  }
 }

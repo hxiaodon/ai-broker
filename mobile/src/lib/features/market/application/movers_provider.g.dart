@@ -83,7 +83,7 @@ final class MoversProvider
   }
 }
 
-String _$moversHash() => r'def6e2166a42ff9d36fcd5ebb8cb41c73acddfbc';
+String _$moversHash() => r'090586814fb8ae842d952227e006179d0745ba68';
 
 /// Fetches a ranked mover list for the given [type] and [market].
 ///

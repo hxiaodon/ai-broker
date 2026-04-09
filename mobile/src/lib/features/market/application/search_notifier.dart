@@ -40,6 +40,9 @@ abstract class SearchState with _$SearchState {
     /// Most-active / hot stocks shown on the initial empty state.
     @Default([]) List<SearchResult> hotStocks,
 
+    /// Error from loading hot stocks (null if successful or not yet loaded).
+    Object? hotStocksError,
+
     /// Recent search terms (max [_kMaxHistory]), newest first.
     @Default([]) List<String> history,
 
@@ -157,10 +160,12 @@ class SearchNotifier extends _$SearchNotifier {
                 delayed: false,
               ))
           .toList();
-      state = state.copyWith(hotStocks: hot);
-    } on Object catch (e) {
-      AppLogger.warning('SearchNotifier: failed to load hot stocks: $e');
-      // Non-fatal — hot stocks section simply stays empty.
+      state = state.copyWith(hotStocks: hot, hotStocksError: null);
+      AppLogger.debug('SearchNotifier: loaded ${hot.length} hot stocks');
+    } on Object catch (e, stack) {
+      AppLogger.error('SearchNotifier: failed to load hot stocks', error: e, stackTrace: stack);
+      // Keep existing hot stocks if any, but mark as stale with error
+      state = state.copyWith(hotStocksError: e);
     }
   }
 

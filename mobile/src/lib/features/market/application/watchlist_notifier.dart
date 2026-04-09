@@ -153,36 +153,54 @@ class WatchlistNotifier extends _$WatchlistNotifier {
   ///
   /// Throws [ValidationException] if the watchlist already has 100 symbols.
   Future<void> add({required String symbol, required String market}) async {
-    final count = state.value?.length ?? 0;
-    if (count >= _kMaxWatchlistSize) {
-      throw ValidationException(message: '自选股最多 $_kMaxWatchlistSize 只');
+    try {
+      final count = state.value?.length ?? 0;
+      if (count >= _kMaxWatchlistSize) {
+        throw ValidationException(message: '自选股最多 $_kMaxWatchlistSize 只');
+      }
+
+      AppLogger.debug('WatchlistNotifier: add $symbol ($market)');
+      final repo = ref.read(watchlistRepositoryProvider);
+      await repo.addToWatchlist(symbol: symbol, market: market);
+
+      // Subscribe the new symbol in WS if connected.
+      final wsState = ref.read(quoteWebSocketProvider);
+      if (wsState.hasValue) {
+        await ref
+            .read(quoteWebSocketProvider.notifier)
+            .subscribe([symbol]);
+      }
+
+      // Refresh from repository (preserves server ordering).
+      ref.invalidateSelf();
+    } catch (e, stack) {
+      AppLogger.error(
+        'WatchlistNotifier: failed to add $symbol',
+        error: e,
+        stackTrace: stack,
+      );
+      rethrow;
     }
-
-    AppLogger.debug('WatchlistNotifier: add $symbol ($market)');
-    final repo = ref.read(watchlistRepositoryProvider);
-    await repo.addToWatchlist(symbol: symbol, market: market);
-
-    // Subscribe the new symbol in WS if connected.
-    final wsState = ref.read(quoteWebSocketProvider);
-    if (wsState.hasValue) {
-      await ref
-          .read(quoteWebSocketProvider.notifier)
-          .subscribe([symbol]);
-    }
-
-    // Refresh from repository (preserves server ordering).
-    ref.invalidateSelf();
   }
 
   /// Remove [symbol] from the watchlist.
   Future<void> remove(String symbol) async {
-    AppLogger.debug('WatchlistNotifier: remove $symbol');
-    final repo = ref.read(watchlistRepositoryProvider);
-    await repo.removeFromWatchlist(symbol);
+    try {
+      AppLogger.debug('WatchlistNotifier: remove $symbol');
+      final repo = ref.read(watchlistRepositoryProvider);
+      await repo.removeFromWatchlist(symbol);
 
-    ref.read(quoteWebSocketProvider.notifier).unsubscribe([symbol]);
+      ref.read(quoteWebSocketProvider.notifier).unsubscribe([symbol]);
 
-    ref.invalidateSelf();
+      ref.invalidateSelf();
+    } catch (e, stack) {
+      AppLogger.error(
+        'WatchlistNotifier: failed to remove $symbol',
+        error: e,
+        stackTrace: stack,
+      );
+      rethrow;
+    }
   }
 
   /// Persist a new symbol order without fetching fresh quote data from the
@@ -190,43 +208,62 @@ class WatchlistNotifier extends _$WatchlistNotifier {
   ///
   /// Immediately reorders the in-memory state so the UI update is instant.
   Future<void> reorder(List<String> orderedSymbols) async {
-    AppLogger.debug('WatchlistNotifier: reorder ${orderedSymbols.length}');
-    final repo = ref.read(watchlistRepositoryProvider);
-    await repo.reorderWatchlist(orderedSymbols);
+    try {
+      AppLogger.debug('WatchlistNotifier: reorder ${orderedSymbols.length}');
+      final repo = ref.read(watchlistRepositoryProvider);
+      await repo.reorderWatchlist(orderedSymbols);
 
-    // Apply ordering optimistically to the current state without a full reload.
-    final current = state.value;
-    if (current != null) {
-      final symbolMap = {for (final q in current) q.symbol: q};
-      final reordered = orderedSymbols
-          .where(symbolMap.containsKey)
-          .map((s) => symbolMap[s]!)
-          .toList();
-      state = AsyncData(reordered);
+      // Apply ordering optimistically to the current state without a full reload.
+      final current = state.value;
+      if (current != null) {
+        final symbolMap = {for (final q in current) q.symbol: q};
+        final reordered = orderedSymbols
+            .where(symbolMap.containsKey)
+            .map((s) => symbolMap[s]!)
+            .toList();
+        state = AsyncData(reordered);
+      }
+    } catch (e, stack) {
+      AppLogger.error(
+        'WatchlistNotifier: failed to reorder ${orderedSymbols.length} symbols',
+        error: e,
+        stackTrace: stack,
+      );
+      rethrow;
     }
   }
 
   /// Import [symbols] from the guest watchlist into the server after login.
   ///
-  /// Silently skips symbols that are already in the watchlist or that fail.
+  /// Returns a list of symbols that failed to import so the UI can show feedback.
   /// After import, the state is refreshed from the server.
   ///
   /// The UI is responsible for checking whether import is needed (via
   /// [pendingGuestSymbols]) and prompting the user.
-  Future<void> importGuestItems(
+  Future<List<String>> importGuestItems(
     List<WatchlistItem> guestItems,
   ) async {
     AppLogger.info(
         'WatchlistNotifier: importing ${guestItems.length} guest items');
     final repo = ref.read(watchlistRepositoryProvider);
+    final failed = <String>[];
+
     for (final item in guestItems) {
       try {
         await repo.addToWatchlist(symbol: item.symbol, market: item.market);
       } on Object catch (e) {
         AppLogger.warning(
             'WatchlistNotifier: failed to import ${item.symbol}: $e');
+        failed.add(item.symbol);
       }
     }
+
     ref.invalidateSelf();
+
+    if (failed.isNotEmpty) {
+      AppLogger.warning('WatchlistNotifier: ${failed.length} items failed to import: $failed');
+    }
+
+    return failed;
   }
 }

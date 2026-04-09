@@ -15,7 +15,8 @@ T _$identity<T>(T value) => value;
 mixin _$SearchState {
 
  String get query; List<SearchResult> get results;/// Most-active / hot stocks shown on the initial empty state.
- List<SearchResult> get hotStocks;/// Recent search terms (max [_kMaxHistory]), newest first.
+ List<SearchResult> get hotStocks;/// Error from loading hot stocks (null if successful or not yet loaded).
+ Object? get hotStocksError;/// Recent search terms (max [_kMaxHistory]), newest first.
  List<String> get history;/// True while a debounced search request is in flight.
  bool get isLoading;/// Non-null when the latest search call failed.
  Object? get error;
@@ -29,16 +30,16 @@ $SearchStateCopyWith<SearchState> get copyWith => _$SearchStateCopyWithImpl<Sear
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is SearchState&&(identical(other.query, query) || other.query == query)&&const DeepCollectionEquality().equals(other.results, results)&&const DeepCollectionEquality().equals(other.hotStocks, hotStocks)&&const DeepCollectionEquality().equals(other.history, history)&&(identical(other.isLoading, isLoading) || other.isLoading == isLoading)&&const DeepCollectionEquality().equals(other.error, error));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is SearchState&&(identical(other.query, query) || other.query == query)&&const DeepCollectionEquality().equals(other.results, results)&&const DeepCollectionEquality().equals(other.hotStocks, hotStocks)&&const DeepCollectionEquality().equals(other.hotStocksError, hotStocksError)&&const DeepCollectionEquality().equals(other.history, history)&&(identical(other.isLoading, isLoading) || other.isLoading == isLoading)&&const DeepCollectionEquality().equals(other.error, error));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,query,const DeepCollectionEquality().hash(results),const DeepCollectionEquality().hash(hotStocks),const DeepCollectionEquality().hash(history),isLoading,const DeepCollectionEquality().hash(error));
+int get hashCode => Object.hash(runtimeType,query,const DeepCollectionEquality().hash(results),const DeepCollectionEquality().hash(hotStocks),const DeepCollectionEquality().hash(hotStocksError),const DeepCollectionEquality().hash(history),isLoading,const DeepCollectionEquality().hash(error));
 
 @override
 String toString() {
-  return 'SearchState(query: $query, results: $results, hotStocks: $hotStocks, history: $history, isLoading: $isLoading, error: $error)';
+  return 'SearchState(query: $query, results: $results, hotStocks: $hotStocks, hotStocksError: $hotStocksError, history: $history, isLoading: $isLoading, error: $error)';
 }
 
 
@@ -49,7 +50,7 @@ abstract mixin class $SearchStateCopyWith<$Res>  {
   factory $SearchStateCopyWith(SearchState value, $Res Function(SearchState) _then) = _$SearchStateCopyWithImpl;
 @useResult
 $Res call({
- String query, List<SearchResult> results, List<SearchResult> hotStocks, List<String> history, bool isLoading, Object? error
+ String query, List<SearchResult> results, List<SearchResult> hotStocks, Object? hotStocksError, List<String> history, bool isLoading, Object? error
 });
 
 
@@ -66,12 +67,12 @@ class _$SearchStateCopyWithImpl<$Res>
 
 /// Create a copy of SearchState
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? query = null,Object? results = null,Object? hotStocks = null,Object? history = null,Object? isLoading = null,Object? error = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? query = null,Object? results = null,Object? hotStocks = null,Object? hotStocksError = freezed,Object? history = null,Object? isLoading = null,Object? error = freezed,}) {
   return _then(_self.copyWith(
 query: null == query ? _self.query : query // ignore: cast_nullable_to_non_nullable
 as String,results: null == results ? _self.results : results // ignore: cast_nullable_to_non_nullable
 as List<SearchResult>,hotStocks: null == hotStocks ? _self.hotStocks : hotStocks // ignore: cast_nullable_to_non_nullable
-as List<SearchResult>,history: null == history ? _self.history : history // ignore: cast_nullable_to_non_nullable
+as List<SearchResult>,hotStocksError: freezed == hotStocksError ? _self.hotStocksError : hotStocksError ,history: null == history ? _self.history : history // ignore: cast_nullable_to_non_nullable
 as List<String>,isLoading: null == isLoading ? _self.isLoading : isLoading // ignore: cast_nullable_to_non_nullable
 as bool,error: freezed == error ? _self.error : error ,
   ));
@@ -158,10 +159,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String query,  List<SearchResult> results,  List<SearchResult> hotStocks,  List<String> history,  bool isLoading,  Object? error)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String query,  List<SearchResult> results,  List<SearchResult> hotStocks,  Object? hotStocksError,  List<String> history,  bool isLoading,  Object? error)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _SearchState() when $default != null:
-return $default(_that.query,_that.results,_that.hotStocks,_that.history,_that.isLoading,_that.error);case _:
+return $default(_that.query,_that.results,_that.hotStocks,_that.hotStocksError,_that.history,_that.isLoading,_that.error);case _:
   return orElse();
 
 }
@@ -179,10 +180,10 @@ return $default(_that.query,_that.results,_that.hotStocks,_that.history,_that.is
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String query,  List<SearchResult> results,  List<SearchResult> hotStocks,  List<String> history,  bool isLoading,  Object? error)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String query,  List<SearchResult> results,  List<SearchResult> hotStocks,  Object? hotStocksError,  List<String> history,  bool isLoading,  Object? error)  $default,) {final _that = this;
 switch (_that) {
 case _SearchState():
-return $default(_that.query,_that.results,_that.hotStocks,_that.history,_that.isLoading,_that.error);case _:
+return $default(_that.query,_that.results,_that.hotStocks,_that.hotStocksError,_that.history,_that.isLoading,_that.error);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -199,10 +200,10 @@ return $default(_that.query,_that.results,_that.hotStocks,_that.history,_that.is
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String query,  List<SearchResult> results,  List<SearchResult> hotStocks,  List<String> history,  bool isLoading,  Object? error)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String query,  List<SearchResult> results,  List<SearchResult> hotStocks,  Object? hotStocksError,  List<String> history,  bool isLoading,  Object? error)?  $default,) {final _that = this;
 switch (_that) {
 case _SearchState() when $default != null:
-return $default(_that.query,_that.results,_that.hotStocks,_that.history,_that.isLoading,_that.error);case _:
+return $default(_that.query,_that.results,_that.hotStocks,_that.hotStocksError,_that.history,_that.isLoading,_that.error);case _:
   return null;
 
 }
@@ -214,7 +215,7 @@ return $default(_that.query,_that.results,_that.hotStocks,_that.history,_that.is
 
 
 class _SearchState extends SearchState {
-  const _SearchState({this.query = '', final  List<SearchResult> results = const [], final  List<SearchResult> hotStocks = const [], final  List<String> history = const [], this.isLoading = false, this.error}): _results = results,_hotStocks = hotStocks,_history = history,super._();
+  const _SearchState({this.query = '', final  List<SearchResult> results = const [], final  List<SearchResult> hotStocks = const [], this.hotStocksError, final  List<String> history = const [], this.isLoading = false, this.error}): _results = results,_hotStocks = hotStocks,_history = history,super._();
   
 
 @override@JsonKey() final  String query;
@@ -234,6 +235,8 @@ class _SearchState extends SearchState {
   return EqualUnmodifiableListView(_hotStocks);
 }
 
+/// Error from loading hot stocks (null if successful or not yet loaded).
+@override final  Object? hotStocksError;
 /// Recent search terms (max [_kMaxHistory]), newest first.
  final  List<String> _history;
 /// Recent search terms (max [_kMaxHistory]), newest first.
@@ -258,16 +261,16 @@ _$SearchStateCopyWith<_SearchState> get copyWith => __$SearchStateCopyWithImpl<_
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SearchState&&(identical(other.query, query) || other.query == query)&&const DeepCollectionEquality().equals(other._results, _results)&&const DeepCollectionEquality().equals(other._hotStocks, _hotStocks)&&const DeepCollectionEquality().equals(other._history, _history)&&(identical(other.isLoading, isLoading) || other.isLoading == isLoading)&&const DeepCollectionEquality().equals(other.error, error));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SearchState&&(identical(other.query, query) || other.query == query)&&const DeepCollectionEquality().equals(other._results, _results)&&const DeepCollectionEquality().equals(other._hotStocks, _hotStocks)&&const DeepCollectionEquality().equals(other.hotStocksError, hotStocksError)&&const DeepCollectionEquality().equals(other._history, _history)&&(identical(other.isLoading, isLoading) || other.isLoading == isLoading)&&const DeepCollectionEquality().equals(other.error, error));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,query,const DeepCollectionEquality().hash(_results),const DeepCollectionEquality().hash(_hotStocks),const DeepCollectionEquality().hash(_history),isLoading,const DeepCollectionEquality().hash(error));
+int get hashCode => Object.hash(runtimeType,query,const DeepCollectionEquality().hash(_results),const DeepCollectionEquality().hash(_hotStocks),const DeepCollectionEquality().hash(hotStocksError),const DeepCollectionEquality().hash(_history),isLoading,const DeepCollectionEquality().hash(error));
 
 @override
 String toString() {
-  return 'SearchState(query: $query, results: $results, hotStocks: $hotStocks, history: $history, isLoading: $isLoading, error: $error)';
+  return 'SearchState(query: $query, results: $results, hotStocks: $hotStocks, hotStocksError: $hotStocksError, history: $history, isLoading: $isLoading, error: $error)';
 }
 
 
@@ -278,7 +281,7 @@ abstract mixin class _$SearchStateCopyWith<$Res> implements $SearchStateCopyWith
   factory _$SearchStateCopyWith(_SearchState value, $Res Function(_SearchState) _then) = __$SearchStateCopyWithImpl;
 @override @useResult
 $Res call({
- String query, List<SearchResult> results, List<SearchResult> hotStocks, List<String> history, bool isLoading, Object? error
+ String query, List<SearchResult> results, List<SearchResult> hotStocks, Object? hotStocksError, List<String> history, bool isLoading, Object? error
 });
 
 
@@ -295,12 +298,12 @@ class __$SearchStateCopyWithImpl<$Res>
 
 /// Create a copy of SearchState
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? query = null,Object? results = null,Object? hotStocks = null,Object? history = null,Object? isLoading = null,Object? error = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? query = null,Object? results = null,Object? hotStocks = null,Object? hotStocksError = freezed,Object? history = null,Object? isLoading = null,Object? error = freezed,}) {
   return _then(_SearchState(
 query: null == query ? _self.query : query // ignore: cast_nullable_to_non_nullable
 as String,results: null == results ? _self._results : results // ignore: cast_nullable_to_non_nullable
 as List<SearchResult>,hotStocks: null == hotStocks ? _self._hotStocks : hotStocks // ignore: cast_nullable_to_non_nullable
-as List<SearchResult>,history: null == history ? _self._history : history // ignore: cast_nullable_to_non_nullable
+as List<SearchResult>,hotStocksError: freezed == hotStocksError ? _self.hotStocksError : hotStocksError ,history: null == history ? _self._history : history // ignore: cast_nullable_to_non_nullable
 as List<String>,isLoading: null == isLoading ? _self.isLoading : isLoading // ignore: cast_nullable_to_non_nullable
 as bool,error: freezed == error ? _self.error : error ,
   ));

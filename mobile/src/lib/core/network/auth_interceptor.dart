@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 
+import '../logging/app_logger.dart';
+
 /// Interceptor that injects the JWT access token into each request header
 /// and handles 401 by attempting a token refresh before retrying.
 ///
@@ -37,15 +39,24 @@ class AuthInterceptor extends Interceptor {
     if (response?.statusCode == 401 && !_isRefreshing) {
       _isRefreshing = true;
       try {
+        AppLogger.debug('AuthInterceptor: attempting token refresh for ${err.requestOptions.path}');
         final newToken = await refreshAccessToken();
         if (newToken != null) {
+          AppLogger.info('AuthInterceptor: token refresh successful, retrying ${err.requestOptions.path}');
           final options = err.requestOptions
             ..headers['Authorization'] = 'Bearer $newToken';
           final retryResponse = await _dio.fetch<dynamic>(options);
           _isRefreshing = false;
           return handler.resolve(retryResponse);
+        } else {
+          AppLogger.warning('AuthInterceptor: token refresh returned null');
         }
-      } on Object catch (_) {
+      } on Object catch (e, stack) {
+        AppLogger.error(
+          'AuthInterceptor: token refresh failed',
+          error: e,
+          stackTrace: stack,
+        );
         // Refresh failed — propagate to ErrorInterceptor
       } finally {
         _isRefreshing = false;

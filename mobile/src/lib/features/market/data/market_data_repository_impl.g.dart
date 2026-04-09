@@ -68,4 +68,4 @@ final class MarketDataRepositoryProvider
 }
 
 String _$marketDataRepositoryHash() =>
-    r'eb81274a2f097284215fa05bd42d0b10837078f6';
+    r'9edd9602b70ff33e362db0ccb4d44be2a0874de3';

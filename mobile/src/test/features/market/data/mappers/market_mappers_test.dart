@@ -1,5 +1,6 @@
 import 'package:decimal/decimal.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:trading_app/core/logging/app_logger.dart';
 import 'package:trading_app/features/market/data/mappers/market_mappers.dart';
 import 'package:trading_app/features/market/data/remote/market_response_models.dart';
 import 'package:trading_app/features/market/domain/entities/market_status.dart';
@@ -48,6 +49,10 @@ QuoteDto _makeQuoteDto({
     );
 
 void main() {
+  setUpAll(() {
+    AppLogger.init();
+  });
+
   // ───────────────────────────────────────────────────────────────────────────
   // QuoteDto → Quote
   // ───────────────────────────────────────────────────────────────────────────
@@ -107,13 +112,11 @@ void main() {
       expect(quote.changePct, Decimal.parse('-1.31'));
     });
 
-    test('invalid price string fires AssertionError in debug mode', () {
-      // _d() uses assert to surface API contract violations loudly in debug.
-      // In release builds asserts are stripped and Decimal.zero is returned.
-      expect(
-        () => _makeQuoteDto(price: 'N/A').toDomain(),
-        throwsA(isA<AssertionError>()),
-      );
+    test('invalid price string returns Decimal.zero and logs warning', () {
+      // _d() logs a warning and returns Decimal.zero for invalid strings.
+      // This prevents crashes on malformed API data.
+      final quote = _makeQuoteDto(price: 'N/A').toDomain();
+      expect(quote.price, Decimal.zero);
     });
   });
 

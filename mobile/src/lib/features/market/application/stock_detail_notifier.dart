@@ -39,20 +39,29 @@ part 'stock_detail_notifier.g.dart';
 class StockDetailNotifier extends _$StockDetailNotifier {
   @override
   Future<StockDetail> build(String symbol) async {
-    // Capture before any await so it's available in onDispose.
-    final wsNotifier = ref.read(quoteWebSocketProvider.notifier);
-    ref.onDispose(() {
-      AppLogger.debug('StockDetailNotifier: dispose — unsubscribing $symbol');
-      wsNotifier.unsubscribe([symbol]);
-    });
+    try {
+      // Capture before any await so it's available in onDispose.
+      final wsNotifier = ref.read(quoteWebSocketProvider.notifier);
+      ref.onDispose(() {
+        AppLogger.debug('StockDetailNotifier: dispose — unsubscribing $symbol');
+        wsNotifier.unsubscribe([symbol]);
+      });
 
-    final repo = ref.read(marketDataRepositoryProvider);
-    final detail = await repo.getStockDetail(symbol);
+      final repo = ref.read(marketDataRepositoryProvider);
+      final detail = await repo.getStockDetail(symbol);
 
-    AppLogger.debug('StockDetailNotifier: loaded $symbol');
-    _setupLiveUpdates(symbol);
+      AppLogger.debug('StockDetailNotifier: loaded $symbol');
+      _setupLiveUpdates(symbol);
 
-    return detail;
+      return detail;
+    } catch (e, stack) {
+      AppLogger.error(
+        'StockDetailNotifier: failed to load detail for $symbol',
+        error: e,
+        stackTrace: stack,
+      );
+      rethrow;
+    }
   }
 
   // ─── WS wiring ────────────────────────────────────────────────────────────

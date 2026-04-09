@@ -513,7 +513,7 @@ void main() {
   // ── garbled binary frame ───────────────────────────────────────────────────
 
   group('invalid binary frame', () {
-    test('garbled bytes are silently ignored — quoteStream does not error',
+    test('garbled bytes propagate error to quoteStream for UI warning',
         () async {
       createClient();
       await connectAndAuth();
@@ -524,7 +524,9 @@ void main() {
       fakeChannel.serverSend(Uint8List.fromList([0xFF, 0xFE, 0x00]));
       await drainStreams();
 
-      expect(errors, isEmpty);
+      expect(errors, hasLength(1));
+      expect(errors.first, isA<BusinessException>());
+      expect((errors.first as BusinessException).errorCode, 'PROTOBUF_DECODE_ERROR');
 
       await sub.cancel();
     });
@@ -609,7 +611,7 @@ void main() {
       await sub.cancel();
     });
 
-    test('malformed JSON text frame is silently ignored', () async {
+    test('malformed JSON text frame propagates error to stream', () async {
       createClient();
       await connectAndAuth();
 
@@ -619,7 +621,9 @@ void main() {
       fakeChannel.serverSend('not json {{{');
       await drainStreams();
 
-      expect(errors, isEmpty);
+      expect(errors, hasLength(1));
+      expect(errors.first, isA<BusinessException>());
+      expect((errors.first as BusinessException).errorCode, 'JSON_DECODE_ERROR');
       await sub.cancel();
     });
   });

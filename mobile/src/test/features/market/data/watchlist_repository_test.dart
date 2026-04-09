@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:trading_app/core/network/connectivity_service.dart';
 import 'package:trading_app/features/market/data/remote/market_remote_data_source.dart';
 
 void main() {
@@ -10,7 +12,7 @@ void main() {
       receiveTimeout: const Duration(seconds: 5),
     ));
 
-    final dataSource = MarketRemoteDataSource(dio);
+    final dataSource = MarketRemoteDataSource(dio, ConnectivityService(Connectivity()));
 
     try {
       final result = await dataSource.getQuotes(['AAPL', 'TSLA', '0700', '9988']);

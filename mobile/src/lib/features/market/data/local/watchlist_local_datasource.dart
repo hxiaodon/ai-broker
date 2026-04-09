@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:hive_ce/hive.dart';
 
+import '../../../../core/logging/app_logger.dart';
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Value type
 // ─────────────────────────────────────────────────────────────────────────────
@@ -47,10 +49,40 @@ class WatchlistLocalDataSource {
   /// Returns the stored watchlist items in their saved order.
   /// Returns default guest watchlist if nothing has been saved yet.
   Future<List<WatchlistItem>> getItems() async {
-    final box = await _box();
-    final raw = box.get(_itemsKey) as String?;
-    if (raw == null || raw.isEmpty) {
-      // Return default watchlist for guest mode testing
+    try {
+      final box = await _box();
+      final raw = box.get(_itemsKey) as String?;
+      if (raw == null || raw.isEmpty) {
+        AppLogger.debug('WatchlistLocalDataSource: no items stored, returning defaults');
+        // Return default watchlist for guest mode testing
+        return const [
+          WatchlistItem(symbol: 'AAPL', market: 'US'),
+          WatchlistItem(symbol: 'TSLA', market: 'US'),
+          WatchlistItem(symbol: '0700', market: 'HK'),
+          WatchlistItem(symbol: '9988', market: 'HK'),
+        ];
+      }
+      final list = jsonDecode(raw) as List<dynamic>;
+      // If the stored list is empty, return default watchlist
+      if (list.isEmpty) {
+        AppLogger.debug('WatchlistLocalDataSource: empty list stored, returning defaults');
+        return const [
+          WatchlistItem(symbol: 'AAPL', market: 'US'),
+          WatchlistItem(symbol: 'TSLA', market: 'US'),
+          WatchlistItem(symbol: '0700', market: 'HK'),
+          WatchlistItem(symbol: '9988', market: 'HK'),
+        ];
+      }
+      return list
+          .map((e) => WatchlistItem.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (e, stack) {
+      AppLogger.error(
+        'WatchlistLocalDataSource: getItems failed',
+        error: e,
+        stackTrace: stack,
+      );
+      // Return default list rather than throwing to keep UI functional
       return const [
         WatchlistItem(symbol: 'AAPL', market: 'US'),
         WatchlistItem(symbol: 'TSLA', market: 'US'),
@@ -58,24 +90,40 @@ class WatchlistLocalDataSource {
         WatchlistItem(symbol: '9988', market: 'HK'),
       ];
     }
-    final list = jsonDecode(raw) as List<dynamic>;
-    return list
-        .map((e) => WatchlistItem.fromJson(e as Map<String, dynamic>))
-        .toList();
   }
 
   /// Atomically replaces the stored list with [items].
   Future<void> saveItems(List<WatchlistItem> items) async {
-    final box = await _box();
-    await box.put(
-      _itemsKey,
-      jsonEncode(items.map((e) => e.toJson()).toList()),
-    );
+    try {
+      final box = await _box();
+      await box.put(
+        _itemsKey,
+        jsonEncode(items.map((e) => e.toJson()).toList()),
+      );
+      AppLogger.debug('WatchlistLocalDataSource: saved ${items.length} items');
+    } catch (e, stack) {
+      AppLogger.error(
+        'WatchlistLocalDataSource: saveItems failed',
+        error: e,
+        stackTrace: stack,
+      );
+      rethrow;
+    }
   }
 
   /// Removes all stored watchlist data.
   Future<void> clear() async {
-    final box = await _box();
-    await box.delete(_itemsKey);
+    try {
+      final box = await _box();
+      await box.delete(_itemsKey);
+      AppLogger.debug('WatchlistLocalDataSource: cleared all items');
+    } catch (e, stack) {
+      AppLogger.error(
+        'WatchlistLocalDataSource: clear failed',
+        error: e,
+        stackTrace: stack,
+      );
+      rethrow;
+    }
   }
 }

@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import '../errors/app_exception.dart';
+import '../logging/app_logger.dart';
 
 /// Maps [DioException] to domain-level [AppException] subtypes.
 class ErrorInterceptor extends Interceptor {
@@ -11,6 +12,11 @@ class ErrorInterceptor extends Interceptor {
   }
 
   AppException _mapError(DioException err) {
+    AppLogger.warning(
+      'DioException: ${err.type} ${err.response?.statusCode ?? "no-status"} ${err.requestOptions.path}',
+      error: err,
+    );
+
     switch (err.type) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.receiveTimeout:

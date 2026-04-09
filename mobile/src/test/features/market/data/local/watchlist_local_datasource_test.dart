@@ -32,9 +32,11 @@ void main() {
   // ── getItems ────────────────────────────────────────────────────────────────
 
   group('getItems()', () {
-    test('returns empty list when box has no entry', () async {
+    test('returns default watchlist when box has no entry', () async {
       final items = await sut.getItems();
-      expect(items, isEmpty);
+      // Changed: now returns default watchlist for guest mode instead of empty
+      expect(items, hasLength(4));
+      expect(items.map((e) => e.symbol).toList(), ['AAPL', 'TSLA', '0700', '9988']);
     });
 
     test('returns items in saved order', () async {
@@ -85,26 +87,29 @@ void main() {
       await sut.saveItems(const []);
 
       final items = await sut.getItems();
-      expect(items, isEmpty);
+      // Changed: empty storage returns default watchlist, not empty list
+      expect(items, hasLength(4));
     });
   });
 
   // ── clear ────────────────────────────────────────────────────────────────────
 
   group('clear()', () {
-    test('removes stored items — getItems returns empty after clear', () async {
+    test('removes stored items — getItems returns default watchlist after clear', () async {
       await sut.saveItems([
         const WatchlistItem(symbol: 'AAPL', market: 'US'),
       ]);
       await sut.clear();
 
       final items = await sut.getItems();
-      expect(items, isEmpty);
+      // Changed: after clear, returns default watchlist instead of empty
+      expect(items, hasLength(4));
     });
 
     test('clear on already-empty box is a no-op', () async {
       await expectLater(sut.clear(), completes);
-      expect(await sut.getItems(), isEmpty);
+      // Changed: empty box returns default watchlist
+      expect(await sut.getItems(), hasLength(4));
     });
   });
 }

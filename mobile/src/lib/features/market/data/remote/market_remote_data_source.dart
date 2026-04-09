@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../../../../core/errors/app_exception.dart';
 import '../../../../core/logging/app_logger.dart';
+import '../../../../core/network/connectivity_service.dart';
 import '../mappers/market_mappers.dart';
 import '../remote/market_response_models.dart';
 import '../../domain/entities/financials.dart';
@@ -33,9 +34,10 @@ import '../../domain/repositories/market_data_repository.dart';
 /// header. This source waits for that duration (capped at [_maxRetryAfterSeconds])
 /// and retries once before surfacing a [BusinessException].
 class MarketRemoteDataSource {
-  MarketRemoteDataSource(this._dio);
+  MarketRemoteDataSource(this._dio, this._connectivity);
 
   final Dio _dio;
+  final ConnectivityService _connectivity;
 
   /// Maximum seconds to honour a Retry-After header before failing fast.
   static const int _maxRetryAfterSeconds = 30;
@@ -45,15 +47,18 @@ class MarketRemoteDataSource {
   /// GET /v1/market/quotes?symbols=AAPL,TSLA,...
   Future<QuotesResponseDto> getQuotes(List<String> symbols) async {
     assert(symbols.isNotEmpty && symbols.length <= 50);
-    return _withRateLimitRetry(
+    return _withConnectivityCheck(
       operation: 'getQuotes',
-      call: () async {
-        final response = await _dio.get<Map<String, dynamic>>(
-          '/v1/market/quotes',
-          queryParameters: {'symbols': symbols.join(',')},
-        );
-        return QuotesResponseDto.fromJson(response.data!);
-      },
+      call: () => _withRateLimitRetry(
+        operation: 'getQuotes',
+        call: () async {
+          final response = await _dio.get<Map<String, dynamic>>(
+            '/v1/market/quotes',
+            queryParameters: {'symbols': symbols.join(',')},
+          );
+          return QuotesResponseDto.fromJson(response.data!);
+        },
+      ),
     );
   }
 
@@ -68,9 +73,11 @@ class MarketRemoteDataSource {
     int? limit,
     String? cursor,
   }) async {
-    return _withRateLimitRetry(
+    return _withConnectivityCheck(
       operation: 'getKline',
-      call: () async {
+      call: () => _withRateLimitRetry(
+        operation: 'getKline',
+        call: () async {
         final params = <String, dynamic>{
           'symbol': symbol,
           'period': period,
@@ -85,7 +92,8 @@ class MarketRemoteDataSource {
           queryParameters: params,
         );
         return KlineResponseDto.fromJson(response.data!);
-      },
+        },
+      ),
     );
   }
 
@@ -97,9 +105,11 @@ class MarketRemoteDataSource {
     String? market,
     int? limit,
   }) async {
-    return _withRateLimitRetry(
+    return _withConnectivityCheck(
       operation: 'searchStocks',
-      call: () async {
+      call: () => _withRateLimitRetry(
+        operation: 'searchStocks',
+        call: () async {
         final params = <String, dynamic>{'q': q};
         if (market != null) params['market'] = market;
         if (limit != null) params['limit'] = limit;
@@ -109,7 +119,8 @@ class MarketRemoteDataSource {
           queryParameters: params,
         );
         return SearchResponseDto.fromJson(response.data!);
-      },
+        },
+      ),
     );
   }
 
@@ -117,9 +128,11 @@ class MarketRemoteDataSource {
 
   /// GET /v1/market/movers
   Future<MoversResponseDto> getMovers({String? type, String? market}) async {
-    return _withRateLimitRetry(
+    return _withConnectivityCheck(
       operation: 'getMovers',
-      call: () async {
+      call: () => _withRateLimitRetry(
+        operation: 'getMovers',
+        call: () async {
         final params = <String, dynamic>{};
         if (type != null) params['type'] = type;
         if (market != null) params['market'] = market;
@@ -129,7 +142,8 @@ class MarketRemoteDataSource {
           queryParameters: params.isEmpty ? null : params,
         );
         return MoversResponseDto.fromJson(response.data!);
-      },
+        },
+      ),
     );
   }
 
@@ -137,14 +151,17 @@ class MarketRemoteDataSource {
 
   /// GET /v1/market/stocks/{symbol}
   Future<StockDetailDto> getStockDetail(String symbol) async {
-    return _withRateLimitRetry(
+    return _withConnectivityCheck(
       operation: 'getStockDetail',
-      call: () async {
+      call: () => _withRateLimitRetry(
+        operation: 'getStockDetail',
+        call: () async {
         final response = await _dio.get<Map<String, dynamic>>(
           '/v1/market/stocks/$symbol',
         );
         return StockDetailDto.fromJson(response.data!);
-      },
+        },
+      ),
     );
   }
 
@@ -156,15 +173,18 @@ class MarketRemoteDataSource {
     int page = 1,
     int pageSize = 10,
   }) async {
-    return _withRateLimitRetry(
+    return _withConnectivityCheck(
       operation: 'getNews',
-      call: () async {
+      call: () => _withRateLimitRetry(
+        operation: 'getNews',
+        call: () async {
         final response = await _dio.get<Map<String, dynamic>>(
           '/v1/market/news/$symbol',
           queryParameters: {'page': page, 'page_size': pageSize},
         );
         return NewsResponseDto.fromJson(response.data!);
-      },
+        },
+      ),
     );
   }
 
@@ -172,14 +192,17 @@ class MarketRemoteDataSource {
 
   /// GET /v1/market/financials/{symbol}
   Future<FinancialsResponseDto> getFinancials(String symbol) async {
-    return _withRateLimitRetry(
+    return _withConnectivityCheck(
       operation: 'getFinancials',
-      call: () async {
+      call: () => _withRateLimitRetry(
+        operation: 'getFinancials',
+        call: () async {
         final response = await _dio.get<Map<String, dynamic>>(
           '/v1/market/financials/$symbol',
         );
         return FinancialsResponseDto.fromJson(response.data!);
-      },
+        },
+      ),
     );
   }
 
@@ -187,12 +210,17 @@ class MarketRemoteDataSource {
 
   /// GET /v1/watchlist
   Future<WatchlistResponseDto> getWatchlist() async {
-    try {
-      final response = await _dio.get<Map<String, dynamic>>('/v1/watchlist');
-      return WatchlistResponseDto.fromJson(response.data!);
-    } on DioException catch (e) {
-      throw _mapDioException(e, 'getWatchlist');
-    }
+    return _withConnectivityCheck(
+      operation: 'getWatchlist',
+      call: () async {
+        try {
+          final response = await _dio.get<Map<String, dynamic>>('/v1/watchlist');
+          return WatchlistResponseDto.fromJson(response.data!);
+        } on DioException catch (e) {
+          throw _mapDioException(e, 'getWatchlist');
+        }
+      },
+    );
   }
 
   /// POST /v1/watchlist  { symbol, market }
@@ -200,23 +228,55 @@ class MarketRemoteDataSource {
     required String symbol,
     required String market,
   }) async {
-    try {
-      await _dio.post<dynamic>(
-        '/v1/watchlist',
-        data: {'symbol': symbol, 'market': market},
-      );
-    } on DioException catch (e) {
-      throw _mapDioException(e, 'addToWatchlist');
-    }
+    return _withConnectivityCheck(
+      operation: 'addToWatchlist',
+      call: () async {
+        try {
+          await _dio.post<dynamic>(
+            '/v1/watchlist',
+            data: {'symbol': symbol, 'market': market},
+          );
+        } on DioException catch (e) {
+          throw _mapDioException(
+            e,
+            'addToWatchlist',
+            context: {'symbol': symbol, 'market': market},
+          );
+        }
+      },
+    );
   }
 
   /// DELETE /v1/watchlist/{symbol}
   Future<void> removeFromWatchlist(String symbol) async {
-    try {
-      await _dio.delete<dynamic>('/v1/watchlist/$symbol');
-    } on DioException catch (e) {
-      throw _mapDioException(e, 'removeFromWatchlist');
+    return _withConnectivityCheck(
+      operation: 'removeFromWatchlist',
+      call: () async {
+        try {
+          await _dio.delete<dynamic>('/v1/watchlist/$symbol');
+        } on DioException catch (e) {
+          throw _mapDioException(e, 'removeFromWatchlist', context: {'symbol': symbol});
+        }
+      },
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Connectivity check wrapper
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// Checks network connectivity before executing [call].
+  /// Throws [NetworkException] immediately if offline, avoiding 30s timeout.
+  Future<T> _withConnectivityCheck<T>({
+    required String operation,
+    required Future<T> Function() call,
+  }) async {
+    final isConnected = await _connectivity.isConnected;
+    if (!isConnected) {
+      AppLogger.warning('$operation: no network connectivity');
+      throw NetworkException(message: '网络未连接，请检查网络设置');
     }
+    return call();
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -241,9 +301,15 @@ class MarketRemoteDataSource {
           );
           await Future<void>.delayed(Duration(seconds: retryAfter));
           try {
-            return await call();
+            final result = await call();
+            AppLogger.info('Market API 429 [$operation] — retry succeeded');
+            return result;
           } on DioException catch (e2) {
-            throw _mapDioException(e2, operation);
+            AppLogger.error(
+              'Market API 429 [$operation] — retry failed: ${e2.type}',
+              error: e2,
+            );
+            throw _mapDioException(e2, '$operation (retry)');
           }
         }
       }
@@ -262,7 +328,11 @@ class MarketRemoteDataSource {
   // Dio → AppException mapping
   // ─────────────────────────────────────────────────────────────────────────
 
-  AppException _mapDioException(DioException e, String operation) {
+  AppException _mapDioException(
+    DioException e,
+    String operation, {
+    Map<String, dynamic>? context,
+  }) {
     final statusCode = e.response?.statusCode;
     final data = e.response?.data;
 
@@ -274,8 +344,9 @@ class MarketRemoteDataSource {
       message = data['message'] as String?;
     }
 
+    final contextStr = context != null ? ' context=$context' : '';
     AppLogger.warning(
-      'Market API error [$operation]: status=$statusCode, code=$errorCode',
+      'Market API error [$operation]: status=$statusCode, code=$errorCode$contextStr',
     );
 
     switch (statusCode) {

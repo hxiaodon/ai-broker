@@ -25,6 +25,16 @@ void main() {
     mockRepository = MockAuthRepository();
     mockTokenService = MockTokenService();
 
+    // Set default stubs for TokenService to prevent null return type errors
+    when(() => mockTokenService.getAccessToken())
+        .thenAnswer((_) async => null);
+    when(() => mockTokenService.getRefreshToken())
+        .thenAnswer((_) async => null);
+    when(() => mockTokenService.isAccessTokenValid())
+        .thenAnswer((_) async => false);
+    when(() => mockTokenService.clearTokens())
+        .thenAnswer((_) async {});
+
     container = ProviderContainer(
       overrides: [
         authRepositoryProvider.overrideWithValue(mockRepository),

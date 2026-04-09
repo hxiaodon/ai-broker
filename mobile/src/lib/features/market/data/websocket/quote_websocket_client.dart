@@ -92,6 +92,20 @@ class QuoteWebSocketClient {
 
   Set<String> _subscribedSymbols = {};
 
+  /// Frame counter for Protobuf binary frames (used in error logging)
+  int _frameCount = 0;
+
+  /// Close reason for tracking disconnect cause
+  String? _closeReason;
+
+  /// Last pong received time for timeout detection
+  DateTime? _lastPongTime;
+
+  /// Pong timeout timer
+  Timer? _pongTimeoutTimer;
+
+  static const _pongTimeout = Duration(seconds: 45); // 1.5x ping interval
+
   // ─── Public API ───────────────────────────────────────────────────────────
 
   /// Live stream of quote updates from all subscribed symbols.
@@ -113,8 +127,19 @@ class QuoteWebSocketClient {
         Uri.parse(_wsUrl),
         protocols: const ['brokerage-market-v1'],
       );
-      await _channel!.ready;
+
+      // Add timeout to ready future to prevent infinite hang on weak networks
+      await _channel!.ready.timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw TimeoutException('WebSocket connection timeout after 10s');
+        },
+      );
+
+      AppLogger.info('WS connection established to $_wsUrl');
     } catch (e) {
+      AppLogger.error('WS connection failed', error: e);
+      _cleanup();
       _state = _WsState.disconnected;
       throw NetworkException(message: 'WS 连接失败: $e', cause: e);
     }
@@ -195,7 +220,11 @@ class QuoteWebSocketClient {
 
   /// Gracefully close the connection (WebSocket code 1000).
   Future<void> close() async {
+    if (_state == _WsState.closed) return;
+
+    _closeReason = 'user_initiated';
     _state = _WsState.closed;
+
     _cleanup();
     await _channel?.sink.close(1000);
     AppLogger.info('WS connection closed');
@@ -223,8 +252,17 @@ class QuoteWebSocketClient {
     Map<String, dynamic> msg;
     try {
       msg = jsonDecode(text) as Map<String, dynamic>;
-    } catch (_) {
-      AppLogger.warning('WS: malformed text frame: $text');
+    } catch (e, stack) {
+      AppLogger.error('WS: malformed text frame', error: e, stackTrace: stack);
+
+      // Add error to stream for critical control messages
+      _quoteController.addError(
+        BusinessException(
+          message: 'Failed to parse WebSocket control message',
+          errorCode: 'JSON_DECODE_ERROR',
+          cause: e,
+        ),
+      );
       return;
     }
 
@@ -237,7 +275,9 @@ class QuoteWebSocketClient {
         final syms = (msg['symbols'] as List?)?.cast<String>() ?? [];
         AppLogger.debug('WS subscribe_ack: ${syms.join(",")}');
       case 'pong':
-        // heartbeat acknowledged — no action needed
+        _lastPongTime = DateTime.now();
+        _pongTimeoutTimer?.cancel();
+        AppLogger.debug('WS: pong received');
         break;
       case 'token_expiring':
         final expiresIn = msg['expires_in'] as int? ?? 0;
@@ -291,6 +331,8 @@ class QuoteWebSocketClient {
   void _handleBinaryFrame(Uint8List bytes) {
     try {
       final frame = proto.WsQuoteFrame.fromBuffer(bytes);
+      _frameCount++;
+
       final protoQuote = frame.quote;
 
       final frameType = switch (frame.frameType) {
@@ -303,24 +345,56 @@ class QuoteWebSocketClient {
       final dto = _protoQuoteToDto(protoQuote);
       final quote = dto.toDomain();
 
+      if (protoQuote.isStale) {
+        AppLogger.warning(
+          'WS: stale quote for ${protoQuote.symbol} '
+          '(staleSince=${protoQuote.staleSinceMs}ms)',
+        );
+      }
+
       _quoteController.add(WsQuoteUpdate(
         frameType: frameType,
         symbol: protoQuote.symbol,
         quote: quote,
       ));
-    } catch (e) {
-      AppLogger.warning('WS: failed to decode Protobuf binary frame: $e');
+    } catch (e, stack) {
+      AppLogger.error(
+        'WS: failed to decode Protobuf binary frame (total frames: $_frameCount)',
+        error: e,
+        stackTrace: stack,
+      );
+
+      // Propagate error to stream so UI can show warning
+      _quoteController.addError(
+        BusinessException(
+          message: 'Failed to parse market data frame',
+          errorCode: 'PROTOBUF_DECODE_ERROR',
+          cause: e,
+        ),
+      );
     }
   }
 
   // ─── Heartbeat ────────────────────────────────────────────────────────────
 
   void _startPingTimer() {
+    _pingTimer?.cancel();
     _pingTimer = Timer.periodic(
       Duration(seconds: pingIntervalSeconds),
       (_) {
         if (_state == _WsState.connected) {
           _sendJson({'action': 'ping'});
+          AppLogger.debug('WS: ping sent');
+
+          // Start pong timeout timer
+          _pongTimeoutTimer?.cancel();
+          _pongTimeoutTimer = Timer(_pongTimeout, () {
+            AppLogger.error('WS: pong timeout - connection appears dead');
+            _quoteController.addError(
+              NetworkException(message: '行情连接超时，正在重连...'),
+            );
+            _channel?.sink.close(1000, 'pong timeout');
+          });
         }
       },
     );
@@ -338,16 +412,33 @@ class QuoteWebSocketClient {
 
   void _onDone() {
     final code = _channel?.closeCode;
-    AppLogger.info('WS connection done: code=$code');
+    final reason = _closeReason ?? 'unknown';
+
+    AppLogger.info('WS connection done: code=$code, reason=$reason, state=$_state');
 
     if (_state != _WsState.closed) {
-      _quoteController.addError(_mapCloseCode(code));
+      final exception = _mapCloseCode(code);
+      AppLogger.warning('WS unexpected disconnect: $exception');
+      _quoteController.addError(exception);
       _cleanup();
+    } else {
+      AppLogger.debug('WS graceful close');
     }
+
+    _closeReason = null;
   }
 
   AppException _mapCloseCode(int? code) {
     return switch (code) {
+      // Standard WebSocket close codes
+      1001 => const NetworkException(message: '服务端正在关闭（code 1001），将自动重连'),
+      1002 => const NetworkException(message: '协议错误（code 1002）'),
+      1003 => const NetworkException(message: '不支持的数据类型（code 1003）'),
+      1006 => const NetworkException(message: '连接异常断开（code 1006），将自动重连'),
+      1011 => const NetworkException(message: '服务端内部错误（code 1011），将自动重连'),
+      1012 => const NetworkException(message: '服务端重启中（code 1012），将自动重连'),
+      1013 => const NetworkException(message: '服务端过载（code 1013），请稍后重连'),
+      // Application-specific close codes
       4001 => const AuthException(message: '认证超时，连接被服务端关闭（code 4001）'),
       4002 => const AuthException(message: 'Token 无效或已过期（code 4002），请重新登录'),
       4003 => const BusinessException(
@@ -374,10 +465,13 @@ class QuoteWebSocketClient {
   }
 
   void _cleanup() {
+    _closeReason ??= 'error_or_network_failure';
     _pingTimer?.cancel();
+    _pongTimeoutTimer?.cancel();
     _authTimeoutTimer?.cancel();
     _subscription?.cancel();
     _pingTimer = null;
+    _pongTimeoutTimer = null;
     _authTimeoutTimer = null;
     _subscribedSymbols = {};
     _state = _WsState.disconnected;

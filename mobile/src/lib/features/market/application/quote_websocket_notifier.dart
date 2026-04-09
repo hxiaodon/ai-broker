@@ -86,6 +86,9 @@ class QuoteWebSocketNotifier extends _$QuoteWebSocketNotifier {
   int _reconnectAttempts = 0;
   bool _paused = false;
 
+  /// Last error for reconnect logging
+  Object? _lastError;
+
   @override
   Future<WsUserType> build() async {
     ref.onDispose(_dispose);
@@ -130,6 +133,8 @@ class QuoteWebSocketNotifier extends _$QuoteWebSocketNotifier {
   // ─── Error & reconnect ────────────────────────────────────────────────────
 
   void _onClientError(Object error) {
+    _lastError = error;
+
     if (error is WsTokenExpiringException) {
       _handleTokenExpiring(error);
     } else if (error is NetworkException) {
@@ -151,9 +156,21 @@ class QuoteWebSocketNotifier extends _$QuoteWebSocketNotifier {
       if (token != null && token.isNotEmpty && _client != null) {
         final userType = await _client!.reauth(token);
         state = AsyncData(userType);
+        AppLogger.info('QuoteWS: reauth successful');
+      } else {
+        throw AuthException(message: 'No valid token available for reauth');
       }
-    } on Object catch (e) {
-      AppLogger.warning('QuoteWS: reauth on token_expiring failed: $e');
+    } on Object catch (e, stack) {
+      AppLogger.error('QuoteWS: reauth on token_expiring failed', error: e, stackTrace: stack);
+
+      // Set error state so UI can show warning
+      state = AsyncError(
+        AuthException(message: '行情认证失败，请重新登录'),
+        stack,
+      );
+
+      // Close connection to trigger reconnect
+      await _client?.close();
     }
   }
 
@@ -161,8 +178,10 @@ class QuoteWebSocketNotifier extends _$QuoteWebSocketNotifier {
     if (_paused) return;
 
     if (_reconnectAttempts >= _kMaxReconnectAttempts) {
+      final errorType = _lastError?.runtimeType ?? 'Unknown';
       AppLogger.error(
-          'QuoteWS: exceeded $_kMaxReconnectAttempts reconnect attempts');
+        'QuoteWS: max reconnect attempts reached after $errorType',
+      );
       state = AsyncError(
         const NetworkException(message: '行情连接失败，请检查网络后重试'),
         StackTrace.current,
@@ -172,9 +191,15 @@ class QuoteWebSocketNotifier extends _$QuoteWebSocketNotifier {
 
     final delay = Duration(seconds: pow(2, _reconnectAttempts).toInt());
     _reconnectAttempts++;
+
+    final reason = _lastError is NetworkException
+        ? (_lastError as NetworkException).message
+        : _lastError?.toString() ?? 'unknown';
+
     AppLogger.debug(
       'QuoteWS: reconnecting in ${delay.inSeconds}s '
-      '(attempt $_reconnectAttempts/$_kMaxReconnectAttempts)',
+      '(attempt $_reconnectAttempts/$_kMaxReconnectAttempts) '
+      'reason: $reason',
     );
 
     await Future<void>.delayed(delay);

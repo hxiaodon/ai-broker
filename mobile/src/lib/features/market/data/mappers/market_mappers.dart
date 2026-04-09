@@ -1,5 +1,6 @@
 import 'package:decimal/decimal.dart';
 
+import '../../../../core/logging/app_logger.dart';
 import '../../domain/entities/candle.dart';
 import '../../domain/entities/financials.dart';
 import '../../domain/entities/market_status.dart';
@@ -18,7 +19,7 @@ import '../remote/market_response_models.dart';
 /// Parse a required price string to [Decimal].
 ///
 /// Per financial-coding-standards §Rule 1 all price fields must be Decimal.
-/// Uses [Decimal.tryParse] defensively — logs assertion failure in debug builds
+/// Uses [Decimal.tryParse] defensively — logs warning on parse failure
 /// and falls back to zero so the app never crashes on malformed API data.
 ///
 /// Empty strings are treated as zero (proto3 zero-value for absent fields in
@@ -26,8 +27,11 @@ import '../remote/market_response_models.dart';
 Decimal _d(String value) {
   if (value.isEmpty) return Decimal.zero;
   final result = Decimal.tryParse(value);
-  assert(result != null, 'MarketMappers: failed to parse Decimal from "$value"');
-  return result ?? Decimal.zero;
+  if (result == null) {
+    AppLogger.warning('MarketMappers: failed to parse Decimal from "$value"');
+    return Decimal.zero;
+  }
+  return result;
 }
 
 /// Parse a nullable price string to [Decimal], returning null when absent.

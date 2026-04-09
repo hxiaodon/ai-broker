@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/network/dio_client.dart';
+import '../../../core/network/connectivity_service.dart';
 import '../../../core/logging/app_logger.dart';
 import '../domain/entities/financials.dart';
 import '../domain/entities/mover_item.dart';
@@ -145,7 +146,8 @@ class MarketDataRepositoryImpl implements MarketDataRepository {
 @Riverpod(keepAlive: true)
 MarketDataRepository marketDataRepository(Ref ref) {
   final dio = DioClient.create(baseUrl: _kMarketBaseUrl);
+  final connectivity = ref.watch(connectivityServiceProvider);
   return MarketDataRepositoryImpl(
-    remoteDataSource: MarketRemoteDataSource(dio),
+    remoteDataSource: MarketRemoteDataSource(dio, connectivity),
   );
 }

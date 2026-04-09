@@ -153,7 +153,7 @@ final class SearchNotifierProvider
   }
 }
 
-String _$searchNotifierHash() => r'8985eb4607cc0644ddb280ecefb0e5d41436a00e';
+String _$searchNotifierHash() => r'481633db6f93ce6cdc20ff50514c03e1fefbdcd2';
 
 /// Manages the search screen state.
 ///
