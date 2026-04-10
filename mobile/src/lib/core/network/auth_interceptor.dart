@@ -8,15 +8,23 @@ import '../logging/app_logger.dart';
 /// Token read/write delegates to [TokenService] (injected lazily to avoid
 /// circular dependency with the Dio instance itself).
 class AuthInterceptor extends Interceptor {
-  AuthInterceptor(this._dio);
+  AuthInterceptor(
+    this._dio, {
+    String? Function()? getAccessToken,
+    Future<String?> Function()? refreshAccessToken,
+  })  : getAccessToken = getAccessToken ?? (() => null),
+        refreshAccessToken = refreshAccessToken ?? (() async => null);
 
   final Dio _dio;
   bool _isRefreshing = false;
 
-  // Lazy accessors avoid circular reference between DioClient and TokenService.
-  // The real implementation will wire this via Riverpod provider.
-  String? Function() getAccessToken = () => null;
-  Future<String?> Function() refreshAccessToken = () async => null;
+  /// Returns the current access token synchronously (from in-memory cache).
+  /// Wired at provider assembly time via [DioClient.create].
+  final String? Function() getAccessToken;
+
+  /// Attempts to refresh the access token. Returns the new token or null.
+  /// Wired at provider assembly time via [DioClient.create].
+  final Future<String?> Function() refreshAccessToken;
 
   @override
   void onRequest(
@@ -57,7 +65,7 @@ class AuthInterceptor extends Interceptor {
           error: e,
           stackTrace: stack,
         );
-        // Refresh failed — propagate to ErrorInterceptor
+        // Refresh failed — propagate original error
       } finally {
         _isRefreshing = false;
       }

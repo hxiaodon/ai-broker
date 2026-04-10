@@ -39,7 +39,7 @@ GoRouter appRouter(Ref ref) {
     refreshListenable: authListenable,
     redirect: (context, state) {
       final authState = ref.read(authProvider);
-      return _redirect(authState, state);
+      return appRouterRedirect(authState, state);
     },
     routes: [
       // ── Splash ────────────────────────────────────────────────────────────
@@ -161,10 +161,11 @@ GoRouter appRouter(Ref ref) {
   );
 }
 
-/// Redirect logic (pure function for testability).
+/// Redirect logic (pure function, extracted for testability).
 ///
 /// Returns redirect path or null.
-String? _redirect(AuthState authState, GoRouterState state) {
+@visibleForTesting
+String? appRouterRedirect(AuthState authState, GoRouterState state) {
   final path = state.matchedLocation;
   final isAuthPath = path.startsWith('/auth');
   final isSplash = path == '/';

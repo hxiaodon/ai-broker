@@ -28,6 +28,9 @@ abstract class BiometricKeyManager {
 }
 
 /// Stub implementation used until Method Channel plugins are integrated.
+///
+/// Phase 1: always returns null/false. NOT production-ready.
+/// Phase 2: implement via iOS Secure Enclave (SecKey) and Android Keystore.
 class StubBiometricKeyManager extends BiometricKeyManager {
   const StubBiometricKeyManager();
 

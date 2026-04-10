@@ -4,7 +4,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/auth/device_info_service.dart';
 import '../../../core/auth/token_service.dart';
 import '../../../core/logging/app_logger.dart';
-import '../../../core/network/dio_client.dart';
+import '../../../core/network/authenticated_dio.dart';
 import '../../../core/storage/secure_storage_service.dart';
 import '../domain/entities/auth_token.dart';
 import '../domain/entities/device_info_entity.dart';
@@ -308,10 +308,14 @@ class AuthRepositoryImpl implements AuthRepository {
 /// - Injects [TokenService], [DeviceInfoService], [SecureStorageService].
 @Riverpod(keepAlive: true)
 AuthRepositoryImpl authRepository(Ref ref) {
-  final Dio dio = DioClient.create(baseUrl: _kAmsBaseUrl);
+  final tokenSvc = ref.read(tokenServiceProvider);
+  final dio = createAuthenticatedDio(
+    baseUrl: _kAmsBaseUrl,
+    tokenService: tokenSvc,
+  );
   return AuthRepositoryImpl(
     remoteDataSource: AuthRemoteDataSource(dio),
-    tokenService: ref.read(tokenServiceProvider),
+    tokenService: tokenSvc,
     deviceInfoService: ref.read(deviceInfoServiceProvider),
     secureStorage: ref.read(secureStorageServiceProvider),
   );

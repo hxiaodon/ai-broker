@@ -120,7 +120,9 @@ class SearchNotifier extends _$SearchNotifier {
   @override
   SearchState build() {
     ref.onDispose(() => _debounceTimer?.cancel());
-    _init();
+    // Schedule init as microtask so build() returns initial state first.
+    // This prevents state writes before the provider is fully initialised.
+    Future.microtask(_init);
     return const SearchState();
   }
 

@@ -98,9 +98,6 @@ class QuoteWebSocketClient {
   /// Close reason for tracking disconnect cause
   String? _closeReason;
 
-  /// Last pong received time for timeout detection
-  DateTime? _lastPongTime;
-
   /// Pong timeout timer
   Timer? _pongTimeoutTimer;
 
@@ -275,7 +272,6 @@ class QuoteWebSocketClient {
         final syms = (msg['symbols'] as List?)?.cast<String>() ?? [];
         AppLogger.debug('WS subscribe_ack: ${syms.join(",")}');
       case 'pong':
-        _lastPongTime = DateTime.now();
         _pongTimeoutTimer?.cancel();
         AppLogger.debug('WS: pong received');
         break;

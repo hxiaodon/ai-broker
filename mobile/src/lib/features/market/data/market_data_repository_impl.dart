@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../../core/network/dio_client.dart';
+import '../../../core/auth/token_service.dart';
+import '../../../core/network/authenticated_dio.dart';
 import '../../../core/network/connectivity_service.dart';
 import '../../../core/logging/app_logger.dart';
 import '../domain/entities/financials.dart';
@@ -142,10 +143,14 @@ class MarketDataRepositoryImpl implements MarketDataRepository {
 /// Wires up [MarketDataRepositoryImpl] with its [MarketRemoteDataSource].
 ///
 /// Uses a dedicated Dio instance for the market-data service.
-/// JWT is injected by the global auth interceptor on [DioClient.create].
+/// JWT is injected by [AuthInterceptor] via [createAuthenticatedDio].
 @Riverpod(keepAlive: true)
 MarketDataRepository marketDataRepository(Ref ref) {
-  final dio = DioClient.create(baseUrl: _kMarketBaseUrl);
+  final tokenSvc = ref.read(tokenServiceProvider);
+  final dio = createAuthenticatedDio(
+    baseUrl: _kMarketBaseUrl,
+    tokenService: tokenSvc,
+  );
   final connectivity = ref.watch(connectivityServiceProvider);
   return MarketDataRepositoryImpl(
     remoteDataSource: MarketRemoteDataSource(dio, connectivity),

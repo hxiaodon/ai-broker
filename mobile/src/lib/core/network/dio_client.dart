@@ -5,7 +5,6 @@ import 'package:uuid/uuid.dart';
 import '../logging/app_logger.dart';
 import '../security/ssl_pinning_config.dart';
 import 'auth_interceptor.dart';
-import 'error_interceptor.dart';
 import '../logging/log_interceptor.dart' as app_log;
 
 /// Factory that creates a configured [Dio] instance.
@@ -14,7 +13,10 @@ import '../logging/log_interceptor.dart' as app_log;
 ///   1. Request ID interceptor — inject X-Request-ID header for tracing
 ///   2. [DioLogInterceptor]   — log requests/responses with PII masking
 ///   3. [AuthInterceptor]     — inject JWT, handle 401 refresh
-///   4. [ErrorInterceptor]    — map DioException → AppException
+///
+/// DioException → AppException mapping is handled by each remote data source
+/// (not by a global interceptor) so that business-specific context like
+/// OTP remainingAttempts or 429 Retry-After is preserved.
 ///
 /// Security:
 ///   Certificate pinning is applied via [createPinnedHttpClient] from
@@ -31,6 +33,7 @@ class DioClient {
     Duration connectTimeout = const Duration(seconds: 15),
     Duration receiveTimeout = const Duration(seconds: 30),
     Duration sendTimeout = const Duration(seconds: 30),
+    AuthInterceptor? authInterceptor,
     List<Interceptor> additionalInterceptors = const [],
   }) {
     final options = BaseOptions(
@@ -76,8 +79,7 @@ class DioClient {
 
     dio.interceptors.addAll([
       const app_log.DioLogInterceptor(),
-      AuthInterceptor(dio),
-      const ErrorInterceptor(),
+      authInterceptor ?? AuthInterceptor(dio),
       ...additionalInterceptors,
     ]);
 

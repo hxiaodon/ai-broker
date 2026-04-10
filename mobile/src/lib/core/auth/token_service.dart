@@ -16,15 +16,19 @@ class _Keys {
 /// Tokens are persisted in [SecureStorageService] (Keychain / EncryptedSharedPrefs).
 /// Access tokens expire after 15 minutes per security policy.
 class TokenService {
-  const TokenService(this._storage);
+  TokenService(this._storage);
 
   final SecureStorageService _storage;
+
+  /// In-memory cache so [AuthInterceptor] can read the token synchronously.
+  String? _cachedAccessToken;
 
   Future<void> saveTokens({
     required String accessToken,
     required String refreshToken,
     required DateTime accessTokenExpiresAt,
   }) async {
+    _cachedAccessToken = accessToken;
     await Future.wait([
       _storage.write(_Keys.accessToken, accessToken),
       _storage.write(_Keys.refreshToken, refreshToken),
@@ -34,6 +38,15 @@ class TokenService {
       ),
     ]);
     AppLogger.debug('Tokens saved (expires: ${accessTokenExpiresAt.toUtc()})');
+  }
+
+  /// Synchronous read from in-memory cache. Returns null if [loadCachedToken]
+  /// has not been called or tokens have been cleared.
+  String? get cachedAccessToken => _cachedAccessToken;
+
+  /// Hydrate the in-memory cache from secure storage. Call once at startup.
+  Future<void> loadCachedToken() async {
+    _cachedAccessToken = await _storage.read(_Keys.accessToken);
   }
 
   Future<String?> getAccessToken() => _storage.read(_Keys.accessToken);
@@ -56,6 +69,7 @@ class TokenService {
   }
 
   Future<void> clearTokens() async {
+    _cachedAccessToken = null;
     await Future.wait([
       _storage.delete(_Keys.accessToken),
       _storage.delete(_Keys.refreshToken),

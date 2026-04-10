@@ -240,6 +240,12 @@ void main() {
 /// Mock TokenService for testing session restore
 class MockTokenServiceForTest implements TokenService {
   @override
+  String? get cachedAccessToken => null;
+
+  @override
+  Future<void> loadCachedToken() async {}
+
+  @override
   Future<void> clearTokens() async {}
 
   @override

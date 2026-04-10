@@ -38,6 +38,9 @@ import '../logging/app_logger.dart';
 /// SPKI SHA-256 fingerprints per host.
 ///
 /// Always maintain at least two pins per host: current + rotation backup.
+///
+/// WARNING: Phase 1 placeholder values. DO NOT ship to production.
+/// Replace with real SPKI fingerprints before release.
 const Map<String, List<String>> _spkiPins = {
   // Primary API gateway
   'api.trading.example.com': [
@@ -102,15 +105,9 @@ bool _spkiBadCertCallback(X509Certificate cert, String host, int port) {
 
 /// Computes the SPKI SHA-256 fingerprint of a DER-encoded certificate.
 ///
-/// The full-certificate DER bytes are used here as an approximation.
-/// A production implementation should extract only the SubjectPublicKeyInfo
-/// field using an ASN.1 parser (the `asn1lib` package) or the platform's
-/// native API (SecCertificateCopyKey on iOS, X509_get_X509_PUBKEY on Android).
-///
-/// Using the full DER bytes gives a cert-level pin (not a true SPKI pin)
-/// until the ASN.1 extraction is implemented in Phase 2.
-///
-/// TODO Phase 2: Replace with proper SPKI-only byte extraction.
+/// WARNING: Phase 1 approximation — hashes the full certificate DER, not the
+/// SPKI field. This gives a cert-level pin, not a true SPKI pin.
+/// Phase 2: extract SPKI bytes via ASN.1 parser or platform native API.
 String _computeSpkiPin(Uint8List certDer) {
   final digest = sha256.convert(certDer);
   return base64.encode(digest.bytes);

@@ -2,7 +2,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/auth/token_service.dart';
 import '../../../core/logging/app_logger.dart';
-import '../../../core/network/dio_client.dart';
+import '../../../core/network/authenticated_dio.dart';
 import '../../../core/network/connectivity_service.dart';
 import '../domain/entities/watchlist.dart';
 import '../domain/repositories/watchlist_repository.dart';
@@ -171,9 +171,12 @@ class WatchlistRepositoryImpl implements WatchlistRepository {
 
 @Riverpod(keepAlive: true)
 WatchlistRepository watchlistRepository(Ref ref) {
-  final dio = DioClient.create(baseUrl: _kMarketBaseUrl);
-  final connectivity = ref.watch(connectivityServiceProvider);
   final tokenService = ref.watch(tokenServiceProvider);
+  final dio = createAuthenticatedDio(
+    baseUrl: _kMarketBaseUrl,
+    tokenService: tokenService,
+  );
+  final connectivity = ref.watch(connectivityServiceProvider);
   return WatchlistRepositoryImpl(
     remote: MarketRemoteDataSource(dio, connectivity),
     local: WatchlistLocalDataSource(),

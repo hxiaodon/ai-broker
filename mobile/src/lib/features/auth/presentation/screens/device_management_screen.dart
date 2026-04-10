@@ -84,6 +84,10 @@ class _DeviceManagementScreenState
       final currentDeviceId = await deviceInfoService.getDeviceId();
       final timestamp =
           DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
+      // Phase 1 stub: real biometric signing via Secure Enclave / Keystore
+      // will be implemented in Phase 2 (see BiometricKeyManager).
+      // Phase 1 stub: real biometric signing via Secure Enclave / Keystore
+      // will be implemented in Phase 2 (see BiometricKeyManager).
       final biometricSignature =
           '$timestamp|$currentDeviceId|revoke|stub_signature';
 
