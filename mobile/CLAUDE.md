@@ -90,6 +90,39 @@ src/
 | `mobile-app-design-v3-supplement.md` | V3 supplement -- KYC, settings, profile flows |
 | `design-review-for-pm.md` | PM review notes on design decisions and open questions |
 
+## Testing Standards
+
+Integration testing follows the **three-tier classification** defined in [docs/INTEGRATION_TEST_GUIDE.md](./docs/INTEGRATION_TEST_GUIDE.md):
+
+| Type | File Name | Purpose | Dependencies | Speed |
+|------|-----------|---------|--------------|-------|
+| **State Management** | `*_state_management_test.dart` | Riverpod providers, routing, state | None | Very fast (~30s) |
+| **API Integration** | `*_api_integration_test.dart` | HTTP layer with Mock Server | Mock Server | Fast (~8s) |
+| **E2E** | `*_e2e_app_test.dart` | Complete user flows UI→API→UI | Emulator + Mock Server | Moderate (~15s) |
+
+**Every module must implement all three test types.** See [integration_test/auth/README.md](./src/integration_test/auth/README.md) for a working example.
+
+**Key Documents:**
+- [INTEGRATION_TEST_GUIDE.md](./docs/INTEGRATION_TEST_GUIDE.md) — Test classification standard (mobile-engineer MUST read)
+- [MOCK_SERVER_GUIDE.md](./docs/MOCK_SERVER_GUIDE.md) — How to run tests locally
+- [TESTING_PRACTICES.md](./docs/TESTING_PRACTICES.md) — Manual test checklist, CI/CD integration, troubleshooting
+- [integration_test/auth/README.md](./src/integration_test/auth/README.md) — Concrete example for Auth module
+
+**Running Tests:**
+```bash
+# State management (no Mock Server needed)
+flutter test integration_test/auth/auth_state_management_test.dart
+
+# API integration (requires Mock Server on localhost:8080)
+flutter test integration_test/auth/auth_api_integration_test.dart
+
+# E2E (requires Mock Server + emulator)
+flutter test integration_test/auth/auth_e2e_app_test.dart
+
+# All tests
+flutter test integration_test/
+```
+
 ## Upstream Dependencies
 
 | Service | What This Domain Consumes |

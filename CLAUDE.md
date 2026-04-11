@@ -90,6 +90,10 @@ Flutter Mobile / H5 WebView / Admin Panel (React)
 | Cross-domain threads | `docs/threads/` |
 | Industry references | `docs/references/` |
 | Global rules | `.claude/rules/` (financial-coding-standards, security-compliance, fund-transfer-compliance) |
+| **Testing Standards** | **`mobile/docs/INTEGRATION_TEST_GUIDE.md`** (three-tier test classification) |
+| Testing Practices | `mobile/docs/TESTING_PRACTICES.md` (manual tests, CI/CD, troubleshooting) |
+| Mock Server | `mobile/docs/MOCK_SERVER_GUIDE.md` (how to run tests locally) |
+| Auth Module Example | `mobile/src/integration_test/auth/README.md` (concrete example) |
 
 ## Key Rules (enforced by `.claude/rules/`)
 

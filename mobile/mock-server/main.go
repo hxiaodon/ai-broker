@@ -27,6 +27,17 @@ func main() {
 	currentStrategy = getStrategy(*strategy)
 
 	// Routes
+	// Auth endpoints
+	http.HandleFunc("/v1/auth/otp/send", handleOtpSend)
+	http.HandleFunc("/v1/auth/otp/verify", handleOtpVerify)
+	http.HandleFunc("/v1/auth/token/refresh", handleTokenRefresh)
+	http.HandleFunc("/v1/auth/biometric/register", handleBiometricRegister)
+	http.HandleFunc("/v1/auth/biometric/verify", handleBiometricVerify)
+	http.HandleFunc("/v1/auth/logout", handleLogout)
+	http.HandleFunc("/v1/auth/devices", handleGetDevices)
+	http.HandleFunc("/v1/auth/devices/", handleDeleteDevice)
+
+	// Market endpoints
 	http.HandleFunc("/ws/market-data", handleWebSocket)
 	http.HandleFunc("/v1/market/quotes", handleQuotes)
 	http.HandleFunc("/v1/market/search", handleSearch)
