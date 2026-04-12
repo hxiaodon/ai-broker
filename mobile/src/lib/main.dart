@@ -12,10 +12,10 @@ Future<void> main() async {
   // Initialize environment configuration (must be first!)
   EnvironmentConfig.initialize();
   final config = EnvironmentConfig.instance;
-  AppLogger.info('App starting — Phase 1 skeleton (env: ${config.environmentName})');
 
-  // Initialize structured logger
+  // Initialize structured logger (must be before any AppLogger calls)
   AppLogger.init(verbose: config.enableDetailedLogging);
+  AppLogger.info('App starting — Phase 1 skeleton (env: ${config.environmentName})');
 
   // Initialize Hive for local storage
   final appDocDir = await getApplicationDocumentsDirectory();

@@ -233,7 +233,7 @@ class _ChartViewState extends State<_ChartView> {
     _trackballBehavior = TrackballBehavior(
       enable: true,
       activationMode: ActivationMode.longPress,
-      lineColor: Colors.grey.withOpacity(0.5),
+      lineColor: Colors.grey.withValues(alpha: 0.5),
       lineWidth: 1,
       lineDashArray: const [3, 3],
       tooltipAlignment: ChartAlignment.center,
@@ -335,18 +335,17 @@ class _ChartViewState extends State<_ChartView> {
             opposedPosition: true,
           ),
         ],
-        series: [
+        series: <CartesianSeries>[
           // Candlestick series
-          CandlestickSeries<_CandleChartData, DateTime>(
+          CandleSeries<_CandleChartData, DateTime>(
             dataSource: chartData,
             xValueMapper: (_CandleChartData data, _) => data.x,
             openValueMapper: (_CandleChartData data, _) => data.open,
             highValueMapper: (_CandleChartData data, _) => data.high,
             lowValueMapper: (_CandleChartData data, _) => data.low,
             closeValueMapper: (_CandleChartData data, _) => data.close,
-            bearishColor: bearishColor,
-            bullishColor: bullishColor,
-            enableSolidCandles: true,
+            bearColor: bearishColor,
+            bullColor: bullishColor,
           ),
           // Volume series
           ColumnSeries<_CandleChartData, DateTime>(
