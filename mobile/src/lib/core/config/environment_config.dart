@@ -27,6 +27,8 @@
 /// 3. Hardcoded fallback values (lowest priority)
 library;
 
+import 'dart:io';
+
 enum Environment {
   /// Local development with Mock Server running on localhost:8080
   development,
@@ -89,7 +91,7 @@ class EnvironmentConfig {
   );
 
   String get _marketBaseUrlDefault => switch (environment) {
-        Environment.development => 'http://localhost:8080',
+        Environment.development => _localhostUrl(),
         Environment.staging => 'https://api-staging.trading.example.com',
         Environment.production => 'https://api.trading.example.com',
       };
@@ -101,7 +103,7 @@ class EnvironmentConfig {
   );
 
   String get _amsBaseUrlDefault => switch (environment) {
-        Environment.development => 'http://localhost:8080',
+        Environment.development => _localhostUrl(),
         Environment.staging => 'https://ams-staging.trading.example.com',
         Environment.production => 'https://ams.trading.example.com',
       };
@@ -113,10 +115,26 @@ class EnvironmentConfig {
   );
 
   String get _wsBaseUrlDefault => switch (environment) {
-        Environment.development => 'ws://localhost:8080',
+        Environment.development => _localhostWsUrl(),
         Environment.staging => 'wss://ws-staging.trading.example.com',
         Environment.production => 'wss://ws.trading.example.com',
       };
+
+  /// Get localhost URL based on platform (Android emulator uses 10.0.2.2)
+  static String _localhostUrl() {
+    if (Platform.isAndroid) {
+      return 'http://10.0.2.2:8080';  // Android emulator host IP
+    }
+    return 'http://localhost:8080';  // iOS simulator and physical devices
+  }
+
+  /// Get localhost WebSocket URL based on platform
+  static String _localhostWsUrl() {
+    if (Platform.isAndroid) {
+      return 'ws://10.0.2.2:8080';  // Android emulator host IP
+    }
+    return 'ws://localhost:8080';  // iOS simulator and physical devices
+  }
 
   /// ─── Feature Flags ────────────────────────────────────────────────────────
 
