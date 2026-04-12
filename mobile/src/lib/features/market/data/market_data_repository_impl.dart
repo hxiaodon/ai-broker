@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/auth/token_service.dart';
+import '../../../core/config/environment_config.dart';
 import '../../../core/network/authenticated_dio.dart';
 import '../../../core/network/connectivity_service.dart';
 import '../../../core/logging/app_logger.dart';
@@ -13,16 +14,6 @@ import '../domain/repositories/market_data_repository.dart';
 import 'remote/market_remote_data_source.dart';
 
 part 'market_data_repository_impl.g.dart';
-
-const _kMarketBaseUrl = String.fromEnvironment(
-  'MARKET_BASE_URL',
-  defaultValue: _defaultMarketBaseUrl,
-);
-
-/// Default base URL for market API.
-/// In test environments (iOS simulator), use 10.0.2.2 to access host machine.
-/// In production, use the actual staging/production endpoint.
-const _defaultMarketBaseUrl = 'http://localhost:8080';
 
 /// Production implementation of [MarketDataRepository].
 ///
@@ -148,12 +139,14 @@ class MarketDataRepositoryImpl implements MarketDataRepository {
 /// Wires up [MarketDataRepositoryImpl] with its [MarketRemoteDataSource].
 ///
 /// Uses a dedicated Dio instance for the market-data service.
+/// Base URL is determined by [EnvironmentConfig].
 /// JWT is injected by [AuthInterceptor] via [createAuthenticatedDio].
 @Riverpod(keepAlive: true)
 MarketDataRepository marketDataRepository(Ref ref) {
   final tokenSvc = ref.read(tokenServiceProvider);
+  final baseUrl = EnvironmentConfig.instance.marketBaseUrl;
   final dio = createAuthenticatedDio(
-    baseUrl: _kMarketBaseUrl,
+    baseUrl: baseUrl,
     tokenService: tokenSvc,
   );
   final connectivity = ref.watch(connectivityServiceProvider);

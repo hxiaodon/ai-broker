@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/auth/token_service.dart';
+import '../../../core/config/environment_config.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../core/logging/app_logger.dart';
 import '../data/websocket/quote_websocket_client.dart';
@@ -15,10 +16,10 @@ part 'quote_websocket_notifier.g.dart';
 // Configuration
 // ─────────────────────────────────────────────────────────────────────────────
 
-const _kWsUrl = String.fromEnvironment(
-  'MARKET_WS_URL',
-  defaultValue: 'wss://ws-staging.trading.example.com/v1/market/quotes',
-);
+String get _wsUrl {
+  final baseWsUrl = EnvironmentConfig.instance.wsBaseUrl;
+  return '$baseWsUrl/v1/market/quotes';
+}
 
 const _kMaxReconnectAttempts = 3;
 const _kSymbolBatchSize = 50;
@@ -107,7 +108,7 @@ class QuoteWebSocketNotifier extends _$QuoteWebSocketNotifier {
   Future<WsUserType> _connectWithToken() async {
     final token = await ref.read(tokenServiceProvider).getAccessToken();
     final factory = ref.read(wsClientFactoryProvider);
-    final client = factory(_kWsUrl);
+    final client = factory(_wsUrl);
 
     final userType = await client.connect(
       token: (token == null || token.isEmpty) ? null : token,
@@ -223,7 +224,7 @@ class QuoteWebSocketNotifier extends _$QuoteWebSocketNotifier {
 
     final token = await ref.read(tokenServiceProvider).getAccessToken();
     final factory = ref.read(wsClientFactoryProvider);
-    final newClient = factory(_kWsUrl);
+    final newClient = factory(_wsUrl);
 
     final userType = await newClient.connect(
       token: (token == null || token.isEmpty) ? null : token,

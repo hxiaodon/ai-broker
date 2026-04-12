@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/auth/token_service.dart';
+import '../../../core/config/environment_config.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/network/authenticated_dio.dart';
 import '../../../core/network/connectivity_service.dart';
@@ -12,11 +13,6 @@ import 'remote/market_remote_data_source.dart';
 import 'remote/market_response_models.dart';
 
 part 'watchlist_repository_impl.g.dart';
-
-const _kMarketBaseUrl = String.fromEnvironment(
-  'MARKET_BASE_URL',
-  defaultValue: 'http://localhost:8080',
-);
 
 /// Production [WatchlistRepository] implementation.
 ///
@@ -172,8 +168,9 @@ class WatchlistRepositoryImpl implements WatchlistRepository {
 @Riverpod(keepAlive: true)
 WatchlistRepository watchlistRepository(Ref ref) {
   final tokenService = ref.watch(tokenServiceProvider);
+  final baseUrl = EnvironmentConfig.instance.marketBaseUrl;
   final dio = createAuthenticatedDio(
-    baseUrl: _kMarketBaseUrl,
+    baseUrl: baseUrl,
     tokenService: tokenService,
   );
   final connectivity = ref.watch(connectivityServiceProvider);
