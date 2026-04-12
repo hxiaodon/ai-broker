@@ -406,4 +406,119 @@ void main() {
       },
     );
   });
+
+  group('Market API - ETF Index Endpoints', () {
+    testWidgets(
+      'MA19: Fetch SPY (S&P 500 ETF)',
+      (tester) async {
+        print('📈 MA19: Fetch SPY ETF');
+
+        final response = await dio.get<Map<String, dynamic>>(
+          '/v1/market/stocks/SPY',
+        );
+
+        expect(response.statusCode, 200);
+        expect(response.data!['symbol'], 'SPY');
+        expect(response.data!['name'], contains('S&P'));
+        expect(response.data!['is_etf'], true);
+        expect(response.data!['tracking_name'], contains('S&P 500'));
+
+        print('    ✅ SPY loaded: \$${response.data!['price']} (${response.data!['change_pct']}%)');
+      },
+    );
+
+    testWidgets(
+      'MA20: Fetch QQQ (Nasdaq-100 ETF)',
+      (tester) async {
+        print('📈 MA20: Fetch QQQ ETF');
+
+        final response = await dio.get<Map<String, dynamic>>(
+          '/v1/market/stocks/QQQ',
+        );
+
+        expect(response.statusCode, 200);
+        expect(response.data!['symbol'], 'QQQ');
+        expect(response.data!['is_etf'], true);
+        expect(response.data!['tracking_name'], contains('Nasdaq'));
+
+        print('    ✅ QQQ loaded: \$${response.data!['price']} (${response.data!['change_pct']}%)');
+      },
+    );
+
+    testWidgets(
+      'MA21: Fetch DIA (DJIA ETF)',
+      (tester) async {
+        print('📈 MA21: Fetch DIA ETF');
+
+        final response = await dio.get<Map<String, dynamic>>(
+          '/v1/market/stocks/DIA',
+        );
+
+        expect(response.statusCode, 200);
+        expect(response.data!['symbol'], 'DIA');
+        expect(response.data!['is_etf'], true);
+        expect(response.data!['tracking_name'], contains('DJIA'));
+
+        print('    ✅ DIA loaded: \$${response.data!['price']} (${response.data!['change_pct']}%)');
+      },
+    );
+
+    testWidgets(
+      'MA22: Fetch batch ETF quotes',
+      (tester) async {
+        print('📊 MA22: Batch ETF quotes');
+
+        final response = await dio.get<Map<String, dynamic>>(
+          '/v1/market/quotes',
+          queryParameters: {
+            'symbols': 'SPY,QQQ,DIA',
+          },
+        );
+
+        expect(response.statusCode, 200);
+        expect(response.data!['quotes']['SPY'], isNotNull);
+        expect(response.data!['quotes']['QQQ'], isNotNull);
+        expect(response.data!['quotes']['DIA'], isNotNull);
+
+        print('    ✅ All 3 ETFs loaded');
+      },
+    );
+
+    testWidgets(
+      'MA23: ETF data completeness',
+      (tester) async {
+        print('✓ MA23: ETF data structure');
+
+        final response = await dio.get<Map<String, dynamic>>(
+          '/v1/market/stocks/SPY',
+        );
+
+        final etf = response.data!;
+        expect(etf['symbol'], 'SPY');
+        expect(etf['price'], isNotEmpty);
+        expect(etf['change_pct'], isNotEmpty);
+        expect(etf['tracking_name'], isNotEmpty);
+        expect(etf['is_etf'], true);
+
+        print('    ✅ ETF has all required fields');
+      },
+    );
+
+    testWidgets(
+      'MA24: ETF price format (large number for DIA)',
+      (tester) async {
+        print('💰 MA24: ETF price format validation');
+
+        final response = await dio.get<Map<String, dynamic>>(
+          '/v1/market/stocks/DIA',
+        );
+
+        final price = response.data!['price'];
+        final priceValue = price is String ? double.parse(price) : price as double;
+        expect(priceValue, greaterThan(30000)); // DIA price ~ 38,000
+
+        print('    ✅ DIA price format correct: \$${response.data!['price']}');
+      },
+    );
+  });
 }
