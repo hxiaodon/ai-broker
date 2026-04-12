@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart' as intl;
+import 'package:syncfusion_flutter_charts/charts.dart';
 
 import '../../application/stock_detail_notifier.dart';
 import '../../data/market_data_repository_impl.dart';
@@ -184,6 +186,25 @@ class _KLineChartWidgetState extends ConsumerState<KLineChartWidget> {
 // Chart view — Syncfusion render
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// Data adapter for Syncfusion CandlestickSeries.
+class _CandleChartData {
+  _CandleChartData({
+    required this.x,
+    required this.open,
+    required this.high,
+    required this.low,
+    required this.close,
+    required this.volume,
+  });
+
+  final DateTime x;
+  final double open;
+  final double high;
+  final double low;
+  final double close;
+  final int volume;
+}
+
 /// Renders candles using Syncfusion Flutter Charts.
 ///
 /// Layout:
@@ -192,15 +213,42 @@ class _KLineChartWidgetState extends ConsumerState<KLineChartWidget> {
 ///
 /// Long-press shows crosshair with OHLCV tooltip.
 /// Pinch-to-zoom and pan are enabled.
-class _ChartView extends StatelessWidget {
+class _ChartView extends StatefulWidget {
   const _ChartView({required this.candles, required this.period});
 
   final List<Candle> candles;
   final _Period period;
 
   @override
+  State<_ChartView> createState() => _ChartViewState();
+}
+
+class _ChartViewState extends State<_ChartView> {
+  late TrackballBehavior _trackballBehavior;
+  late ZoomPanBehavior _zoomPanBehavior;
+
+  @override
+  void initState() {
+    super.initState();
+    _trackballBehavior = TrackballBehavior(
+      enable: true,
+      activationMode: ActivationMode.longPress,
+      lineColor: Colors.grey.withOpacity(0.5),
+      lineWidth: 1,
+      lineDashArray: const [3, 3],
+      tooltipAlignment: ChartAlignment.center,
+      tooltipDisplayMode: TrackballDisplayMode.groupAllPoints,
+    );
+    _zoomPanBehavior = ZoomPanBehavior(
+      enablePinching: true,
+      enablePanning: true,
+      zoomMode: ZoomMode.xy,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (candles.isEmpty) {
+    if (widget.candles.isEmpty) {
       return Container(
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surfaceContainer,
@@ -218,78 +266,143 @@ class _ChartView extends StatelessWidget {
       );
     }
 
-    // TODO(T05): Replace this placeholder with Syncfusion SfCartesianChart
-    // once the chart package integration is confirmed. The implementation should:
-    //   1. Use SfCartesianChart with two NumericAxis / DateTimeAxis
-    //   2. Add CandleSeries<Candle, DateTime> for price
-    //   3. Add ColumnSeries<Candle, DateTime> for volume (lower panel, ~30% height)
-    //   4. Enable CrosshairBehavior (longPress) with OHLCV tooltip
-    //   5. Enable ZoomPanBehavior (pinch, pan)
-    //   6. Color candles: bullish = priceUp token, bearish = priceDown token
+    // Convert Candle entities to chart data
+    final chartData = widget.candles
+        .map((c) => _CandleChartData(
+              x: c.t,
+              open: c.o.toDouble(),
+              high: c.h.toDouble(),
+              low: c.l.toDouble(),
+              close: c.c.toDouble(),
+              volume: c.v,
+            ))
+        .toList();
+
+    // Calculate max volume for secondary axis scaling
+    final maxVolume = chartData.isNotEmpty
+        ? chartData
+            .map((d) => d.volume)
+            .reduce((a, b) => a > b ? a : b)
+            .toDouble()
+        : 1000000.0;
+
+    final bullishColor = const Color(0xFF0DC582); // Green
+    final bearishColor = const Color(0xFFFF4747); // Red
+
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(12),
       ),
-      padding: const EdgeInsets.all(12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '${candles.length} 根K线  (Syncfusion chart placeholder)',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontSize: 11,
-            ),
+      padding: const EdgeInsets.all(8),
+      child: SfCartesianChart(
+        primaryXAxis: DateTimeAxis(
+          intervalType: _getIntervalType(widget.period.apiPeriod),
+          interval: _getInterval(widget.period.apiPeriod).toDouble(),
+          majorGridLines: const MajorGridLines(width: 0),
+          axisLine: const AxisLine(width: 0),
+          labelStyle: TextStyle(
+            fontSize: 10,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: CustomPaint(
-              painter: _SparklinePainter(candles: candles, context: context),
-              child: const SizedBox.expand(),
+          dateFormat: _getDateFormat(widget.period.apiPeriod),
+        ),
+        primaryYAxis: NumericAxis(
+          labelPosition: ChartDataLabelPosition.outside,
+          opposedPosition: true,
+          majorGridLines: MajorGridLines(
+            width: 1,
+            color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.3),
+          ),
+          axisLine: const AxisLine(width: 0),
+          labelStyle: TextStyle(
+            fontSize: 10,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          numberFormat: intl.NumberFormat('0.00#'),
+        ),
+        axes: [
+          NumericAxis(
+            name: 'volumeAxis',
+            majorGridLines: const MajorGridLines(width: 0),
+            axisLine: const AxisLine(width: 0),
+            maximum: maxVolume * 1.5,
+            labelStyle: TextStyle(
+              fontSize: 9,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
+            numberFormat: intl.NumberFormat('0.##a'),
+            opposedPosition: true,
           ),
         ],
+        series: [
+          // Candlestick series
+          CandlestickSeries<_CandleChartData, DateTime>(
+            dataSource: chartData,
+            xValueMapper: (_CandleChartData data, _) => data.x,
+            openValueMapper: (_CandleChartData data, _) => data.open,
+            highValueMapper: (_CandleChartData data, _) => data.high,
+            lowValueMapper: (_CandleChartData data, _) => data.low,
+            closeValueMapper: (_CandleChartData data, _) => data.close,
+            bearishColor: bearishColor,
+            bullishColor: bullishColor,
+            enableSolidCandles: true,
+          ),
+          // Volume series
+          ColumnSeries<_CandleChartData, DateTime>(
+            dataSource: chartData,
+            xValueMapper: (_CandleChartData data, _) => data.x,
+            yValueMapper: (_CandleChartData data, _) => data.volume.toDouble(),
+            yAxisName: 'volumeAxis',
+            pointColorMapper: (_CandleChartData data, _) {
+              return data.close >= data.open ? bullishColor : bearishColor;
+            },
+            opacity: 0.4,
+            width: 0.6,
+          ),
+        ],
+        trackballBehavior: _trackballBehavior,
+        zoomPanBehavior: _zoomPanBehavior,
       ),
     );
   }
-}
 
-/// Minimal sparkline fallback until Syncfusion is wired up.
-class _SparklinePainter extends CustomPainter {
-  _SparklinePainter({required this.candles, required this.context});
-
-  final List<Candle> candles;
-  final BuildContext context;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (candles.isEmpty) return;
-
-    final prices = candles.map((c) => c.c.toDouble()).toList();
-    final minP = prices.reduce((a, b) => a < b ? a : b);
-    final maxP = prices.reduce((a, b) => a > b ? a : b);
-    final range = (maxP - minP).abs();
-    if (range == 0) return;
-
-    final paint = Paint()
-      ..color = Theme.of(context).colorScheme.primary
-      ..strokeWidth = 1.5
-      ..style = PaintingStyle.stroke;
-
-    final path = Path();
-    for (var i = 0; i < prices.length; i++) {
-      final x = i / (prices.length - 1) * size.width;
-      final y = size.height - (prices[i] - minP) / range * size.height;
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-    }
-    canvas.drawPath(path, paint);
+  /// Determine interval type based on period.
+  DateTimeIntervalType _getIntervalType(String period) {
+    return switch (period) {
+      '1min' || '5min' || '15min' || '30min' => DateTimeIntervalType.minutes,
+      '60min' || '1h' => DateTimeIntervalType.hours,
+      '1d' => DateTimeIntervalType.days,
+      '1w' => DateTimeIntervalType.days,  // Use days for weekly; interval=7
+      '1mo' => DateTimeIntervalType.months,
+      _ => DateTimeIntervalType.days,
+    };
   }
 
-  @override
-  bool shouldRepaint(_SparklinePainter old) => old.candles != candles;
+  /// Determine interval value for better label spacing.
+  int _getInterval(String period) {
+    return switch (period) {
+      '1min' => 30,
+      '5min' => 60,
+      '15min' => 120,
+      '30min' => 240,
+      '60min' || '1h' => 4,
+      '1d' => 5,
+      '1w' => 7,  // 7 days for weekly
+      '1mo' => 3,
+      _ => 1,
+    };
+  }
+
+  /// Get date format for X-axis labels.
+  intl.DateFormat _getDateFormat(String period) {
+    return switch (period) {
+      '1min' || '5min' || '15min' || '30min' => intl.DateFormat('HH:mm'),
+      '60min' || '1h' => intl.DateFormat('HH:mm'),
+      '1d' => intl.DateFormat('MM-dd'),
+      '1w' => intl.DateFormat('MM-dd'),
+      '1mo' => intl.DateFormat('yyyy-MM'),
+      _ => intl.DateFormat('yyyy-MM-dd'),
+    };
+  }
 }
