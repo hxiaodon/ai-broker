@@ -56,6 +56,9 @@ class WatchlistLocalDataSource {
         AppLogger.debug('WatchlistLocalDataSource: no items stored, returning defaults');
         // Return default watchlist for guest mode testing
         return const [
+          WatchlistItem(symbol: 'SPY', market: 'US'),
+          WatchlistItem(symbol: 'QQQ', market: 'US'),
+          WatchlistItem(symbol: 'DIA', market: 'US'),
           WatchlistItem(symbol: 'AAPL', market: 'US'),
           WatchlistItem(symbol: 'TSLA', market: 'US'),
           WatchlistItem(symbol: '0700', market: 'HK'),
@@ -67,6 +70,9 @@ class WatchlistLocalDataSource {
       if (list.isEmpty) {
         AppLogger.debug('WatchlistLocalDataSource: empty list stored, returning defaults');
         return const [
+          WatchlistItem(symbol: 'SPY', market: 'US'),
+          WatchlistItem(symbol: 'QQQ', market: 'US'),
+          WatchlistItem(symbol: 'DIA', market: 'US'),
           WatchlistItem(symbol: 'AAPL', market: 'US'),
           WatchlistItem(symbol: 'TSLA', market: 'US'),
           WatchlistItem(symbol: '0700', market: 'HK'),
@@ -84,6 +90,9 @@ class WatchlistLocalDataSource {
       );
       // Return default list rather than throwing to keep UI functional
       return const [
+        WatchlistItem(symbol: 'SPY', market: 'US'),
+        WatchlistItem(symbol: 'QQQ', market: 'US'),
+        WatchlistItem(symbol: 'DIA', market: 'US'),
         WatchlistItem(symbol: 'AAPL', market: 'US'),
         WatchlistItem(symbol: 'TSLA', market: 'US'),
         WatchlistItem(symbol: '0700', market: 'HK'),

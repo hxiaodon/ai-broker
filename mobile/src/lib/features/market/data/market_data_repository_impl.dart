@@ -16,7 +16,7 @@ part 'market_data_repository_impl.g.dart';
 
 const _kMarketBaseUrl = String.fromEnvironment(
   'MARKET_BASE_URL',
-  defaultValue: 'https://api-staging.trading.example.com',
+  defaultValue: 'http://localhost:8080',
 );
 
 /// Production implementation of [MarketDataRepository].
