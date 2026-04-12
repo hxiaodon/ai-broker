@@ -24,11 +24,13 @@ final indexQuotesProvider = IndexQuotesProvider._();
 final class IndexQuotesProvider
     extends
         $FunctionalProvider<
-          AsyncValue<List<Quote>>,
-          List<Quote>,
-          FutureOr<List<Quote>>
+          AsyncValue<Map<String, Quote>>,
+          Map<String, Quote>,
+          FutureOr<Map<String, Quote>>
         >
-    with $FutureModifier<List<Quote>>, $FutureProvider<List<Quote>> {
+    with
+        $FutureModifier<Map<String, Quote>>,
+        $FutureProvider<Map<String, Quote>> {
   /// Provides real-time quotes for market index ETFs (SPY, QQQ, DIA).
   ///
   /// Independent of [watchlistProvider] to avoid loading delays.
@@ -39,7 +41,7 @@ final class IndexQuotesProvider
         argument: null,
         retry: null,
         name: r'indexQuotesProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -49,14 +51,14 @@ final class IndexQuotesProvider
 
   @$internal
   @override
-  $FutureProviderElement<List<Quote>> $createElement(
+  $FutureProviderElement<Map<String, Quote>> $createElement(
     $ProviderPointer pointer,
   ) => $FutureProviderElement(pointer);
 
   @override
-  FutureOr<List<Quote>> create(Ref ref) {
+  FutureOr<Map<String, Quote>> create(Ref ref) {
     return indexQuotes(ref);
   }
 }
 
-String _$indexQuotesHash() => r'03a601e3ec63945e6d25533b5c440c62693e21e7';
+String _$indexQuotesHash() => r'aafd659799a75b00813fdd2917e3b988f3ad8de4';

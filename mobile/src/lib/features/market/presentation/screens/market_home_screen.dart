@@ -154,6 +154,7 @@ class _IndexBanner extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // ETF 数据独立加载，不依赖 watchlist
     final indexQuotesAsync = ref.watch(indexQuotesProvider);
 
     return Container(
@@ -183,13 +184,13 @@ class _IndexBanner extends ConsumerWidget {
           SizedBox(
             height: 72,
             child: indexQuotesAsync.when(
-              data: (quotes) => ListView.separated(
+              data: (quoteMap) => ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: _indexes.length,
                 separatorBuilder: (_, i) => const SizedBox(width: 8),
                 itemBuilder: (context, i) {
                   final info = _indexes[i];
-                  final quote = quotes.where((q) => q.symbol == info.symbol).firstOrNull;
+                  final quote = quoteMap[info.symbol];
 
                   return _IndexCard(
                     info: info,
