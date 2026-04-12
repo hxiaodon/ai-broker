@@ -16,8 +16,13 @@ part 'market_data_repository_impl.g.dart';
 
 const _kMarketBaseUrl = String.fromEnvironment(
   'MARKET_BASE_URL',
-  defaultValue: 'http://localhost:8080',
+  defaultValue: _defaultMarketBaseUrl,
 );
+
+/// Default base URL for market API.
+/// In test environments (iOS simulator), use 10.0.2.2 to access host machine.
+/// In production, use the actual staging/production endpoint.
+const _defaultMarketBaseUrl = 'http://localhost:8080';
 
 /// Production implementation of [MarketDataRepository].
 ///
