@@ -7,6 +7,7 @@ import '../../../../core/routing/route_names.dart';
 import '../../../../shared/widgets/loading/skeleton_loader.dart';
 import '../../../auth/application/auth_notifier.dart';
 import '../../../auth/presentation/widgets/login_guidance_sheet.dart';
+import '../../application/index_quotes_provider.dart';
 import '../../application/movers_provider.dart';
 import '../../application/watchlist_notifier.dart';
 import '../../domain/entities/quote.dart';
@@ -153,7 +154,7 @@ class _IndexBanner extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final watchlistAsync = ref.watch(watchlistProvider);
+    final indexQuotesAsync = ref.watch(indexQuotesProvider);
 
     return Container(
       decoration: BoxDecoration(
@@ -181,22 +182,59 @@ class _IndexBanner extends ConsumerWidget {
           const SizedBox(height: 12),
           SizedBox(
             height: 72,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: _indexes.length,
-              separatorBuilder: (_, i) => const SizedBox(width: 8),
-              itemBuilder: (context, i) {
-                final info = _indexes[i];
-                final quotes = watchlistAsync.asData?.value;
-                final quote = quotes?.where((Quote q) => q.symbol == info.symbol).firstOrNull;
+            child: indexQuotesAsync.when(
+              data: (quotes) => ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _indexes.length,
+                separatorBuilder: (_, i) => const SizedBox(width: 8),
+                itemBuilder: (context, i) {
+                  final info = _indexes[i];
+                  final quote = quotes.where((q) => q.symbol == info.symbol).firstOrNull;
 
-                return _IndexCard(
-                  info: info,
-                  price: quote?.price,
-                  changePct: quote?.changePct,
-                  onTap: () => onStockTap(info.symbol),
-                );
-              },
+                  return _IndexCard(
+                    info: info,
+                    price: quote?.price,
+                    changePct: quote?.changePct,
+                    onTap: () => onStockTap(info.symbol),
+                  );
+                },
+              ),
+              loading: () => ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _indexes.length,
+                separatorBuilder: (_, i) => const SizedBox(width: 8),
+                itemBuilder: (context, i) => Container(
+                  width: 104,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white10,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.white24),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        _indexes[i].symbol,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SkeletonLoader(width: 70, height: 14, borderRadius: 3),
+                      const SkeletonLoader(width: 48, height: 12, borderRadius: 3),
+                    ],
+                  ),
+                ),
+              ),
+              error: (error, stack) => Center(
+                child: Text(
+                  '加载失败',
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+              ),
             ),
           ),
         ],

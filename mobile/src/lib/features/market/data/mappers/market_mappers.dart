@@ -183,7 +183,7 @@ extension StockDetailDtoMapper on StockDetailDto {
         turnoverRate: _d(turnoverRate),
         exchange: exchange,
         sector: sector,
-        asOf: _dt(asOf),
+        asOf: asOf.isEmpty ? DateTime.now().toUtc() : _dt(asOf),
       );
 }
 
