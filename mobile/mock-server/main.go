@@ -40,6 +40,8 @@ func main() {
 	// Market endpoints
 	http.HandleFunc("/ws/market-data", handleWebSocket)
 	http.HandleFunc("/v1/market/quotes", handleQuotes)
+	http.HandleFunc("/v1/market/kline", handleKline)
+	http.HandleFunc("/v1/market/kline/", handleKline)
 	http.HandleFunc("/v1/market/search", handleSearch)
 	http.HandleFunc("/v1/market/movers", handleMovers)
 	http.HandleFunc("/v1/market/stocks/", handleStockDetail)
