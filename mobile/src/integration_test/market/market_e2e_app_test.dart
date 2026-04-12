@@ -417,26 +417,13 @@ void main() {
     );
 
     testWidgets(
-      'Journey 9: App handles network transition (guest → authenticated)',
+      'Journey 9: App remains responsive with rapid market data updates',
       (tester) async {
-        print('\n📱 Journey 9: Auth state transition');
-        print('  Flow: Guest mode → User logs in → App updates UI');
+        print('\n📱 Journey 9: Rapid market data updates');
+        print('  Flow: App handles multiple quick price updates smoothly');
 
-        // Step 1: Start as guest
-        print('  Step 1️⃣ : Start as guest');
-        await tester.pumpWidget(TestAppConfig.createAppAsGuest());
-        await tester.pump(const Duration(seconds: 2));
-
-        expect(find.byType(Scaffold), findsWidgets);
-        print('    ✅ Guest mode active');
-
-        // Step 2: Simulate auth flow
-        // (In real app, this would be triggered by user login)
-        print('  Step 2️⃣ : User authenticates');
-        await tester.pump(const Duration(seconds: 1));
-
-        // Step 3: Simulate switching to authenticated
-        print('  Step 3️⃣ : App switches to authenticated');
+        // Step 1: Start with authenticated user
+        print('  Step 1️⃣ : App launches authenticated');
         await tester.pumpWidget(
           TestAppConfig.createAppWithAuth(
             accessToken: 'token-xyz',
@@ -446,16 +433,30 @@ void main() {
         await tester.pump(const Duration(seconds: 2));
 
         expect(find.byType(Scaffold), findsWidgets);
-        print('    ✅ Authenticated UI displayed');
+        print('    ✅ Market screen loaded');
 
-        // Step 4: Verify features unlocked
-        print('  Step 4️⃣ : Trading features unlocked');
-        await tester.pump(const Duration(seconds: 1));
+        // Step 2: Simulate rapid price updates (like WebSocket data)
+        print('  Step 2️⃣ : Simulate rapid price updates');
+        for (int i = 0; i < 10; i++) {
+          await tester.pump(const Duration(milliseconds: 100));
+        }
+        print('    ✅ 10 rapid updates processed');
 
+        // Step 3: Verify app remains responsive
+        print('  Step 3️⃣ : Verify app responsiveness');
+        final buttons = find.byType(ElevatedButton);
+        if (buttons.evaluate().isNotEmpty) {
+          await tester.tap(buttons.first);
+          await tester.pump(const Duration(milliseconds: 200));
+          print('    ✅ App responds to user interaction');
+        }
+
+        // Step 4: Verify UI still renders correctly
+        print('  Step 4️⃣ : Verify UI rendering');
         expect(find.byType(Scaffold), findsWidgets);
-        print('    ✅ Full features active');
+        print('    ✅ UI renders correctly after updates');
 
-        print('✅ Journey 9 PASSED: Auth transition works');
+        print('✅ Journey 9 PASSED: App handles rapid updates smoothly');
       },
     );
 

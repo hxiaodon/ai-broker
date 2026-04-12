@@ -397,7 +397,10 @@ void main() {
 
         final price = response.data!['price'];
         expect(price, isNotNull);
-        expect(price, greaterThan(0));
+
+        // Price may be String or double from API
+        final priceValue = price is String ? double.parse(price) : price as double;
+        expect(priceValue, greaterThan(0));
 
         print('    ✅ Price is positive: $price');
       },
