@@ -182,7 +182,7 @@ class _IndexBanner extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           SizedBox(
-            height: 72,
+            height: 85,
             child: indexQuotesAsync.when(
               data: (quoteMap) => ListView.separated(
                 scrollDirection: Axis.horizontal,
@@ -278,7 +278,7 @@ class _IndexCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         width: 104,
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: Colors.white10,
           borderRadius: BorderRadius.circular(8),
@@ -286,7 +286,8 @@ class _IndexCard extends StatelessWidget {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               info.symbol,
