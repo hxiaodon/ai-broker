@@ -11,6 +11,7 @@ part of 'market_data_repository_impl.dart';
 /// Wires up [MarketDataRepositoryImpl] with its [MarketRemoteDataSource].
 ///
 /// Uses a dedicated Dio instance for the market-data service.
+/// Base URL is determined by [EnvironmentConfig].
 /// JWT is injected by [AuthInterceptor] via [createAuthenticatedDio].
 
 @ProviderFor(marketDataRepository)
@@ -19,6 +20,7 @@ final marketDataRepositoryProvider = MarketDataRepositoryProvider._();
 /// Wires up [MarketDataRepositoryImpl] with its [MarketRemoteDataSource].
 ///
 /// Uses a dedicated Dio instance for the market-data service.
+/// Base URL is determined by [EnvironmentConfig].
 /// JWT is injected by [AuthInterceptor] via [createAuthenticatedDio].
 
 final class MarketDataRepositoryProvider
@@ -32,6 +34,7 @@ final class MarketDataRepositoryProvider
   /// Wires up [MarketDataRepositoryImpl] with its [MarketRemoteDataSource].
   ///
   /// Uses a dedicated Dio instance for the market-data service.
+  /// Base URL is determined by [EnvironmentConfig].
   /// JWT is injected by [AuthInterceptor] via [createAuthenticatedDio].
   MarketDataRepositoryProvider._()
     : super(
@@ -68,4 +71,4 @@ final class MarketDataRepositoryProvider
 }
 
 String _$marketDataRepositoryHash() =>
-    r'f6e0e7ae5d441abfa523a7b37cd9c9fe3532788b';
+    r'62f34d20f8dd9fbde2d385213a3e2798126838df';

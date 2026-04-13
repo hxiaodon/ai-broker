@@ -68,11 +68,7 @@ class VerifyOtpUseCase {
 
       return result;
     } on AuthException catch (e) {
-      // Handle specific auth errors with remaining attempts
-      AppLogger.warning(
-        'OTP verification failed: ${e.message} '
-        '(remaining=${result?.remainingAttempts})',
-      );
+      AppLogger.warning('OTP verification failed: ${e.message}');
       rethrow;
     } on AppException {
       rethrow;

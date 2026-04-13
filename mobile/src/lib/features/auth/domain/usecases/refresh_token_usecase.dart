@@ -44,8 +44,7 @@ class RefreshTokenUseCase {
       // ─── Check for Cascade Refresh ──────────────────────────────────
       // If the new token expires within 5 minutes, refresh again immediately.
       // This prevents short-lived tokens from expiring between checks.
-      const bufferDuration = Duration(minutes: 5);
-      final timeUntilExpiry = newToken.expiresAt.difference(DateTime.now().toUtc());
+      final timeUntilExpiry = newToken.accessTokenExpiresAt.difference(DateTime.now().toUtc());
 
       if (timeUntilExpiry.inMinutes < 5) {
         AppLogger.warning(
