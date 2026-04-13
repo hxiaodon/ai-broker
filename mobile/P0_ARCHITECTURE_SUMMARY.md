@@ -2,7 +2,7 @@
 
 **Status**: ✅ COMPLETED  
 **Timeframe**: 2026-04-13 (Single Session)  
-**Commits**: d3852f7, 19a97b6
+**Commits**: d3852f7, 19a97b6, d67c137
 
 ---
 
@@ -38,6 +38,22 @@ Together these establish the foundation for a resilient, offline-capable trading
 - 3 error propagation tests (BusinessException, NetworkException, unexpected errors)
 - 1 idempotency test (UUID uniqueness verification)
 - ✅ **All 14 tests passing**
+
+**11 Unit Tests** for VerifyOtpUseCase:
+- 2 happy path tests (existing user, new user)
+- 5 validation tests (empty request ID, empty phone, invalid OTP format, wrong lengths)
+- 3 error propagation tests (AuthException, BusinessException, unexpected errors)
+- 1 idempotency test (UUID uniqueness verification)
+- ✅ **All 11 tests passing**
+
+**12 Unit Tests** for RefreshTokenUseCase:
+- 2 happy path tests (normal refresh, no cascade)
+- 2 cascade refresh tests (single cascade, multi-cascade chain)
+- 5 validation tests (empty token, invalid JWT format, wrong part counts)
+- 3 error propagation tests (AuthException, NetworkException, unexpected errors)
+- ✅ **All 12 tests passing**
+
+**Total P0-1 Coverage**: 35 unit tests, 100% passing rate
 
 ### Architecture Pattern
 
@@ -139,9 +155,15 @@ ${Application Documents}/trading_app.sqlite
 ### P0-1: Unit Tests (Domain Layer)
 
 ```bash
-flutter test test/features/auth/domain/usecases/send_otp_usecase_test.dart
-# Result: 00:00 +14: All tests passed!
+flutter test test/features/auth/domain/usecases/
+# Result: 00:00 +35: All tests passed!
 ```
+
+**Test Coverage Breakdown**:
+- **SendOtpUseCase**: 12 tests (happy path, validation, error handling, idempotency)
+- **VerifyOtpUseCase**: 11 tests (happy path, validation, error handling, idempotency)
+- **RefreshTokenUseCase**: 12 tests (happy path, cascade refresh, validation, error handling)
+- **Total**: 35 tests, 100% passing
 
 **Test Framework**: mocktail (runtime mocks, no code generation)  
 **Coverage**: Business logic validation without HTTP/Riverpod
@@ -160,9 +182,10 @@ Currently no automated tests for caching (reserved for next phase):
 | Metric | P0-1 | P0-2 |
 |--------|------|------|
 | Lint Warnings | 0 | 0 |
-| Test Coverage | 100% | N/A (manual) |
-| Commit Size | 7 files, 846 lines | 3 files, 2129 lines |
-| Time to Implement | ~2h | ~1.5h |
+| Test Count | 35 | N/A (manual) |
+| Test Coverage | 100% | N/A |
+| Commit Size | 10 files, 1866 lines | 3 files, 2129 lines |
+| Time to Implement | ~3.5h | ~1.5h |
 
 ---
 
