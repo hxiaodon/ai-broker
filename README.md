@@ -98,6 +98,69 @@ A mobile trading platform that enables retail investors to trade US (NYSE/NASDAQ
     └── skills-metabot/                # Archived MetaBot skills
 ```
 
+## System Architecture
+
+```mermaid
+graph TB
+    subgraph Clients["🔹 Client Layer"]
+        Mobile["📱 Flutter Mobile<br/>(iOS + Android)"]
+        H5["🌐 H5 WebView<br/>(React/Vite)"]
+        Admin["⚙️ Admin Panel<br/>(React)"]
+    end
+
+    subgraph API["🔷 API Gateway"]
+        Gateway["REST/gRPC/WebSocket<br/>Request Routing"]
+    end
+
+    subgraph Services["🔶 Microservices (Go 1.22+)"]
+        AMS["🔐 AMS<br/>Auth, KYC/AML<br/>Account Mgmt"]
+        Market["📊 Market Data<br/>Quotes, WebSocket<br/>K-line, Feed Handler<br/>✓ Buildable"]
+        Trading["💹 Trading Engine<br/>OMS, Risk, Settlement<br/>FIX Protocol, Margin"]
+        Fund["💰 Fund Transfer<br/>Deposit/Withdrawal<br/>AML, Ledger, Reconciliation"]
+    end
+
+    subgraph Data["🔷 Data Layer"]
+        MySQL["🗄️ MySQL 8.0+<br/>(Orders, KYC,<br/>Fund Records)"]
+        Redis["⚡ Redis 7+<br/>(Cache, Sessions)"]
+        Kafka["📨 Kafka<br/>(Outbox, DLQ,<br/>Event Stream)"]
+    end
+
+    subgraph External["🌍 External Systems"]
+        Polygon["Polygon.io<br/>(Market Data Feed)"]
+        FIX["FIX 4.4<br/>(Exchange Connectivity)"]
+        Bank["🏦 Bank Gateway<br/>(Fund Transfer)"]
+    end
+
+    Clients -->|REST/gRPC| Gateway
+    Gateway -->|Route| AMS
+    Gateway -->|Route| Market
+    Gateway -->|Route| Trading
+    Gateway -->|Route| Fund
+    
+    Market -->|Query/Cache| MySQL
+    Market -->|Cache| Redis
+    Market -->|Consume| Polygon
+    
+    AMS -->|Read/Write| MySQL
+    AMS -->|Session| Redis
+    AMS -->|Audit Event| Kafka
+    
+    Trading -->|Query| MySQL
+    Trading -->|Cache| Redis
+    Trading -->|Publish Event| Kafka
+    Trading -->|Connect| FIX
+    
+    Fund -->|Transaction| MySQL
+    Fund -->|Publish Event| Kafka
+    Fund -->|Transfer| Bank
+
+    style Clients fill:#e1f5ff
+    style API fill:#fff3e0
+    style Services fill:#f3e5f5
+    style Data fill:#e8f5e9
+    style External fill:#fce4ec
+```
+
 ## How It Works: Collaborative Iteration
 
 Unlike traditional software development or pure AI automation, this project uses **Harness Engineering** — a hybrid approach where:
