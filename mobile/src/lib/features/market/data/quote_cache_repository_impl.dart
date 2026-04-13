@@ -44,8 +44,8 @@ class MarketDataCacheRepositoryImpl implements MarketDataRepository {
   /// Strategy:
   /// 1. Fetch from API
   /// 2. On success: update cache, return results
-  /// 3. On failure: return cached data for available symbols
-  /// 4. If cache miss and API fails: propagate error
+  /// 3. On failure: return cached data for available symbols (if fresh)
+  /// 4. If cache miss or stale, and API fails: propagate error
   @override
   Future<Map<String, dynamic>> getQuotes(List<String> symbols) async {
     if (symbols.isEmpty) return {};
@@ -59,7 +59,7 @@ class MarketDataCacheRepositoryImpl implements MarketDataRepository {
 
       return apiResult;
     } on NetworkException {
-      // API failed: fall back to cached quotes
+      // API failed: fall back to cached quotes (if fresh)
       AppLogger.warning('getQuotes API failed, trying cache for ${symbols.length} symbols');
 
       try {
@@ -83,37 +83,50 @@ class MarketDataCacheRepositoryImpl implements MarketDataRepository {
   }
 
   /// Get all cached quotes for symbols (returns as map for compatibility).
+  /// Only returns quotes that are within TTL.
   Future<Map<String, dynamic>> _getCachedQuotesAsMap(List<String> symbols) async {
     final result = <String, dynamic>{};
+    final now = DateTime.now().toUtc();
 
     for (final symbol in symbols) {
       for (final market in ['US', 'HK']) {
         final cached = await database.getQuote(symbol, market);
         if (cached != null) {
-          final quote = _toDomainQuote(cached);
-          result[symbol] = {
-            'symbol': quote.symbol,
-            'name': quote.name,
-            'nameZh': quote.nameZh,
-            'market': quote.market,
-            'price': quote.price.toString(),
-            'change': quote.change.toString(),
-            'changePct': quote.changePct.toString(),
-            'volume': quote.volume,
-            'bid': quote.bid?.toString(),
-            'ask': quote.ask?.toString(),
-            'turnover': quote.turnover,
-            'prevClose': quote.prevClose.toString(),
-            'open': quote.open.toString(),
-            'high': quote.high.toString(),
-            'low': quote.low.toString(),
-            'marketCap': quote.marketCap,
-            'peRatio': quote.peRatio,
-            'delayed': quote.delayed,
-            'marketStatus': quote.marketStatus.name,
-            'isStale': true, // Mark as stale since it's from cache
-          };
-          break; // Found quote for this symbol
+          // Check if cache is still valid (within TTL)
+          final cachedAt = DateTime.parse(cached.cachedAt);
+          final age = now.difference(cachedAt);
+
+          if (age <= cacheTTL) {
+            final quote = _toDomainQuote(cached);
+            result[symbol] = {
+              'symbol': quote.symbol,
+              'name': quote.name,
+              'nameZh': quote.nameZh,
+              'market': quote.market,
+              'price': quote.price.toString(),
+              'change': quote.change.toString(),
+              'changePct': quote.changePct.toString(),
+              'volume': quote.volume,
+              'bid': quote.bid?.toString(),
+              'ask': quote.ask?.toString(),
+              'turnover': quote.turnover,
+              'prevClose': quote.prevClose.toString(),
+              'open': quote.open.toString(),
+              'high': quote.high.toString(),
+              'low': quote.low.toString(),
+              'marketCap': quote.marketCap,
+              'peRatio': quote.peRatio,
+              'delayed': quote.delayed,
+              'marketStatus': quote.marketStatus.name,
+              'isStale': false, // Fresh cache (within TTL)
+            };
+            break; // Found valid quote for this symbol
+          } else {
+            // Cache expired
+            AppLogger.debug(
+              'Quote cache expired for $symbol: age=${age.inSeconds}s, ttl=${cacheTTL.inSeconds}s',
+            );
+          }
         }
       }
     }
