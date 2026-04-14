@@ -3,11 +3,6 @@
 /// Provides simplified test app builders that handle all Riverpod setup
 /// and allow focusing on the widget behavior being tested.
 
-/// Widget Test Integration Helpers
-///
-/// Provides simplified test app builders that handle all Riverpod setup
-/// and allow focusing on the widget behavior being tested.
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
