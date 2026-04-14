@@ -196,10 +196,11 @@ flutter test test/features/market/data/quote_cache_repository_test.dart
 | Metric | P0-1 | P0-2 |
 |--------|------|------|
 | Lint Warnings | 0 | 0 |
-| Test Count | 35 | 8 |
+| Unit Tests | 35 | 8 |
+| API Integration Tests | — | 10 |
 | Test Coverage | 100% | 100% |
-| Commit Count | 4 | 1 |
-| Total Commits | 5 |
+| Commit Count | 4 | 2 |
+| Total Commits | 7 |
 
 ---
 
