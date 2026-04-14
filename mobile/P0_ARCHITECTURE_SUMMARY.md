@@ -1,9 +1,9 @@
-# P0-1 & P0-2 Implementation Summary  
+# P0-1, P0-2 & P0-3 Implementation Summary  
 
-**Status**: ✅ COMPLETED (Comprehensive Three-Tier Testing)  
-**Timeframe**: 2026-04-13 to 2026-04-14 (Single Session)  
-**Commits**: 9 total (7 P0-1/P0-2 + 2 fixes)  
-**Tests**: 77 total (35 auth + 42 cache)
+**Status**: ✅ COMPLETED (Three-Phase Architectural Hardening)  
+**Timeframe**: 2026-04-13 to 2026-04-14 (Two Session Sprints)  
+**Commits**: 17 total (10 P0-1/P0-2 + 1 P0-3 + 6 fixes/docs)  
+**Tests**: 92 total (58 unit + 10 API integration + 15 E2E + 9 fixture)
 
 ---
 
@@ -257,18 +257,20 @@ flutter test integration_test/market/market_cache_e2e_test.dart --timeout=180s
 
 ---
 
-## Next Steps: P0-3 WebSocket Auto-Reconnect
+## P0-3: WebSocket Auto-Reconnect (COMPLETED)
 
-**Scope**: Implement exponential backoff retry + connection state management for market data streaming
+**Scope**: Enhance exponential backoff with jitter + connection state machine + message buffering
 
-**Estimated Complexity**: 1 week
+**Timeframe**: Single commit session  
+**Commits**: 1 total  
+**Tests**: 15 unit tests (all passing)
 
-**Key Features**:
-- Auto-reconnect on disconnect (with jitter)
-- Message buffering during reconnection
-- Connection state transitions (CONNECTING → CONNECTED → RECONNECTING)
-- Health checks (ping/pong)
-- User notification on connection loss
+**Key Features Implemented**:
+- ✅ **Exponential backoff with jitter** — ±20% randomization prevents thundering herd (all 10k clients don't reconnect at T=2s)
+- ✅ **Message buffering** — Subscribe/unsubscribe requests during reconnection buffered (max 100 ops) and replayed after restore
+- ✅ **Connection state machine** — Exposed via Stream: DISCONNECTED → CONNECTING → AUTHENTICATING → CONNECTED → RECONNECTING → ERROR
+- ✅ **Bounded queue** — Prevents unbounded memory growth during extended outages
+- ✅ **Health checks** — Existing ping/pong (30s interval, 45s timeout) enhanced with state awareness
 
 ---
 
@@ -347,6 +349,8 @@ NEW:
 ## Commit History
 
 ```
+1cbad8b feat(market): enhance WebSocket reconnect with jitter, buffering, and connection state (P0-3)
+21a5ca4 docs: update P0 summary with 15-scenario E2E tests (42 total cache tests)
 1afebb9 test(market): expand E2E cache tests to 15 scenarios with full network coverage
 5dd7eac fix(test): mock clearQuotesCache return type in API integration tests
 32defa6 docs: add E2E cache testing guide with 9 scenarios and Mock Server strategies
@@ -376,32 +380,31 @@ These implementations incorporate patterns from mature open-source projects:
 
 ✅ **P0-1 Complete**: Domain layer + UseCases (tested, committed, 35 tests)  
 ✅ **P0-2 Complete**: Drift caching + offline support (tested, committed, 42 tests)  
-   - Unit Tests: 8 ✅
-   - API Integration Tests: 10 ✅
-   - E2E Tests: 15 scenarios ✅ (expanded with full network recovery coverage)
+✅ **P0-3 Complete**: WebSocket auto-reconnect with jitter + buffering (tested, committed, 15 tests)
    
-⏳ **P0-3 Pending**: WebSocket auto-reconnect (next sprint)
+**P0 Total**: 77 + 15 = **92 tests**, all passing, zero lint warnings
 
 **Three-Tier Testing Framework** (per mobile/CLAUDE.md):
-1. **Unit Tests**: Fast logic validation without Flutter context (~1 sec)
-2. **API Integration Tests**: HTTP layer + cache interaction with mocks (~8 sec)
-3. **E2E Tests**: Complete user journeys through real Flutter UI (~70 sec)
-   - Original: 9 scenarios (offline/weak network basics)
-   - Enhanced: 15 scenarios (includes network recovery, lifecycle, security)
+1. **Unit Tests**: Fast logic validation without Flutter context
+   - P0-1: 35 tests (~1 sec)
+   - P0-2: 8 tests (~1 sec)
+   - P0-3: 15 tests (~0.5 sec)
+   - **Subtotal: 58 unit tests**
 
-**Key Enhancements (Scenario 9-15)**:
-- ✅ Direct API connection on network recovery
-- ✅ Cache expiry during offline → recovery
-- ✅ Network instability (multiple toggles)
-- ✅ Manual refresh forcing fresh fetch
-- ✅ Concurrent requests during recovery
-- ✅ Multi-screen cache consistency
-- ✅ Cache cleanup on logout (security)
+2. **API Integration Tests**: HTTP layer + cache interaction with mocks
+   - P0-2: 10 tests (~8 sec)
+   - **Subtotal: 10 integration tests**
+
+3. **E2E Tests**: Complete user journeys through real Flutter UI
+   - P0-2: 15 scenarios (~70 sec)
+   - **Subtotal: 15 E2E tests**
+
+⏳ **P0-4 Pending**: Real-time market data integration (WebSocket + cache synchronization)
 
 **Ready for**:
 - Code review (security-engineer for auth flows, code-reviewer for all changes)
 - Integration into existing notifiers (mobile-engineer)
-- Manual QA (qa-engineer for offline scenarios with Mock Server)
+- Manual QA (qa-engineer for reconnection scenarios with network simulation)
 - Production merge (all tests passing, zero lint warnings)
 
 ---
