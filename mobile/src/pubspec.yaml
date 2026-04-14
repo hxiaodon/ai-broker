@@ -80,6 +80,9 @@ dependencies:
   path_provider: ^2.1.5
   path: ^1.9.1
 
+  # Error tracking & monitoring
+  sentry_flutter: ^7.15.0
+
   # Assets rendering
   flutter_svg: ^2.0.17
   rive: ^0.13.20
