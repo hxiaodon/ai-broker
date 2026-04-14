@@ -5,6 +5,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:mocktail/mocktail.dart';
+
 import 'package:trading_app/core/auth/token_service.dart';
 import 'package:trading_app/features/auth/application/auth_notifier.dart';
 import 'package:trading_app/features/market/application/watchlist_notifier.dart';
@@ -99,8 +101,3 @@ class MockTokenServiceForWidget extends Mock implements TokenService {
   @override
   Future<String?> getRefreshToken() async => _accessToken != null ? 'refresh-token' : null;
 }
-
-// For mocktail compatibility
-import 'package:mocktail/mocktail.dart';
-
-class Mock implements Exception {}
