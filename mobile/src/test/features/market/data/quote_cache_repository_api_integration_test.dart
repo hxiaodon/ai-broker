@@ -46,6 +46,9 @@ void main() {
   setUp(() {
     mockBaseRepository = _MockBaseRepository();
     mockDatabase = _MockDatabase();
+    // Mock clearQuotesCache to return Future<int>
+    when(() => mockDatabase.clearQuotesCache())
+        .thenAnswer((_) async => 0);
     cacheRepository = MarketDataCacheRepositoryImpl(
       database: mockDatabase,
       baseRepository: mockBaseRepository,
