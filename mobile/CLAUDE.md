@@ -22,6 +22,40 @@ Everything the end user sees and touches lives here. Backend business logic live
 
 Financial calculations must use `Decimal` from `package:decimal` -- never `double`.
 
+## State Management Standards (Riverpod)
+
+### AsyncValue Pattern (Mandatory)
+
+All asynchronous operations in providers must use Riverpod's `AsyncValue<T>` pattern with explicit `.when()` handling:
+
+```dart
+// ✅ Provider: FutureProvider or StateNotifierProvider returning Future<T>
+@riverpod
+Future<List<Quote>> indexQuotes(Ref ref) async {
+  final repo = ref.watch(marketRepositoryProvider);
+  return repo.getIndexQuotes();
+}
+
+// ✅ UI: Use .when() for complete state handling
+quotesAsync.when(
+  loading: () => const LoadingIndicator(),
+  error: (error, stack) => ErrorView(
+    message: _formatError(error),
+    onRetry: () => ref.invalidate(indexQuotesProvider),
+  ),
+  data: (quotes) => QuoteList(quotes: quotes),
+);
+```
+
+**Rules**:
+- All Future/Stream providers must use explicit AsyncValue via `.when()` in UI
+- Never use `.asData?.value` (unsafe, can hide loading/error states)
+- Error handling must check error type and provide user-friendly messages
+- Loading states must show appropriate skeleton or spinner
+- Caching strategy: use `autoDispose` for user data, `keepAlive` for config
+
+See [ASYNC_VALUE_BEST_PRACTICES.md](docs/ASYNC_VALUE_BEST_PRACTICES.md) for complete guide.
+
 ## Source Layout
 
 Flutter project root is `src/`. All `flutter`/`dart` commands must be run from `mobile/src/`.
