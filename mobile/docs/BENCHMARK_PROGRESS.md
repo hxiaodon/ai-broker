@@ -238,14 +238,14 @@ Phase 3: 性能优化
 | **1** | WebSocket 重连 | 1w | 1w | ✅ |
 | **1** | AsyncValue 统一 | 1-2w | 1d | ✅ |
 | **2** | 全局错误处理 | 1w | 1d | 🟢 |
-| **2** | Unit Tests (Repo) | 1-1.5w | 1d | 🟢 |
-| **2** | Unit Tests (Notifier) | 1-1.5w | - | 📋 |
+| **2** | Unit Tests (Repo) | 1-1.5w | 1d | ✅ |
+| **2** | Unit Tests (Notifier) | 1-1.5w | 1d | ✅ |
 | **2** | Unit Tests (Widget) | 1-1.5w | - | 📋 |
 | **2** | Riverpod DevTools | 3-5d | - | 📋 |
 | **2** | 离线优先架构 | 2-3w | - | 📋 |
 | **3** | 代码生成自动化 | 1-2w | - | 📋 |
 | **3** | 性能优化 | 2-3w | - | 📋 |
-| | **合计** | 18-32w | 5-6w+ | **20-25% 完成** |
+| | **合计** | 18-32w | 5-6w+ | **25% 完成** |
 
 ---
 
@@ -281,7 +281,7 @@ Phase 3: 性能优化
 11. **可观测性** — 全局错误处理 + Sentry (实现完成)
 
 ### 📋 待实施
-12. **测试覆盖** — Unit + Widget Tests (0% 完成)
+12. **测试覆盖** — Unit + Widget Tests (Phase 1-2 完成 50%, Phase 3-4 待实施)
 13. **性能基准** — 性能优化和监控 (0% 完成)
 
 ---
@@ -312,14 +312,15 @@ Phase 3: 性能优化
 - [ ] 集成测试验证 (firebase integration)
 
 ### 下周 (Week of 2026-04-21)
-- [ ] 启动 Unit Tests for Domain 层
+- [x] 启动 Unit Tests for Repository 层 (已完成)
+- [x] Unit Tests for Notifier 层 (已完成)
 - [ ] Sentry 集成上线
-- [ ] 错误边界和用户反馈流程测试
+- [ ] Phase 3 规划: Widget Tests
 
-### 2-3 周后 (Week of 2026-04-28)
-- [ ] Widget Tests for Market module
+### 2-3 周后 (Week of 2026-04-28 ~ 2026-05-12)
+- [ ] Phase 3: Widget Tests for Market module (WatchlistTab, MarketHomeScreen, StockDetailScreen)
 - [ ] Performance profiling setup
-- [ ] Offline indicator UI implementation
+- [ ] Phase 4: Coverage optimization and E2E integration
 
 ---
 
