@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:trading_app/core/auth/token_service.dart';
+import 'package:trading_app/core/config/environment_config.dart';
 import 'package:trading_app/core/logging/app_logger.dart';
 import 'package:trading_app/features/market/application/quote_websocket_notifier.dart';
 import 'package:trading_app/features/market/application/stock_detail_notifier.dart';
@@ -121,7 +122,10 @@ ProviderContainer buildContainer({
 // ─────────────────────────────────────────────────────────────────────────────
 
 void main() {
-  setUpAll(() => AppLogger.init());
+  setUpAll(() {
+    AppLogger.init();
+    EnvironmentConfig.initialize(environment: Environment.development);
+  });
 
   late MockMarketDataRepository mockRepo;
   late MockTokenService mockToken;
