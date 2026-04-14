@@ -13,6 +13,37 @@ import '../data/websocket/quote_websocket_client.dart';
 part 'quote_websocket_notifier.g.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Connection State Machine
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum QuoteWebSocketConnectionState {
+  disconnected,
+  connecting,
+  authenticating,
+  connected,
+  reconnecting,
+  error,
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Pending Operations Queue
+// ─────────────────────────────────────────────────────────────────────────────
+
+abstract class _PendingOperation {
+  const _PendingOperation();
+}
+
+class _PendingSubscribe extends _PendingOperation {
+  const _PendingSubscribe(this.symbols);
+  final List<String> symbols;
+}
+
+class _PendingUnsubscribe extends _PendingOperation {
+  const _PendingUnsubscribe(this.symbols);
+  final List<String> symbols;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Configuration
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -23,6 +54,8 @@ String get _wsUrl {
 
 const _kMaxReconnectAttempts = 3;
 const _kSymbolBatchSize = 50;
+const _kMaxPendingOperations = 100;
+const _kBackoffJitterPercent = 0.2; // ±20% jitter on exponential backoff
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Factory provider (injectable for tests)
@@ -81,14 +114,29 @@ class QuoteWebSocketNotifier extends _$QuoteWebSocketNotifier {
   final _outputController = StreamController<WsQuoteUpdate>.broadcast();
   StreamSubscription<WsQuoteUpdate>? _pipeSubscription;
 
+  /// Connection state stream for UI indicators.
+  final _connectionStateController = StreamController<QuoteWebSocketConnectionState>.broadcast();
+
   /// Symbols to re-subscribe after a reconnect.
   final Set<String> _subscribedSymbols = {};
 
+  /// Queue of pending subscribe/unsubscribe operations during reconnection.
+  /// Max size: [_kMaxPendingOperations] to prevent unbounded growth.
+  final List<_PendingOperation> _pendingOperations = [];
+
   int _reconnectAttempts = 0;
   bool _paused = false;
+  QuoteWebSocketConnectionState _connectionState = QuoteWebSocketConnectionState.disconnected;
 
   /// Last error for reconnect logging
   Object? _lastError;
+
+  /// Random number generator for jitter calculation
+  final _random = Random();
+
+  @visibleForTesting
+  Stream<QuoteWebSocketConnectionState> get connectionStateStream =>
+      _connectionStateController.stream;
 
   @override
   Future<WsUserType> build() async {
@@ -100,15 +148,30 @@ class QuoteWebSocketNotifier extends _$QuoteWebSocketNotifier {
     _pipeSubscription?.cancel();
     _client?.dispose();
     _outputController.close();
+    _connectionStateController.close();
     _client = null;
+  }
+
+  // ─── Connection State Management ───────────────────────────────────────────
+
+  void _setConnectionState(QuoteWebSocketConnectionState newState) {
+    if (_connectionState != newState) {
+      _connectionState = newState;
+      _connectionStateController.add(newState);
+      AppLogger.debug('QuoteWS: connection state → $newState');
+    }
   }
 
   // ─── Connection ───────────────────────────────────────────────────────────
 
   Future<WsUserType> _connectWithToken() async {
+    _setConnectionState(QuoteWebSocketConnectionState.connecting);
+
     final token = await ref.read(tokenServiceProvider).getAccessToken();
     final factory = ref.read(wsClientFactoryProvider);
     final client = factory(_wsUrl);
+
+    _setConnectionState(QuoteWebSocketConnectionState.authenticating);
 
     final userType = await client.connect(
       token: (token == null || token.isEmpty) ? null : token,
@@ -116,8 +179,10 @@ class QuoteWebSocketNotifier extends _$QuoteWebSocketNotifier {
 
     _client = client;
     _reconnectAttempts = 0;
+    _pendingOperations.clear();
     _pipeClientEvents(client);
 
+    _setConnectionState(QuoteWebSocketConnectionState.connected);
     AppLogger.debug('QuoteWS: connected as $userType');
     return userType;
   }
@@ -183,6 +248,7 @@ class QuoteWebSocketNotifier extends _$QuoteWebSocketNotifier {
       AppLogger.error(
         'QuoteWS: max reconnect attempts reached after $errorType',
       );
+      _setConnectionState(QuoteWebSocketConnectionState.error);
       state = AsyncError(
         const NetworkException(message: '行情连接失败，请检查网络后重试'),
         StackTrace.current,
@@ -190,7 +256,15 @@ class QuoteWebSocketNotifier extends _$QuoteWebSocketNotifier {
       return;
     }
 
-    final delay = Duration(seconds: pow(2, _reconnectAttempts).toInt());
+    _setConnectionState(QuoteWebSocketConnectionState.reconnecting);
+
+    // Calculate exponential backoff with jitter to prevent thundering herd
+    final baseDelay = pow(2, _reconnectAttempts).toInt();
+    final jitterMs = (baseDelay * 1000 * _kBackoffJitterPercent).toInt();
+    final randomJitter = _random.nextInt(2 * jitterMs) - jitterMs;
+    final finalDelayMs = (baseDelay * 1000) + randomJitter;
+    final delay = Duration(milliseconds: finalDelayMs.clamp(100, 32000).toInt());
+
     _reconnectAttempts++;
 
     final reason = _lastError is NetworkException
@@ -198,7 +272,8 @@ class QuoteWebSocketNotifier extends _$QuoteWebSocketNotifier {
         : _lastError?.toString() ?? 'unknown';
 
     AppLogger.debug(
-      'QuoteWS: reconnecting in ${delay.inSeconds}s '
+      'QuoteWS: reconnecting in ${delay.inSeconds}s (${delay.inMilliseconds}ms, '
+      'with ±${(jitterMs / 1000).toStringAsFixed(1)}s jitter) '
       '(attempt $_reconnectAttempts/$_kMaxReconnectAttempts) '
       'reason: $reason',
     );
@@ -217,14 +292,20 @@ class QuoteWebSocketNotifier extends _$QuoteWebSocketNotifier {
 
   Future<void> _reconnectInternal() async {
     final prevSymbols = Set<String>.from(_subscribedSymbols);
+    final pendingOps = List<_PendingOperation>.from(_pendingOperations);
     _subscribedSymbols.clear();
+    _pendingOperations.clear();
 
     _pipeSubscription?.cancel();
     await _client?.dispose();
 
+    _setConnectionState(QuoteWebSocketConnectionState.connecting);
+
     final token = await ref.read(tokenServiceProvider).getAccessToken();
     final factory = ref.read(wsClientFactoryProvider);
     final newClient = factory(_wsUrl);
+
+    _setConnectionState(QuoteWebSocketConnectionState.authenticating);
 
     final userType = await newClient.connect(
       token: (token == null || token.isEmpty) ? null : token,
@@ -234,12 +315,37 @@ class QuoteWebSocketNotifier extends _$QuoteWebSocketNotifier {
     _reconnectAttempts = 0;
     _pipeClientEvents(newClient);
 
+    // Replay previously subscribed symbols first
     if (prevSymbols.isNotEmpty) {
       await _subscribeInternal(prevSymbols.toList());
     }
 
+    // Then replay buffered pending operations (subscribe/unsubscribe that occurred during disconnect)
+    await _replayPendingOperations(pendingOps);
+
+    _setConnectionState(QuoteWebSocketConnectionState.connected);
     state = AsyncData(userType);
-    AppLogger.info('QuoteWS: reconnected successfully as $userType');
+    AppLogger.info(
+      'QuoteWS: reconnected successfully as $userType '
+      '(replayed ${prevSymbols.length} symbols + ${pendingOps.length} buffered ops)',
+    );
+  }
+
+  /// Replay pending operations (subscribe/unsubscribe) that were buffered during reconnection.
+  Future<void> _replayPendingOperations(List<_PendingOperation> pendingOps) async {
+    if (pendingOps.isEmpty || _client == null) return;
+
+    for (final op in pendingOps) {
+      try {
+        if (op is _PendingSubscribe) {
+          await _subscribeInternal(op.symbols);
+        } else if (op is _PendingUnsubscribe) {
+          unsubscribe(op.symbols);
+        }
+      } catch (e) {
+        AppLogger.warning('QuoteWS: failed to replay operation $op: $e');
+      }
+    }
   }
 
   // ─── Public API ───────────────────────────────────────────────────────────
@@ -252,9 +358,16 @@ class QuoteWebSocketNotifier extends _$QuoteWebSocketNotifier {
   /// Subscribe to real-time (or delayed) quotes for [symbols].
   ///
   /// Automatically batches into groups of [_kSymbolBatchSize] (50) per the
-  /// server limit.
+  /// server limit. If currently reconnecting, buffers the request for replay.
   Future<void> subscribe(List<String> symbols) async {
     if (symbols.isEmpty) return;
+
+    // If reconnecting, buffer the request for replay after connection restored
+    if (_connectionState == QuoteWebSocketConnectionState.reconnecting) {
+      _bufferOperation(_PendingSubscribe(symbols));
+      return;
+    }
+
     await _subscribeInternal(symbols);
   }
 
@@ -269,11 +382,30 @@ class QuoteWebSocketNotifier extends _$QuoteWebSocketNotifier {
   }
 
   /// Unsubscribe from [symbols].
+  /// If currently reconnecting, buffers the request for replay after connection restored.
   void unsubscribe(List<String> symbols) {
     if (symbols.isEmpty) return;
+
+    // If reconnecting, buffer the request for replay after connection restored
+    if (_connectionState == QuoteWebSocketConnectionState.reconnecting) {
+      _bufferOperation(_PendingUnsubscribe(symbols));
+      return;
+    }
+
     _client?.unsubscribe(symbols);
     _subscribedSymbols.removeAll(symbols);
     AppLogger.debug('QuoteWS: unsubscribed from ${symbols.length} symbols');
+  }
+
+  /// Buffer an operation for replay during reconnection.
+  /// Operations are queued if buffer is not full; oldest operations are dropped if needed.
+  void _bufferOperation(_PendingOperation op) {
+    if (_pendingOperations.length >= _kMaxPendingOperations) {
+      _pendingOperations.removeAt(0); // Drop oldest operation
+      AppLogger.warning('QuoteWS: pending operation buffer full, dropping oldest op');
+    }
+    _pendingOperations.add(op);
+    AppLogger.debug('QuoteWS: buffered operation ${op.runtimeType}');
   }
 
   /// Re-authenticate with a refreshed [newToken].
