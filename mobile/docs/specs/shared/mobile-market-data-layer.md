@@ -7,12 +7,12 @@
 > 1. 本文档基于 **KMP/Kotlin** 技术栈撰写（StateFlow、Koin、@Composable、ViewModelScope 等），项目已于 2026-03-13 切换至 **Flutter/Dart/Riverpod**，文档内容与当前技术栈完全不兼容。
 > 2. 行情模块 PRD（PRD-03）尚未获得行情工程师的最终 approve，待 PRD 确定后由 mobile-engineer 基于 Flutter 技术栈重新输出实施方案。
 >
-> **后续替代文档**: 待 PRD-03 review 完成后新建 `mobile-market-data-layer-flutter.md`。
+> **后续替代文档**: Flutter 版本的行情数据层架构已在 `market/market-implementation-spec.md` §7-8 中完整描述（基于 Riverpod + Dio + WebSocket）。
 >
 > **参考入口**:
 > - 当前技术栈: `docs/specs/mobile-flutter-tech-spec.md`
+> - 行情实现规范: `docs/specs/market/market-implementation-spec.md`
 > - 行情 PRD: `docs/prd/03-market.md`
-> - 行情 PRD review 线程: `docs/threads/2026-03-prd-03-market-data-review/`
 
 ---
 

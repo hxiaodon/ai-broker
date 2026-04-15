@@ -22,13 +22,8 @@ final authRepositoryProvider = AuthRepositoryProvider._();
 /// - Injects [TokenService], [DeviceInfoService], [SecureStorageService].
 
 final class AuthRepositoryProvider
-    extends
-        $FunctionalProvider<
-          AuthRepositoryImpl,
-          AuthRepositoryImpl,
-          AuthRepositoryImpl
-        >
-    with $Provider<AuthRepositoryImpl> {
+    extends $FunctionalProvider<AuthRepository, AuthRepository, AuthRepository>
+    with $Provider<AuthRepository> {
   /// Wires up [AuthRepositoryImpl] with all required dependencies.
   ///
   /// - Creates a dedicated [Dio] instance for the AMS service (SPKI pinned).
@@ -49,22 +44,21 @@ final class AuthRepositoryProvider
 
   @$internal
   @override
-  $ProviderElement<AuthRepositoryImpl> $createElement(
-    $ProviderPointer pointer,
-  ) => $ProviderElement(pointer);
+  $ProviderElement<AuthRepository> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
 
   @override
-  AuthRepositoryImpl create(Ref ref) {
+  AuthRepository create(Ref ref) {
     return authRepository(ref);
   }
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(AuthRepositoryImpl value) {
+  Override overrideWithValue(AuthRepository value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<AuthRepositoryImpl>(value),
+      providerOverride: $SyncValueProvider<AuthRepository>(value),
     );
   }
 }
 
-String _$authRepositoryHash() => r'bd10142b37dee4fe14aa87847c118144132a50d8';
+String _$authRepositoryHash() => r'c52b409c6bede34a0543644e0a3b141973216a87';

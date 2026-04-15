@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 
 import '../logging/app_logger.dart';
@@ -16,7 +18,7 @@ class AuthInterceptor extends Interceptor {
         refreshAccessToken = refreshAccessToken ?? (() async => null);
 
   final Dio _dio;
-  bool _isRefreshing = false;
+  Completer<String?>? _refreshCompleter;
 
   /// Returns the current access token synchronously (from in-memory cache).
   /// Wired at provider assembly time via [DioClient.create].
@@ -44,20 +46,47 @@ class AuthInterceptor extends Interceptor {
     ErrorInterceptorHandler handler,
   ) async {
     final response = err.response;
-    if (response?.statusCode == 401 && !_isRefreshing) {
-      _isRefreshing = true;
+    if (response?.statusCode == 401) {
+      // If a refresh is already in progress, wait for it
+      if (_refreshCompleter != null) {
+        AppLogger.debug('AuthInterceptor: waiting for ongoing token refresh');
+        try {
+          final newToken = await _refreshCompleter!.future;
+          if (newToken != null) {
+            AppLogger.info('AuthInterceptor: using refreshed token, retrying ${err.requestOptions.path}');
+            final options = err.requestOptions
+              ..headers['Authorization'] = 'Bearer $newToken';
+            final retryResponse = await _dio.fetch<dynamic>(options);
+            return handler.resolve(retryResponse);
+          }
+        } on Object catch (e, stack) {
+          AppLogger.error(
+            'AuthInterceptor: waiting for refresh failed',
+            error: e,
+            stackTrace: stack,
+          );
+        }
+        return handler.next(err);
+      }
+
+      // Start a new refresh operation
+      _refreshCompleter = Completer<String?>();
       try {
         AppLogger.debug('AuthInterceptor: attempting token refresh for ${err.requestOptions.path}');
         final newToken = await refreshAccessToken();
+
         if (newToken != null) {
-          AppLogger.info('AuthInterceptor: token refresh successful, retrying ${err.requestOptions.path}');
+          AppLogger.info('AuthInterceptor: token refresh successful');
+          _refreshCompleter!.complete(newToken);
+
+          // Retry the original request
           final options = err.requestOptions
             ..headers['Authorization'] = 'Bearer $newToken';
           final retryResponse = await _dio.fetch<dynamic>(options);
-          _isRefreshing = false;
           return handler.resolve(retryResponse);
         } else {
           AppLogger.warning('AuthInterceptor: token refresh returned null');
+          _refreshCompleter!.complete(null);
         }
       } on Object catch (e, stack) {
         AppLogger.error(
@@ -65,9 +94,9 @@ class AuthInterceptor extends Interceptor {
           error: e,
           stackTrace: stack,
         );
-        // Refresh failed — propagate original error
+        _refreshCompleter!.completeError(e, stack);
       } finally {
-        _isRefreshing = false;
+        _refreshCompleter = null;
       }
     }
     handler.next(err);

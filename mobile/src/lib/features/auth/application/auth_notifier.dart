@@ -1,9 +1,11 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/auth/jwt_decoder.dart';
 import '../../../core/auth/token_service.dart';
 import '../../../core/logging/app_logger.dart';
 import '../data/auth_repository_impl.dart';
+import '../domain/repositories/auth_repository.dart';
 import '../domain/entities/auth_token.dart';
 
 part 'auth_notifier.freezed.dart';
@@ -62,7 +64,7 @@ class AuthNotifier extends _$AuthNotifier {
 
       final isValid = await tokenService.isAccessTokenValid();
       if (isValid) {
-        final accountId = _extractClaim(accessToken, 'account_id') ?? 'unknown';
+        final accountId = JwtDecoder.extractAccountId(accessToken) ?? 'unknown';
         final biometricEnabled = await _isBiometricRegistered();
         state = AuthState.authenticated(
           accountId: accountId,
@@ -191,43 +193,5 @@ class AuthNotifier extends _$AuthNotifier {
   Future<bool> _isBiometricRegistered() async {
     final repo = ref.read(authRepositoryProvider);
     return repo.isBiometricRegistered();
-  }
-
-  String? _extractClaim(String jwt, String claim) {
-    try {
-      final parts = jwt.split('.');
-      if (parts.length != 3) return null;
-      final payload = parts[1];
-      final padded = payload.padRight((payload.length + 3) & ~3, '=');
-      final decoded = String.fromCharCodes(_base64UrlDecode(padded));
-      final re = RegExp('"$claim"\\s*:\\s*"([^"]*)"');
-      return re.firstMatch(decoded)?.group(1);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  List<int> _base64UrlDecode(String input) {
-    const chars =
-        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-    final normalized = input.replaceAll('-', '+').replaceAll('_', '/');
-    final bytes = <int>[];
-    for (var i = 0; i + 3 < normalized.length; i += 4) {
-      final b0 = chars.indexOf(normalized[i]);
-      final b1 = chars.indexOf(normalized[i + 1]);
-      final c2 = normalized[i + 2];
-      final c3 = normalized[i + 3];
-      final b2 = c2 == '=' ? 0 : chars.indexOf(c2);
-      final b3 = c3 == '=' ? 0 : chars.indexOf(c3);
-      bytes.add(((b0 < 0 ? 0 : b0) << 2) | ((b1 < 0 ? 0 : b1) >> 4));
-      if (c2 != '=') {
-        bytes.add((((b1 < 0 ? 0 : b1) & 0xF) << 4) |
-            ((b2 < 0 ? 0 : b2) >> 2));
-      }
-      if (c3 != '=') {
-        bytes.add((((b2 < 0 ? 0 : b2) & 0x3) << 6) | (b3 < 0 ? 0 : b3));
-      }
-    }
-    return bytes;
   }
 }

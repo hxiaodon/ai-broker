@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/auth/device_info_service.dart';
+import '../../../core/auth/jwt_decoder.dart';
 import '../../../core/auth/token_service.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/network/authenticated_dio.dart';
@@ -132,7 +133,9 @@ class AuthRepositoryImpl implements AuthRepository {
 
     // Re-read accountId from current token (refresh doesn't return it)
     final existingAccess = await _tokenService.getAccessToken();
-    final accountId = _extractAccountIdFromJwt(existingAccess) ?? 'unknown';
+    final accountId = existingAccess != null
+        ? JwtDecoder.extractAccountId(existingAccess) ?? 'unknown'
+        : 'unknown';
 
     final token = AuthToken(
       accessToken: response.accessToken,
@@ -248,58 +251,6 @@ class AuthRepositoryImpl implements AuthRepository {
       biometricType: dto.biometricType,
     );
   }
-
-  /// Decode account_id claim from JWT payload without verifying signature.
-  /// Used only to maintain accountId after a token refresh (non-security path).
-  String? _extractAccountIdFromJwt(String? jwt) {
-    if (jwt == null) return null;
-    try {
-      final parts = jwt.split('.');
-      if (parts.length != 3) return null;
-      // Add padding if needed for base64 decode
-      final payload = parts[1];
-      final padded = payload.padRight((payload.length + 3) & ~3, '=');
-      final decoded = String.fromCharCodes(
-        _base64UrlDecode(padded),
-      );
-      final claims = _parseJsonSimple(decoded);
-      return claims['account_id'] as String?;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  List<int> _base64UrlDecode(String input) {
-    final normalized = input.replaceAll('-', '+').replaceAll('_', '/');
-    final bytes = <int>[];
-    for (var i = 0; i < normalized.length; i += 4) {
-      final chunk = normalized.substring(i, i + 4);
-      final b0 = _b64Char(chunk[0]);
-      final b1 = _b64Char(chunk[1]);
-      final b2 = chunk[2] == '=' ? 0 : _b64Char(chunk[2]);
-      final b3 = chunk[3] == '=' ? 0 : _b64Char(chunk[3]);
-      bytes.add((b0 << 2) | (b1 >> 4));
-      if (chunk[2] != '=') bytes.add(((b1 & 0xF) << 4) | (b2 >> 2));
-      if (chunk[3] != '=') bytes.add(((b2 & 0x3) << 6) | b3);
-    }
-    return bytes;
-  }
-
-  int _b64Char(String c) {
-    const chars =
-        'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-    return chars.indexOf(c);
-  }
-
-  Map<String, dynamic> _parseJsonSimple(String json) {
-    // Minimal JSON object parser for JWT claims (account_id is a string field)
-    final result = <String, dynamic>{};
-    final re = RegExp(r'"([^"]+)"\s*:\s*"([^"]*)"');
-    for (final match in re.allMatches(json)) {
-      result[match.group(1)!] = match.group(2)!;
-    }
-    return result;
-  }
 }
 
 /// Wires up [AuthRepositoryImpl] with all required dependencies.
@@ -307,7 +258,7 @@ class AuthRepositoryImpl implements AuthRepository {
 /// - Creates a dedicated [Dio] instance for the AMS service (SPKI pinned).
 /// - Injects [TokenService], [DeviceInfoService], [SecureStorageService].
 @Riverpod(keepAlive: true)
-AuthRepositoryImpl authRepository(Ref ref) {
+AuthRepository authRepository(Ref ref) {
   final tokenSvc = ref.read(tokenServiceProvider);
   final dio = createAuthenticatedDio(
     baseUrl: _kAmsBaseUrl,

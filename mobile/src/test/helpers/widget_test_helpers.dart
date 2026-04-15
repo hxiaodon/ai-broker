@@ -9,7 +9,9 @@ import 'package:mocktail/mocktail.dart';
 
 import 'package:trading_app/core/auth/token_service.dart';
 import 'package:trading_app/features/auth/application/auth_notifier.dart';
+import 'package:trading_app/features/market/application/quote_websocket_notifier.dart';
 import 'package:trading_app/features/market/application/watchlist_notifier.dart';
+import 'package:trading_app/features/market/data/watchlist_repository_impl.dart';
 import 'package:trading_app/features/market/data/websocket/quote_websocket_client.dart';
 import 'package:trading_app/features/market/domain/repositories/watchlist_repository.dart';
 
@@ -31,6 +33,7 @@ class TestWidgetBuilder {
           AuthState.authenticated(
             accountId: accountId,
             accountStatus: accountStatus,
+            biometricEnabled: false,
           ),
         ),
         // Market repositories and services

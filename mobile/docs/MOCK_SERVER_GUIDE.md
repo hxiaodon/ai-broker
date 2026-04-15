@@ -378,7 +378,7 @@ flutter test integration_test/ --verbose --timeout=30m
 
 ## 📚 相关文档
 
-- [INTEGRATION_TESTS.md](./docs/INTEGRATION_TESTS.md) - 完整测试指南
+- [INTEGRATION_TEST_GUIDE.md](./INTEGRATION_TEST_GUIDE.md) - 完整测试指南
 - [mock-server/README.md](./mock-server/README.md) - Mock server 详细文档
 - [mock-server/TESTING.md](./mock-server/TESTING.md) - 测试用例
 

@@ -100,21 +100,31 @@ Step 8: 开户协议文本展示      → H5（阅读展示，签名动作回 Na
 ### Flutter 侧（WebView 宿主）
 
 ```dart
-// 在 WebView 加载完成后注入 auth context
-controller.runJavaScript(
-  'window.JSBridge?.setAuthContext("${token}", "${userId}")',
-);
+// 使用 webview_flutter
+late final WebViewController _controller;
 
-// 监听 closeWebView 回调
-JavascriptChannel(
-  name: 'FlutterBridge',
-  onMessageReceived: (msg) {
-    final result = jsonDecode(msg.message);
-    if (result['signed'] == true) {
-      // 推进 KYC 步骤
-    }
-  },
-)
+_controller = WebViewController()
+  ..setJavaScriptMode(JavaScriptMode.unrestricted)
+  ..addJavaScriptChannel(
+    'FlutterBridge',
+    onMessageReceived: (JavaScriptMessage message) {
+      final result = jsonDecode(message.message);
+      if (result['signed'] == true) {
+        // 推进 KYC 步骤
+      }
+    },
+  )
+  ..setNavigationDelegate(
+    NavigationDelegate(
+      onPageFinished: (url) {
+        // 在 WebView 加载完成后注入 auth context
+        _controller.runJavaScript(
+          'window.JSBridge?.setAuthContext("$token", "$userId")',
+        );
+      },
+    ),
+  )
+  ..loadRequest(Uri.parse(webViewUrl));
 ```
 
 ### H5 侧（React）

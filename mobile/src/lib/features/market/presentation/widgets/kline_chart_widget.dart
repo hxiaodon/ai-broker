@@ -1,3 +1,4 @@
+import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' as intl;
@@ -78,13 +79,13 @@ class _OhlcvInfo {
   });
 
   final String time;
-  final double open;
-  final double high;
-  final double low;
-  final double close;
+  final Decimal open;
+  final Decimal high;
+  final Decimal low;
+  final Decimal close;
   final int volume;
-  final double change;
-  final double changePercent;
+  final Decimal change;
+  final Decimal changePercent;
   final bool isUp;
 }
 
@@ -234,6 +235,12 @@ class _ChartViewState extends State<_ChartView> {
   double? _crosshairX;
   double? _crosshairY;
 
+  // MA calculation cache
+  List<_MaPoint>? _cachedMa5;
+  List<_MaPoint>? _cachedMa10;
+  List<_MaPoint>? _cachedMa20;
+  int? _cachedDataLength;
+
   static const _bullish = Color(0xFF0DC582);
   static const _bearish = Color(0xFFFF4747);
   static const _ma5Color = Color(0xFFFFB800);
@@ -280,19 +287,21 @@ class _ChartViewState extends State<_ChartView> {
     _lastHoveredIdx = idx;
 
     final c = widget.candles[idx];
-    final prevClose = idx > 0 ? widget.candles[idx - 1].c.toDouble() : c.o.toDouble();
-    final change = c.c.toDouble() - prevClose;
-    final changePercent = prevClose != 0 ? change / prevClose * 100 : 0.0;
+    final prevClose = idx > 0 ? widget.candles[idx - 1].c : c.o;
+    final change = c.c - prevClose;
+    final changePercent = prevClose != Decimal.zero
+        ? (change / prevClose).toDecimal(scaleOnInfinitePrecision: 10) * Decimal.fromInt(100)
+        : Decimal.zero;
 
     setState(() {
       _crosshairX = point.xPosition;
       _crosshairY = point.yPosition;
       _hoveredInfo = _OhlcvInfo(
         time: _timeFormat(widget.period.apiPeriod).format(c.t.toLocal()),
-        open: c.o.toDouble(),
-        high: c.h.toDouble(),
-        low: c.l.toDouble(),
-        close: c.c.toDouble(),
+        open: c.o,
+        high: c.h,
+        low: c.l,
+        close: c.c,
         volume: c.v,
         change: change,
         changePercent: changePercent,
@@ -340,16 +349,18 @@ class _ChartViewState extends State<_ChartView> {
     // Default info bar: latest candle
     final latest = widget.candles.last;
     final prevClose = widget.candles.length > 1
-        ? widget.candles[widget.candles.length - 2].c.toDouble()
-        : latest.o.toDouble();
-    final latestChange = latest.c.toDouble() - prevClose;
-    final latestChangePct = prevClose != 0 ? latestChange / prevClose * 100 : 0.0;
+        ? widget.candles[widget.candles.length - 2].c
+        : latest.o;
+    final latestChange = latest.c - prevClose;
+    final latestChangePct = prevClose != Decimal.zero
+        ? (latestChange / prevClose).toDecimal(scaleOnInfinitePrecision: 10) * Decimal.fromInt(100)
+        : Decimal.zero;
     final defaultInfo = _OhlcvInfo(
       time: _timeFormat(widget.period.apiPeriod).format(latest.t.toLocal()),
-      open: latest.o.toDouble(),
-      high: latest.h.toDouble(),
-      low: latest.l.toDouble(),
-      close: latest.c.toDouble(),
+      open: latest.o,
+      high: latest.h,
+      low: latest.l,
+      close: latest.c,
       volume: latest.v,
       change: latestChange,
       changePercent: latestChangePct,
@@ -504,9 +515,17 @@ class _ChartViewState extends State<_ChartView> {
 
   /// 日K/周K/月K: 蜡烛图 + MA均线 + 成交量
   List<CartesianSeries> _buildKlineSeries(List<_CandleChartData> chartData) {
-    final ma5 = _calcMA(chartData, 5);
-    final ma10 = _calcMA(chartData, 10);
-    final ma20 = _calcMA(chartData, 20);
+    // Use cached MA values if data hasn't changed
+    if (_cachedDataLength != chartData.length) {
+      _cachedMa5 = _calcMA(chartData, 5);
+      _cachedMa10 = _calcMA(chartData, 10);
+      _cachedMa20 = _calcMA(chartData, 20);
+      _cachedDataLength = chartData.length;
+    }
+
+    final ma5 = _cachedMa5!;
+    final ma10 = _cachedMa10!;
+    final ma20 = _cachedMa20!;
 
     // Adaptive candle width: fewer candles → narrower to avoid oversized bars
     final count = chartData.length;
@@ -637,14 +656,14 @@ class _OhlcvInfoBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final priceColor = info.isUp ? const Color(0xFF0DC582) : const Color(0xFFFF4747);
-    final changeColor = info.change >= 0 ? const Color(0xFF0DC582) : const Color(0xFFFF4747);
+    final changeColor = info.change >= Decimal.zero ? const Color(0xFF0DC582) : const Color(0xFFFF4747);
     final labelColor = Theme.of(context).colorScheme.onSurfaceVariant;
     final priceFmt = intl.NumberFormat('0.00##');
     final volFmt = intl.NumberFormat.compact();
     final changePctStr =
-        '${info.changePercent >= 0 ? '+' : ''}${info.changePercent.toStringAsFixed(2)}%';
+        '${info.changePercent >= Decimal.zero ? '+' : ''}${info.changePercent.toStringAsFixed(2)}%';
     final changeStr =
-        '${info.change >= 0 ? '+' : ''}${priceFmt.format(info.change)}';
+        '${info.change >= Decimal.zero ? '+' : ''}${priceFmt.format(info.change.toDouble())}';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
@@ -687,13 +706,13 @@ class _OhlcvInfoBar extends StatelessWidget {
           // OHLCV row
           Row(
             children: [
-              _InfoCell(label: '开', value: priceFmt.format(info.open), color: priceColor),
+              _InfoCell(label: '开', value: priceFmt.format(info.open.toDouble()), color: priceColor),
               const SizedBox(width: 10),
-              _InfoCell(label: '高', value: priceFmt.format(info.high), color: priceColor),
+              _InfoCell(label: '高', value: priceFmt.format(info.high.toDouble()), color: priceColor),
               const SizedBox(width: 10),
-              _InfoCell(label: '低', value: priceFmt.format(info.low), color: priceColor),
+              _InfoCell(label: '低', value: priceFmt.format(info.low.toDouble()), color: priceColor),
               const SizedBox(width: 10),
-              _InfoCell(label: '收', value: priceFmt.format(info.close), color: priceColor),
+              _InfoCell(label: '收', value: priceFmt.format(info.close.toDouble()), color: priceColor),
               const SizedBox(width: 10),
               _InfoCell(label: '量', value: volFmt.format(info.volume), color: labelColor),
             ],

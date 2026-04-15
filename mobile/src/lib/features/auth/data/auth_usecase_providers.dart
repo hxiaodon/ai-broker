@@ -10,7 +10,7 @@ part 'auth_usecase_providers.g.dart';
 /// Depends on: [authRepositoryProvider]
 /// Lifetime: stateless, new instance on every call
 @riverpod
-SendOtpUseCase sendOtpUseCase(SendOtpUseCaseRef ref) {
+SendOtpUseCase sendOtpUseCase(Ref ref) {
   final repository = ref.watch(authRepositoryProvider);
   return SendOtpUseCase(repository);
 }
@@ -20,7 +20,7 @@ SendOtpUseCase sendOtpUseCase(SendOtpUseCaseRef ref) {
 /// Depends on: [authRepositoryProvider]
 /// Lifetime: stateless, new instance on every call
 @riverpod
-VerifyOtpUseCase verifyOtpUseCase(VerifyOtpUseCaseRef ref) {
+VerifyOtpUseCase verifyOtpUseCase(Ref ref) {
   final repository = ref.watch(authRepositoryProvider);
   return VerifyOtpUseCase(repository);
 }
@@ -30,7 +30,7 @@ VerifyOtpUseCase verifyOtpUseCase(VerifyOtpUseCaseRef ref) {
 /// Depends on: [authRepositoryProvider]
 /// Lifetime: stateless, new instance on every call
 @riverpod
-RefreshTokenUseCase refreshTokenUseCase(RefreshTokenUseCaseRef ref) {
+RefreshTokenUseCase refreshTokenUseCase(Ref ref) {
   final repository = ref.watch(authRepositoryProvider);
   return RefreshTokenUseCase(repository);
 }

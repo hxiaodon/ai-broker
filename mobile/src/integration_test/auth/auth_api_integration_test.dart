@@ -325,7 +325,7 @@ void main() {
             options: Options(validateStatus: (status) => status! < 500),
           );
 
-          lastMessage = response.data!['message'];
+          lastMessage = response.data!['message'] as String;
           print('    Attempt $i: ${response.data!['message']}');
         }
 

@@ -55,7 +55,7 @@ class MarketDataCacheRepositoryImpl implements MarketDataRepository {
       final apiResult = await baseRepository.getQuotes(symbols);
 
       // Update cache with API responses
-      _updateQuotesCache(apiResult).ignore();
+      await _updateQuotesCache(apiResult);
 
       return apiResult;
     } on NetworkException {

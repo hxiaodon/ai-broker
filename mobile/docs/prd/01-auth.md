@@ -1,6 +1,6 @@
 ---
 type: surface-prd
-version: v3.0
+version: v2.1
 updated_date: 2026-03-29T15:00+08:00
 domain_prd:
   - path: ../../../services/ams/docs/prd/kyc-flow.md
@@ -210,7 +210,7 @@ stateDiagram-v2
 | 有效期 | OTP 5 分钟内有效，过期需重新发送 |
 | 错误上限 | 同一 OTP 请求最多错误 5 次，超限锁定账号 30 分钟 |
 | 区号支持 | Phase 1：+86（中国大陆，11 位）、+852（香港，8 位） |
-| 自动填充 | iOS 系统原生识别短信 OTP；Android 通过 SMS Retriever API（无需 READ_SMS 权限）自动填充 |
+| 自动填充 | iOS 系统原生识别短信 OTP；Android 通过 SMS Retriever API（无需 READ_SMS 权限）自动填充<br/>**注**：Phase 1 中 SMS 自动填充降级为 UI 占位（stub），完整实现延迟至 Phase 2（参见 auth.tracker.md T16 决策日志） |
 
 ### 6.2 生物识别规则
 

@@ -7,6 +7,7 @@ import '../../../../core/auth/device_info_service.dart';
 import '../../../../core/logging/app_logger.dart';
 import '../../../../shared/theme/color_tokens.dart';
 import '../../data/auth_repository_impl.dart';
+import '../../domain/repositories/auth_repository.dart';
 import '../../domain/entities/device_info_entity.dart';
 
 /// DeviceManagementScreen — manage registered devices (T06).

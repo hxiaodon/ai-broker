@@ -63,6 +63,9 @@ abstract class AuthRepository {
     required String targetDeviceId,
     required String biometricSignature,
   });
+
+  /// Check whether biometric has been registered on this device.
+  Future<bool> isBiometricRegistered();
 }
 
 /// Result from OTP send endpoint.

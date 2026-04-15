@@ -11,7 +11,7 @@
 | 项目 | 链接 |
 |------|------|
 | PRD | [mobile/docs/prd/03-market.md](../prd/03-market.md) (v2.3) |
-| 高保真原型 | [mobile/prototypes/03-market/hifi/](../../prototypes/03-market/hifi/index.html) |
+| 高保真原型 | [docs/prd/prototypes/03-market/](../../prd/prototypes/03-market/index.html) |
 | API 合约 | [docs/contracts/market-data-to-mobile.md](../../../docs/contracts/market-data-to-mobile.md) (v1.1) |
 | 权威规范 | [services/market-data/docs/specs/](../../../services/market-data/docs/specs/) (market-api-spec v2.0, websocket-spec v2.1, market-data-system v2.1) |
 | 总览仪表盘 | [mobile/docs/active-features.yaml](../active-features.yaml) |

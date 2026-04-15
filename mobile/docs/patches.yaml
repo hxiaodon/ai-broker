@@ -1,0 +1,14 @@
+# Patch 注册表
+# 记录所有针对已发布功能的补丁修复
+
+# 格式说明：
+# - patch_id: 唯一标识符（格式：P-YYYYMMDD-序号）
+# - module: 所属模块（auth/market/trading/portfolio/funding/kyc/settings）
+# - version: 影响的版本号
+# - issue: 问题描述
+# - fix: 修复说明
+# - files: 修改的文件列表
+# - date: 修复日期
+# - author: 修复人
+
+patches: []

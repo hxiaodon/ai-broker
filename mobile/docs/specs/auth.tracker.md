@@ -143,8 +143,8 @@
 - [x] 所有错误场景有明确的中文用户提示，无白屏或静默失败
 - [x] 账号锁定 30 分钟后自动解锁，无需人工干预
 - [x] `flutter analyze` 0 issues
-- [ ] `security-engineer` review 通过（auth + biometric + token 存储）
-- [ ] `code-reviewer` review 通过
+- [x] `security-engineer` review 通过（auth + biometric + token 存储）
+- [x] `code-reviewer` review 通过
 
 ---
 
