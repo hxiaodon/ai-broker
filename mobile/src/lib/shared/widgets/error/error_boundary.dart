@@ -44,30 +44,26 @@ class _ErrorBoundaryState extends State<ErrorBoundary> {
       );
     }
 
-    return ErrorWidget.builder = (FlutterErrorDetails details) {
-      _error = details.exception;
-      _stackTrace = details.stack;
+    ErrorWidget.builder = (FlutterErrorDetails details) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        setState(() {
+          _error = details.exception;
+          _stackTrace = details.stack;
+        });
+      });
 
-      // Report to error handler
       GlobalErrorHandler.reportError(
         details.exception,
         stackTrace: details.stack,
         userMessage: '应用发生错误',
       );
 
-      // Call user callback
       widget.onError?.call(details.exception, details.stack ?? StackTrace.current);
-
-      // Update state to show error screen
-      setState(() {
-        _error = details.exception;
-        _stackTrace = details.stack;
-      });
 
       return SizedBox.expand(
         child: _ErrorScreen(
-          error: _error!,
-          stackTrace: _stackTrace,
+          error: details.exception,
+          stackTrace: details.stack,
           onReset: _reset,
           onReportIssue: _showFeedback,
         ),
@@ -168,13 +164,12 @@ class _UserFeedbackDialogState extends State<UserFeedbackDialog> {
     setState(() => _isSubmitting = true);
 
     try {
-      final feedback = SentryUserFeedback(
-        eventId: Sentry.lastEventId,
-        name: '用户',
-        comments: _controller.text,
+      final feedback = SentryFeedback(
+        message: _controller.text,
+        associatedEventId: Sentry.lastEventId ?? SentryId.empty(),
       );
 
-      await Sentry.captureUserFeedback(feedback);
+      await Sentry.captureFeedback(feedback);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

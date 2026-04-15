@@ -81,7 +81,7 @@ dependencies:
   path: ^1.9.1
 
   # Error tracking & monitoring
-  sentry_flutter: ^7.15.0
+  sentry_flutter: ^8.14.0
 
   # Assets rendering
   flutter_svg: ^2.0.17

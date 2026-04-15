@@ -4,7 +4,6 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
-
 import '../logging/app_logger.dart';
 import 'error_category.dart';
 import 'error_severity.dart';
@@ -61,12 +60,6 @@ class GlobalErrorHandler {
           options.tracesSampleRate = environment == 'production' ? 0.1 : 1.0;
           options.attachStacktrace = true;
           options.maxBreadcrumbs = environment == 'production' ? 50 : 100;
-
-          // Integrations
-          options.addIntegration(LoggingIntegration());
-          if (Platform.isAndroid || Platform.isIOS) {
-            options.addIntegration(NativeIntegration());
-          }
 
           // Custom beforeSend for filtering
           options.beforeSend = _beforeSendToSentry;
@@ -211,22 +204,28 @@ class GlobalErrorHandler {
   }
 
   static SentryEvent? _beforeSendToSentry(SentryEvent event, Hint hint) {
-    // 1. Filter sensitive information
-    event.request?.headers?.remove('Authorization');
-    event.request?.headers?.remove('X-API-Key');
+    // 1. Filter sensitive headers
+    final headers = Map<String, String>.from(event.request?.headers ?? {})
+      ..remove('Authorization')
+      ..remove('X-API-Key');
+    final request = event.request?.copyWith(headers: headers);
 
-    // 2. Add context
-    event.level = SentryLevel.fromName(
+    // 2. Build updated tags
+    final tags = Map<String, String>.from(event.tags ?? {});
+    if (hint.get('category') is String) {
+      tags['error_category'] = hint.get('category') as String;
+    }
+
+    // 3. Resolve level from hint
+    final level = SentryLevel.fromName(
       hint.get('severity')?.toString() ?? 'error',
     );
 
-    // 3. Add tags for filtering
-    if (hint.get('category') is String) {
-      event.tags ??= {};
-      event.tags!['error_category'] = hint.get('category') as String;
-    }
-
-    return event;
+    return event.copyWith(
+      request: request,
+      level: level,
+      tags: tags,
+    );
   }
 
   static void _handleFlutterError(FlutterErrorDetails details) {

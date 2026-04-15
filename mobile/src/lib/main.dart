@@ -54,33 +54,30 @@ Future<void> main() async {
 }
 
 /// Observer for logging Riverpod provider state changes in debug mode.
-class RiverpodObserver extends ProviderObserver {
+base class RiverpodObserver extends ProviderObserver {
   @override
   void didAddProvider(
-    ProviderBase provider,
+    ProviderObserverContext context,
     Object? value,
-    ProviderContainer container,
   ) {
-    AppLogger.debug('Provider ${provider.name} added with value: $value');
+    AppLogger.debug('Provider ${context.provider.name} added with value: $value');
   }
 
   @override
   void didUpdateProvider(
-    ProviderBase provider,
+    ProviderObserverContext context,
     Object? previousValue,
     Object? newValue,
-    ProviderContainer container,
   ) {
     AppLogger.debug(
-      'Provider ${provider.name} updated: $previousValue → $newValue',
+      'Provider ${context.provider.name} updated: $previousValue → $newValue',
     );
   }
 
   @override
   void didDisposeProvider(
-    ProviderBase provider,
-    ProviderContainer container,
+    ProviderObserverContext context,
   ) {
-    AppLogger.debug('Provider ${provider.name} disposed');
+    AppLogger.debug('Provider ${context.provider.name} disposed');
   }
 }
