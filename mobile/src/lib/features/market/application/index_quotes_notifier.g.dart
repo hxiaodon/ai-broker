@@ -61,7 +61,7 @@ final class IndexQuotesNotifierProvider
 }
 
 String _$indexQuotesNotifierHash() =>
-    r'369304228da764df4f4a66bd90872e8d23da0fb1';
+    r'0811770f67f7ecb9806f71f4c660ee1d7e1e4ca9';
 
 /// Provides real-time quotes for market index ETFs (SPY, QQQ, DIA).
 ///

@@ -99,7 +99,7 @@ final class WatchlistNotifierProvider
   WatchlistNotifier create() => WatchlistNotifier();
 }
 
-String _$watchlistNotifierHash() => r'6b44984dda692e83b6addd668688c1460d5ebf40';
+String _$watchlistNotifierHash() => r'f0cf54428951f133f2e89d7161adf08fec576205';
 
 /// Manages the user's watchlist and provides real-time quote updates.
 ///

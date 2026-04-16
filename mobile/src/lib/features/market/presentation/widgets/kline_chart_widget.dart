@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart' as intl;
 import 'package:syncfusion_flutter_charts/charts.dart';
 
+import '../../application/kline_realtime_notifier.dart';
 import '../../application/stock_detail_notifier.dart';
 import '../../data/market_data_repository_impl.dart';
 import '../../domain/entities/candle.dart';
@@ -36,6 +37,12 @@ const _kPeriods = [
 
 final _klineDataProvider = FutureProvider.autoDispose
     .family<List<Candle>, KlineParams>((ref, params) async {
+  // For 1min period, use KlineRealtimeNotifier for real-time updates
+  if (params.period == '1min') {
+    return ref.watch(klineRealtimeNotifierProvider(params).future);
+  }
+
+  // Other periods: static REST data only
   final repo = ref.read(marketDataRepositoryProvider);
   final result = await repo.getKline(
     symbol: params.symbol,
