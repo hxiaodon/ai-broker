@@ -6,6 +6,8 @@ import (
 	"log"
 	"net/http"
 	"os"
+
+	"github.com/gorilla/websocket"
 )
 
 var (
@@ -38,8 +40,14 @@ func main() {
 	http.HandleFunc("/v1/auth/devices/", handleDeleteDevice)
 
 	// Market endpoints
-	http.HandleFunc("/ws/market-data", handleWebSocket)
-	http.HandleFunc("/v1/market/quotes", handleQuotes)
+	// Merge REST and WebSocket on same path
+	http.HandleFunc("/v1/market/quotes", func(w http.ResponseWriter, r *http.Request) {
+		if websocket.IsWebSocketUpgrade(r) {
+			handleWebSocket(w, r)
+		} else {
+			handleQuotes(w, r)
+		}
+	})
 	http.HandleFunc("/v1/market/kline", handleKline)
 	http.HandleFunc("/v1/market/kline/", handleKline)
 	http.HandleFunc("/v1/market/search", handleSearch)
@@ -53,7 +61,7 @@ func main() {
 
 	addr := fmt.Sprintf(":%d", *port)
 	log.Printf("🚀 Mock server started on %s (strategy: %s)", addr, *strategy)
-	log.Printf("📡 WebSocket endpoint: ws://localhost%s/ws/market-data", addr)
+	log.Printf("📡 WebSocket endpoint: ws://localhost%s/v1/market/quotes", addr)
 	log.Printf("🔧 Switch strategy: go run . --strategy=<name>")
 	log.Fatal(http.ListenAndServe(addr, nil))
 }

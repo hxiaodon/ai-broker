@@ -12,15 +12,22 @@ import (
 
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all origins for testing
+		return true
 	},
+	Subprotocols: []string{"brokerage-market-v1"},
+}
+
+type wsFrame struct {
+	msgType int
+	data    []byte
 }
 
 type Client struct {
 	conn          *websocket.Conn
-	send          chan []byte
+	send          chan wsFrame
 	subscriptions map[string]bool
-	userType      string // "registered" or "guest"
+	userType      string
+	authenticated bool
 	mu            sync.RWMutex
 }
 
@@ -28,13 +35,6 @@ type WSMessage struct {
 	Action  string   `json:"action"`
 	Token   string   `json:"token,omitempty"`
 	Symbols []string `json:"symbols,omitempty"`
-}
-
-type WSResponse struct {
-	Type     string      `json:"type"`
-	UserType string      `json:"user_type,omitempty"`
-	Message  string      `json:"message,omitempty"`
-	Data     interface{} `json:"data,omitempty"`
 }
 
 func handleWebSocket(w http.ResponseWriter, r *http.Request) {
@@ -46,13 +46,12 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 	client := &Client{
 		conn:          conn,
-		send:          make(chan []byte, 256),
+		send:          make(chan wsFrame, 256),
 		subscriptions: make(map[string]bool),
 	}
 
 	log.Printf("✅ Client connected: %s", conn.RemoteAddr())
 
-	// Start goroutines
 	go client.writePump()
 	go client.readPump()
 }
@@ -91,18 +90,17 @@ func (c *Client) writePump() {
 
 	for {
 		select {
-		case message, ok := <-c.send:
+		case frame, ok := <-c.send:
 			if !ok {
 				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
 
-			if err := c.conn.WriteMessage(websocket.TextMessage, message); err != nil {
+			if err := c.conn.WriteMessage(frame.msgType, frame.data); err != nil {
 				return
 			}
 
 		case <-ticker.C:
-			// Send tick updates for subscribed symbols
 			c.sendTickUpdates()
 		}
 	}
@@ -112,55 +110,97 @@ func (c *Client) handleMessage(msg WSMessage) {
 	switch msg.Action {
 	case "auth":
 		c.handleAuth(msg.Token)
+	case "reauth":
+		c.handleReauth(msg.Token)
 	case "subscribe":
+		if !c.authenticated {
+			return
+		}
 		c.handleSubscribe(msg.Symbols)
 	case "unsubscribe":
+		if !c.authenticated {
+			return
+		}
 		c.handleUnsubscribe(msg.Symbols)
+	case "ping":
+		c.sendControl(map[string]interface{}{"type": "pong"})
 	default:
 		log.Printf("Unknown action: %s", msg.Action)
 	}
 }
 
 func (c *Client) handleAuth(token string) {
-	// Apply strategy
-	if shouldRejectAuth := currentStrategy.ShouldRejectAuth(token); shouldRejectAuth {
-		c.sendError(4002, "Token 无效或已过期（code 4002）")
+	if currentStrategy.ShouldRejectAuth(token) {
+		c.sendControl(map[string]interface{}{
+			"type":    "auth_result",
+			"success": false,
+		})
 		time.AfterFunc(100*time.Millisecond, func() {
 			c.conn.Close()
 		})
 		return
 	}
 
-	// Determine user type
+	if token == "" || token == "guest" {
+		c.userType = "guest"
+	} else {
+		c.userType = "registered"
+	}
+	c.authenticated = true
+
+	c.sendControl(map[string]interface{}{
+		"type":      "auth_result",
+		"success":   true,
+		"user_type": c.userType,
+	})
+
+	log.Printf("🔐 Auth success: %s (type: %s)", c.conn.RemoteAddr(), c.userType)
+}
+
+func (c *Client) handleReauth(token string) {
+	if currentStrategy.ShouldRejectAuth(token) {
+		c.sendControl(map[string]interface{}{
+			"type":    "reauth_result",
+			"success": false,
+		})
+		return
+	}
+
 	if token == "" || token == "guest" {
 		c.userType = "guest"
 	} else {
 		c.userType = "registered"
 	}
 
-	resp := WSResponse{
-		Type:     "auth_success",
-		UserType: c.userType,
-		Message:  "认证成功",
-	}
+	c.sendControl(map[string]interface{}{
+		"type":      "reauth_result",
+		"success":   true,
+		"user_type": c.userType,
+	})
 
-	data, _ := json.Marshal(resp)
-	c.send <- data
-
-	log.Printf("🔐 Auth success: %s (type: %s)", c.conn.RemoteAddr(), c.userType)
+	log.Printf("🔄 Reauth success: %s (type: %s)", c.conn.RemoteAddr(), c.userType)
 }
 
 func (c *Client) handleSubscribe(symbols []string) {
 	c.mu.Lock()
-	for _, symbol := range symbols {
-		c.subscriptions[symbol] = true
+	for _, s := range symbols {
+		c.subscriptions[s] = true
 	}
 	c.mu.Unlock()
 
+	c.sendControl(map[string]interface{}{
+		"type":    "subscribe_ack",
+		"symbols": symbols,
+	})
+
 	log.Printf("📊 Subscribed: %v", symbols)
 
-	// Send initial snapshot
-	c.sendSnapshot(symbols)
+	for _, symbol := range symbols {
+		quote := generateQuote(symbol, c.userType)
+		quoteBuf := encodeQuote(quote, c.userType)
+		frame := encodeWsQuoteFrame(frameTypeSnapshot, quoteBuf)
+		c.send <- wsFrame{websocket.BinaryMessage, frame}
+	}
 }
 
 func (c *Client) handleUnsubscribe(symbols []string) {
@@ -171,19 +211,6 @@ func (c *Client) handleUnsubscribe(symbols []string) {
 	c.mu.Unlock()
 
 	log.Printf("🚫 Unsubscribed: %v", symbols)
-}
-
-func (c *Client) sendSnapshot(symbols []string) {
-	for _, symbol := range symbols {
-		quote := generateQuote(symbol, c.userType)
-		frame := map[string]interface{}{
-			"type":   "snapshot",
-			"symbol": symbol,
-			"data":   quote,
-		}
-		data, _ := json.Marshal(frame)
-		c.send <- data
-	}
 }
 
 func (c *Client) sendTickUpdates() {
@@ -198,8 +225,7 @@ func (c *Client) sendTickUpdates() {
 		return
 	}
 
-	// Apply strategy
-	if shouldDisconnect := currentStrategy.ShouldDisconnect(); shouldDisconnect {
+	if currentStrategy.ShouldDisconnect() {
 		log.Printf("💥 Strategy triggered disconnect")
 		c.conn.Close()
 		return
@@ -210,24 +236,20 @@ func (c *Client) sendTickUpdates() {
 		time.Sleep(delay)
 	}
 
+	frameType := frameTypeTick
+	if c.userType == "guest" {
+		frameType = frameTypeDelayed
+	}
+
 	for _, symbol := range symbols {
 		quote := generateTickUpdate(symbol, c.userType)
-		frame := map[string]interface{}{
-			"type":   "tick",
-			"symbol": symbol,
-			"data":   quote,
-		}
-		data, _ := json.Marshal(frame)
-		c.send <- data
+		quoteBuf := encodeQuote(quote, c.userType)
+		frame := encodeWsQuoteFrame(frameType, quoteBuf)
+		c.send <- wsFrame{websocket.BinaryMessage, frame}
 	}
 }
 
-func (c *Client) sendError(code int, message string) {
-	resp := map[string]interface{}{
-		"type":    "error",
-		"code":    code,
-		"message": message,
-	}
-	data, _ := json.Marshal(resp)
-	c.send <- data
+func (c *Client) sendControl(data map[string]interface{}) {
+	b, _ := json.Marshal(data)
+	c.send <- wsFrame{websocket.TextMessage, b}
 }
