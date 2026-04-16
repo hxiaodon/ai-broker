@@ -13,6 +13,24 @@ import 'stock_detail_notifier.dart';
 part 'kline_realtime_notifier.g.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
+
+String _defaultFrom(String period) {
+  final now = DateTime.now().toUtc();
+  final d = switch (period) {
+    '1min' || '5min' || '15min' || '30min' || '60min' =>
+      now.subtract(const Duration(days: 1)),
+    '1d' => now.subtract(const Duration(days: 365 * 5)),
+    '1w' => now.subtract(const Duration(days: 365 * 10)),
+    _ => now.subtract(const Duration(days: 365)),
+  };
+  return '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // KlineRealtimeNotifier
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -65,7 +83,7 @@ class KlineRealtimeNotifier extends _$KlineRealtimeNotifier {
       final result = await repo.getKline(
         symbol: params.symbol,
         period: params.period,
-        from: params.from,
+        from: params.from ?? _defaultFrom(params.period),
         to: params.to,
         limit: params.limit,
         cursor: params.cursor,

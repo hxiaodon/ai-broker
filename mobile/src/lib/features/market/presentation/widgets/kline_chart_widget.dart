@@ -35,14 +35,9 @@ const _kPeriods = [
 // Data provider
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Static provider for non-intraday periods only.
 final _klineDataProvider = FutureProvider.autoDispose
     .family<List<Candle>, KlineParams>((ref, params) async {
-  // For 1min period, use KlineRealtimeNotifier for real-time updates
-  if (params.period == '1min') {
-    return ref.watch(klineRealtimeNotifierProvider(params).future);
-  }
-
-  // Other periods: static REST data only
   final repo = ref.read(marketDataRepositoryProvider);
   final result = await repo.getKline(
     symbol: params.symbol,
@@ -146,18 +141,14 @@ class _KLineChartWidgetState extends ConsumerState<KLineChartWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final klineAsync = ref.watch(_klineDataProvider(_params));
-
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         SizedBox(
           height: 300,
-          child: klineAsync.when(
-            loading: () => _buildPlaceholder(context, loading: true),
-            error: (_, __) => _buildPlaceholder(context, loading: false),
-            data: (candles) => _ChartView(candles: candles, period: _period),
-          ),
+          child: _period.isIntraday
+              ? _IntradayChartView(params: _params)
+              : _buildStaticChart(context),
         ),
         const SizedBox(height: 12),
         // Period selector
@@ -198,6 +189,15 @@ class _KLineChartWidgetState extends ConsumerState<KLineChartWidget> {
     );
   }
 
+  Widget _buildStaticChart(BuildContext context) {
+    final klineAsync = ref.watch(_klineDataProvider(_params));
+    return klineAsync.when(
+      loading: () => _buildPlaceholder(context, loading: true),
+      error: (_, __) => _buildPlaceholder(context, loading: false),
+      data: (candles) => _ChartView(candles: candles, period: _period),
+    );
+  }
+
   Widget _buildPlaceholder(BuildContext context, {required bool loading}) {
     return Container(
       decoration: BoxDecoration(
@@ -214,6 +214,383 @@ class _KLineChartWidgetState extends ConsumerState<KLineChartWidget> {
                   fontSize: 13,
                 ),
               ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Intraday chart view (real-time, incremental updates)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Renders the 分时 (1min intraday) chart with real-time WebSocket updates.
+///
+/// Uses [ChartSeriesController.updateDataSource] for incremental updates
+/// instead of rebuilding the entire widget on each tick.
+class _IntradayChartView extends ConsumerStatefulWidget {
+  const _IntradayChartView({required this.params});
+
+  final KlineParams params;
+
+  @override
+  ConsumerState<_IntradayChartView> createState() => _IntradayChartViewState();
+}
+
+class _IntradayChartViewState extends ConsumerState<_IntradayChartView> {
+  late TrackballBehavior _trackballBehavior;
+  late ZoomPanBehavior _zoomPanBehavior;
+
+  // Mutable chart data list — updated in-place for incremental updates
+  final List<_CandleChartData> _chartData = [];
+  int _prevCandleCount = 0;
+
+  // Series controllers for incremental updates
+  ChartSeriesController? _lineController;
+  ChartSeriesController? _volumeController;
+
+  // ValueNotifiers — updates these never trigger a widget rebuild
+  final _infoNotifier = ValueNotifier<_OhlcvInfo?>(null);
+  final _crosshairNotifier = ValueNotifier<({double x, double? y})?>(null);
+
+  // Candles reference for trackball info
+  List<Candle> _candles = [];
+
+  // Whether chart has been rendered at least once
+  bool _chartReady = false;
+
+  // Manual listener — registered once, cancelled on dispose
+  ProviderSubscription<AsyncValue<List<Candle>>>? _klineSubscription;
+
+  static const _bullish = Color(0xFF0DC582);
+  static const _bearish = Color(0xFFFF4747);
+
+  @override
+  void initState() {
+    super.initState();
+    _zoomPanBehavior = ZoomPanBehavior(
+      enablePinching: true,
+      enablePanning: true,
+      zoomMode: ZoomMode.x,
+      enableDoubleTapZooming: true,
+    );
+    _trackballBehavior = TrackballBehavior(
+      enable: true,
+      activationMode: ActivationMode.singleTap,
+      lineColor: Colors.transparent,
+      lineWidth: 0,
+      tooltipDisplayMode: TrackballDisplayMode.none,
+      shouldAlwaysShow: false,
+      hideDelay: 3000,
+      markerSettings: const TrackballMarkerSettings(
+        markerVisibility: TrackballVisibilityMode.hidden,
+      ),
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Register listener exactly once using listenManual (safe outside build).
+    _klineSubscription ??= ref.listenManual<AsyncValue<List<Candle>>>(
+      klineRealtimeProvider(widget.params),
+      (_, next) => next.whenData(_onCandlesUpdated),
+    );
+  }
+
+  @override
+  void dispose() {
+    _klineSubscription?.close();
+    _infoNotifier.dispose();
+    _crosshairNotifier.dispose();
+    super.dispose();
+  }
+
+  void _onCandlesUpdated(List<Candle> candles) {
+    if (candles.isEmpty) return;
+    _candles = candles;
+
+    if (_chartData.isEmpty) {
+      // Initial load — populate full list and trigger one-time render
+      _chartData.addAll(candles.map((c) => _CandleChartData(
+            x: c.t,
+            open: c.o.toDouble(),
+            high: c.h.toDouble(),
+            low: c.l.toDouble(),
+            close: c.c.toDouble(),
+            volume: c.v,
+          )));
+      _prevCandleCount = candles.length;
+      // Single setState only for initial chart render
+      if (mounted) setState(() { _chartReady = true; });
+      return;
+    }
+
+    final newCount = candles.length;
+
+    if (newCount > _prevCandleCount) {
+      // New candle appended
+      final prevLast = candles[newCount - 2];
+      _chartData[_prevCandleCount - 1] = _CandleChartData(
+        x: prevLast.t,
+        open: prevLast.o.toDouble(),
+        high: prevLast.h.toDouble(),
+        low: prevLast.l.toDouble(),
+        close: prevLast.c.toDouble(),
+        volume: prevLast.v,
+      );
+      final newLast = candles.last;
+      _chartData.add(_CandleChartData(
+        x: newLast.t,
+        open: newLast.o.toDouble(),
+        high: newLast.h.toDouble(),
+        low: newLast.l.toDouble(),
+        close: newLast.c.toDouble(),
+        volume: newLast.v,
+      ));
+      _prevCandleCount = newCount;
+      _lineController?.updateDataSource(
+        addedDataIndexes: [_chartData.length - 1],
+        updatedDataIndexes: [_chartData.length - 2],
+      );
+      _volumeController?.updateDataSource(
+        addedDataIndexes: [_chartData.length - 1],
+        updatedDataIndexes: [_chartData.length - 2],
+      );
+    } else {
+      // Update last candle in-place
+      final last = candles.last;
+      _chartData[_chartData.length - 1] = _CandleChartData(
+        x: last.t,
+        open: last.o.toDouble(),
+        high: last.h.toDouble(),
+        low: last.l.toDouble(),
+        close: last.c.toDouble(),
+        volume: last.v,
+      );
+      _lineController?.updateDataSource(updatedDataIndexes: [_chartData.length - 1]);
+      _volumeController?.updateDataSource(updatedDataIndexes: [_chartData.length - 1]);
+    }
+
+    // Update info bar via ValueNotifier — no setState, no rebuild
+    if (_crosshairNotifier.value == null) {
+      _infoNotifier.value = _buildInfoFromLatest();
+    }
+  }
+
+  void _onTrackballChanged(TrackballArgs args) {
+    final point = args.chartPointInfo;
+    final idx = point.dataPointIndex ?? -1;
+    if (idx < 0 || idx >= _candles.length) return;
+
+    final c = _candles[idx];
+    final prevClose = idx > 0 ? _candles[idx - 1].c : c.o;
+    final change = c.c - prevClose;
+    final changePercent = prevClose != Decimal.zero
+        ? (change / prevClose).toDecimal(scaleOnInfinitePrecision: 10) * Decimal.fromInt(100)
+        : Decimal.zero;
+
+    // Update via ValueNotifier — no setState, no rebuild
+    _crosshairNotifier.value = (x: point.xPosition!, y: point.yPosition);
+    _infoNotifier.value = _OhlcvInfo(
+      time: intl.DateFormat('MM-dd HH:mm').format(c.t.toLocal()),
+      open: c.o,
+      high: c.h,
+      low: c.l,
+      close: c.c,
+      volume: c.v,
+      change: change,
+      changePercent: changePercent,
+      isUp: c.c >= c.o,
+    );
+  }
+
+  _OhlcvInfo? _buildInfoFromLatest() {
+    if (_candles.isEmpty) return null;
+    final latest = _candles.last;
+    final prevClose = _candles.length > 1 ? _candles[_candles.length - 2].c : latest.o;
+    final change = latest.c - prevClose;
+    final changePct = prevClose != Decimal.zero
+        ? (change / prevClose).toDecimal(scaleOnInfinitePrecision: 10) * Decimal.fromInt(100)
+        : Decimal.zero;
+    return _OhlcvInfo(
+      time: intl.DateFormat('MM-dd HH:mm').format(latest.t.toLocal()),
+      open: latest.o,
+      high: latest.h,
+      low: latest.l,
+      close: latest.c,
+      volume: latest.v,
+      change: change,
+      changePercent: changePct,
+      isUp: latest.c >= latest.o,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_chartReady) {
+      final async = ref.watch(klineRealtimeProvider(widget.params));
+      if (async.isLoading) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainer,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Center(child: CircularProgressIndicator.adaptive()),
+        );
+      }
+      if (async.hasError) {
+        return Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainer,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Center(
+            child: Text(
+              'K线数据加载失败',
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13),
+            ),
+          ),
+        );
+      }
+      return Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainer,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Center(
+          child: Text(
+            '暂无K线数据',
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13),
+          ),
+        ),
+      );
+    }
+
+    final refPrice = _chartData.first.open;
+    final lastPrice = _chartData.last.close;
+    final lineColor = lastPrice >= refPrice ? _bullish : _bearish;
+    final maxVolume = _chartData.map((d) => d.volume).reduce((a, b) => a > b ? a : b).toDouble();
+
+    // Seed info notifier on first render
+    if (_infoNotifier.value == null) {
+      _infoNotifier.value = _buildInfoFromLatest();
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Info bar — rebuilt only when ValueNotifier changes, not on tick
+          ValueListenableBuilder<_OhlcvInfo?>(
+            valueListenable: _infoNotifier,
+            builder: (_, info, __) => info != null
+                ? _OhlcvInfoBar(
+                    info: info,
+                    isHovering: _crosshairNotifier.value != null,
+                  )
+                : const SizedBox.shrink(),
+          ),
+          const SizedBox(height: 4),
+          Expanded(
+            child: Stack(
+              children: [
+                SfCartesianChart(
+                  plotAreaBorderWidth: 0,
+                  onTrackballPositionChanging: _onTrackballChanged,
+                  onChartTouchInteractionUp: (_) {
+                    _crosshairNotifier.value = null;
+                    _infoNotifier.value = _buildInfoFromLatest();
+                  },
+                  primaryXAxis: DateTimeAxis(
+                    intervalType: DateTimeIntervalType.minutes,
+                    interval: 60,
+                    majorGridLines: MajorGridLines(
+                      width: 0.5,
+                      color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.2),
+                    ),
+                    axisLine: const AxisLine(width: 0),
+                    labelStyle: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    dateFormat: intl.DateFormat('HH:mm'),
+                    edgeLabelPlacement: EdgeLabelPlacement.shift,
+                  ),
+                  primaryYAxis: NumericAxis(
+                    labelPosition: ChartDataLabelPosition.outside,
+                    opposedPosition: true,
+                    desiredIntervals: 4,
+                    majorGridLines: MajorGridLines(
+                      width: 0.5,
+                      color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.3),
+                    ),
+                    axisLine: const AxisLine(width: 0),
+                    labelStyle: TextStyle(fontSize: 10, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    numberFormat: intl.NumberFormat('0.00#'),
+                    plotBands: [
+                      PlotBand(
+                        start: refPrice,
+                        end: refPrice,
+                        borderColor: Colors.grey.withValues(alpha: 0.6),
+                        borderWidth: 1,
+                        dashArray: const [4, 4],
+                      ),
+                    ],
+                  ),
+                  axes: [
+                    NumericAxis(
+                      name: 'volumeAxis',
+                      majorGridLines: const MajorGridLines(width: 0),
+                      axisLine: const AxisLine(width: 0),
+                      maximum: maxVolume * 1.5,
+                      desiredIntervals: 2,
+                      isVisible: false,
+                      opposedPosition: true,
+                    ),
+                  ],
+                  series: [
+                    SplineAreaSeries<_CandleChartData, DateTime>(
+                      onRendererCreated: (c) => _lineController = c,
+                      dataSource: _chartData,
+                      xValueMapper: (d, _) => d.x,
+                      yValueMapper: (d, _) => d.close,
+                      borderColor: lineColor,
+                      borderWidth: 1.5,
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [lineColor.withValues(alpha: 0.25), lineColor.withValues(alpha: 0.0)],
+                      ),
+                      splineType: SplineType.monotonic,
+                      enableTooltip: false,
+                    ),
+                    ColumnSeries<_CandleChartData, DateTime>(
+                      onRendererCreated: (c) => _volumeController = c,
+                      dataSource: _chartData,
+                      xValueMapper: (d, _) => d.x,
+                      yValueMapper: (d, _) => d.volume.toDouble(),
+                      yAxisName: 'volumeAxis',
+                      color: lineColor.withValues(alpha: 0.35),
+                      width: 0.8,
+                      enableTooltip: false,
+                    ),
+                  ],
+                  trackballBehavior: _trackballBehavior,
+                  zoomPanBehavior: _zoomPanBehavior,
+                ),
+                // Crosshair overlay — rebuilt only when ValueNotifier changes
+                ValueListenableBuilder<({double x, double? y})?>(
+                  valueListenable: _crosshairNotifier,
+                  builder: (_, pos, __) => pos != null
+                      ? _CrosshairOverlay(x: pos.x, y: pos.y)
+                      : const SizedBox.shrink(),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
