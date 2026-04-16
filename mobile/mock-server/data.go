@@ -240,25 +240,34 @@ func generateTickUpdate(symbol, userType string) map[string]interface{} {
 		return generateQuote(symbol, userType)
 	}
 
-	// Generate small price change
+	// Generate small price change from base price
 	priceStr := base["price"].(string)
 	price, err := strconv.ParseFloat(priceStr, 64)
 	if err != nil {
-		// Fallback if parse fails
 		price = 175.50
 	}
 
-	// Random tick: ±0.01 to ±0.50
+	// Random tick: ±0.50
 	delta := (rand.Float64() - 0.5) * 1.0
 	newPrice := price + delta
 
+	// change and change_pct must be relative to prev_close (cumulative),
+	// not relative to the single tick delta.
+	prevCloseStr, _ := base["prev_close"].(string)
+	prevClose, err := strconv.ParseFloat(prevCloseStr, 64)
+	if err != nil || prevClose == 0 {
+		prevClose = price
+	}
+	change := newPrice - prevClose
+	changePct := (change / prevClose) * 100
+
 	tick := map[string]interface{}{
-		"symbol":      symbol, // IMPORTANT: Include symbol field
-		"market":      base["market"],
-		"price":       formatPrice(newPrice),
-		"change":      formatPrice(delta),
-		"change_pct":  formatPrice((delta / price) * 100),
-		"timestamp":   time.Now().UTC().Format(time.RFC3339),
+		"symbol":       symbol,
+		"market":       base["market"],
+		"price":        formatPrice(newPrice),
+		"change":       formatPrice(change),
+		"change_pct":   formatPrice(changePct),
+		"timestamp":    time.Now().UTC().Format(time.RFC3339),
 		"timestamp_ms": time.Now().UTC().UnixMilli(),
 	}
 

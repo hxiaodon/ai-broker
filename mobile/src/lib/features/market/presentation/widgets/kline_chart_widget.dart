@@ -320,17 +320,22 @@ class _IntradayChartViewState extends ConsumerState<_IntradayChartView> {
             volume: c.v,
           )));
       _prevCandleCount = candles.length;
-      // Single setState only for initial chart render
       if (mounted) setState(() { _chartReady = true; });
       return;
     }
 
     final newCount = candles.length;
 
-    if (newCount > _prevCandleCount) {
-      // New candle appended
+    // If lengths are out of sync (e.g. provider trimmed head), full reset
+    if (_chartData.length != _prevCandleCount) {
+      _fullReset(candles);
+      return;
+    }
+
+    if (newCount == _prevCandleCount + 1) {
+      // Exactly one new candle appended — incremental update
       final prevLast = candles[newCount - 2];
-      _chartData[_prevCandleCount - 1] = _CandleChartData(
+      _chartData[_chartData.length - 1] = _CandleChartData(
         x: prevLast.t,
         open: prevLast.o.toDouble(),
         high: prevLast.h.toDouble(),
@@ -349,10 +354,11 @@ class _IntradayChartViewState extends ConsumerState<_IntradayChartView> {
       ));
       _prevCandleCount = newCount;
 
-      // Mirror the 390-candle cap from KlineRealtimeNotifier
+      // Mirror the 390-candle cap — remove oldest if over limit
       if (_chartData.length > 390) {
         _chartData.removeAt(0);
       }
+
       _lineController?.updateDataSource(
         addedDataIndexes: [_chartData.length - 1],
         updatedDataIndexes: [_chartData.length - 2],
@@ -361,8 +367,8 @@ class _IntradayChartViewState extends ConsumerState<_IntradayChartView> {
         addedDataIndexes: [_chartData.length - 1],
         updatedDataIndexes: [_chartData.length - 2],
       );
-    } else {
-      // Update last candle in-place
+    } else if (newCount == _prevCandleCount) {
+      // Same count — update last candle in-place
       final last = candles.last;
       _chartData[_chartData.length - 1] = _CandleChartData(
         x: last.t,
@@ -374,9 +380,38 @@ class _IntradayChartViewState extends ConsumerState<_IntradayChartView> {
       );
       _lineController?.updateDataSource(updatedDataIndexes: [_chartData.length - 1]);
       _volumeController?.updateDataSource(updatedDataIndexes: [_chartData.length - 1]);
+    } else {
+      // Count jumped by more than 1 or shrank — full reset to stay in sync
+      _fullReset(candles);
+      return;
     }
 
     // Update info bar via ValueNotifier — no setState, no rebuild
+    if (_crosshairNotifier.value == null) {
+      _infoNotifier.value = _buildInfoFromLatest();
+    }
+  }
+
+  /// Full reset of _chartData from candles list.
+  /// Used when incremental tracking is out of sync.
+  void _fullReset(List<Candle> candles) {
+    _chartData
+      ..clear()
+      ..addAll(candles.map((c) => _CandleChartData(
+            x: c.t,
+            open: c.o.toDouble(),
+            high: c.h.toDouble(),
+            low: c.l.toDouble(),
+            close: c.c.toDouble(),
+            volume: c.v,
+          )));
+    _prevCandleCount = candles.length;
+    _lineController?.updateDataSource(
+      updatedDataIndexes: List.generate(_chartData.length, (i) => i),
+    );
+    _volumeController?.updateDataSource(
+      updatedDataIndexes: List.generate(_chartData.length, (i) => i),
+    );
     if (_crosshairNotifier.value == null) {
       _infoNotifier.value = _buildInfoFromLatest();
     }

@@ -40,13 +40,6 @@ class StockDetailNotifier extends _$StockDetailNotifier {
   @override
   Future<StockDetail> build(String symbol) async {
     try {
-      // Capture before any await so it's available in onDispose.
-      final wsNotifier = ref.read(quoteWebSocketProvider.notifier);
-      ref.onDispose(() {
-        AppLogger.debug('StockDetailNotifier: dispose — unsubscribing $symbol');
-        wsNotifier.unsubscribe([symbol]);
-      });
-
       final startTime = DateTime.now();
       final repo = ref.read(marketDataRepositoryProvider);
       final detail = await repo.getStockDetail(symbol);
