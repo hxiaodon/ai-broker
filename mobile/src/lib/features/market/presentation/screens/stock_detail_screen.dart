@@ -227,7 +227,7 @@ class _PriceHero extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    '${isPos ? '+' : ''}${(detail.changePct * Decimal.fromInt(100)).toStringAsFixed(2)}%',
+                    '${isPos ? '+' : ''}${detail.changePct.toStringAsFixed(2)}%',
                     style: TextStyle(
                       color: changeColor,
                       fontSize: 18,

@@ -19,6 +19,14 @@ class PriceChangeBadge extends StatelessWidget {
   final int decimalPlaces;
   final bool showSign;
 
+  /// Displays a price change percentage as a coloured badge.
+  ///
+  /// Colour is determined by the sign of [change]:
+  ///   - Positive: [Theme.of(context).colorScheme.tertiary] (priceUp colour)
+  ///   - Negative: [Theme.of(context).colorScheme.error] (priceDown colour)
+  ///   - Zero: grey
+  ///
+  /// [change] is expected in percentage form (e.g. 1.33 means +1.33%).
   @override
   Widget build(BuildContext context) {
     final isPositive = change > Decimal.zero;
@@ -38,9 +46,9 @@ class PriceChangeBadge extends StatelessWidget {
       textColor = scheme.onSurfaceVariant;
     }
 
-    final pct = (change * Decimal.fromInt(100));
+    // change is already in percentage form (e.g. 1.33 = 1.33%), no * 100 needed
     final sign = (showSign && isPositive) ? '+' : '';
-    final text = '$sign${pct.toStringAsFixed(decimalPlaces)}%';
+    final text = '$sign${change.toStringAsFixed(decimalPlaces)}%';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

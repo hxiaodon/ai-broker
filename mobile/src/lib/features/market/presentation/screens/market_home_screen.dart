@@ -313,7 +313,7 @@ class _IndexCard extends StatelessWidget {
               const SkeletonLoader(width: 48, height: 12, borderRadius: 3)
             else
               Text(
-                '${isPos ? '+' : ''}${(pct * Decimal.fromInt(100)).toStringAsFixed(2)}%',
+                '${isPos ? '+' : ''}${pct.toStringAsFixed(2)}%',
                 style: TextStyle(
                   color: pctColor,
                   fontSize: 12,

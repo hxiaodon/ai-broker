@@ -38,11 +38,11 @@ extension DecimalFinancialExtensions on Decimal {
   }
 
   /// Format as percentage change.
-  /// Example: Decimal('0.0523') → '+5.23%'
+  /// [this] is expected in percentage form (e.g. 1.33 means +1.33%).
+  /// Example: Decimal('1.33') → '+1.33%'
   String toPercentChange({int decimalPlaces = 2}) {
-    final pct = this * Decimal.fromInt(100);
-    final sign = pct >= Decimal.zero ? '+' : '';
-    return '$sign${pct.toStringAsFixed(decimalPlaces)}%';
+    final sign = this >= Decimal.zero ? '+' : '';
+    return '$sign${toStringAsFixed(decimalPlaces)}%';
   }
 
   /// Format plain decimal with explicit decimal places.

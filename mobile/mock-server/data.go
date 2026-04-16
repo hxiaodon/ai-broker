@@ -247,8 +247,9 @@ func generateTickUpdate(symbol, userType string) map[string]interface{} {
 		price = 175.50
 	}
 
-	// Random tick: ±0.50
-	delta := (rand.Float64() - 0.5) * 1.0
+	// Random tick: ±0.5% of base price, so all symbols show meaningful movement
+	deltaRatio := (rand.Float64() - 0.5) * 0.01 // ±0.5%
+	delta := price * deltaRatio
 	newPrice := price + delta
 
 	// change and change_pct must be relative to prev_close (cumulative),
