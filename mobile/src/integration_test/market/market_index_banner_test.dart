@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:trading_app/features/market/application/index_quotes_provider.dart';
+import 'package:trading_app/features/market/application/index_quotes_notifier.dart';
 import 'package:trading_app/features/market/domain/entities/quote.dart';
 import 'package:trading_app/features/market/domain/entities/market_status.dart';
 import 'package:trading_app/features/market/presentation/screens/market_home_screen.dart';

@@ -61,7 +61,7 @@ final class SendOtpUseCaseProvider
   }
 }
 
-String _$sendOtpUseCaseHash() => r'8a33c8957052c4536620b85c3d5249e9a14828c5';
+String _$sendOtpUseCaseHash() => r'82d141a0b90df9d9b8045a2ffe0c79f15c56860f';
 
 /// Provider for [VerifyOtpUseCase].
 ///
@@ -121,7 +121,7 @@ final class VerifyOtpUseCaseProvider
   }
 }
 
-String _$verifyOtpUseCaseHash() => r'9ce93a0681dba1ac837f08d442354fcc4b4b067d';
+String _$verifyOtpUseCaseHash() => r'f6aa84f19312a63cf6992a01cb744c18fb2c04e5';
 
 /// Provider for [RefreshTokenUseCase].
 ///
@@ -183,4 +183,4 @@ final class RefreshTokenUseCaseProvider
 }
 
 String _$refreshTokenUseCaseHash() =>
-    r'48ef56919375fb9bbfb85ea4a69d86248b4e0ee9';
+    r'bc0d00fefda68767e7dfb5deff56d22e581c7110';

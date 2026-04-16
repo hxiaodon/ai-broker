@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"math/rand"
+	"strconv"
 	"time"
 )
 
@@ -240,10 +242,10 @@ func generateTickUpdate(symbol, userType string) map[string]interface{} {
 
 	// Generate small price change
 	priceStr := base["price"].(string)
-	var price float64
-	if _, err := time.Parse("", priceStr); err == nil {
-		// Parse price
-		price = 175.50 // fallback
+	price, err := strconv.ParseFloat(priceStr, 64)
+	if err != nil {
+		// Fallback if parse fails
+		price = 175.50
 	}
 
 	// Random tick: ±0.01 to ±0.50
@@ -251,6 +253,8 @@ func generateTickUpdate(symbol, userType string) map[string]interface{} {
 	newPrice := price + delta
 
 	tick := map[string]interface{}{
+		"symbol":      symbol, // IMPORTANT: Include symbol field
+		"market":      base["market"],
 		"price":       formatPrice(newPrice),
 		"change":      formatPrice(delta),
 		"change_pct":  formatPrice((delta / price) * 100),
@@ -270,5 +274,5 @@ func generateTickUpdate(symbol, userType string) map[string]interface{} {
 }
 
 func formatPrice(f float64) string {
-	return time.Now().Format("150.40") // Simplified formatting
+	return fmt.Sprintf("%.2f", f)
 }

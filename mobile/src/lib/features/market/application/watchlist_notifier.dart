@@ -74,18 +74,30 @@ class WatchlistNotifier extends _$WatchlistNotifier {
   /// Listens to [quoteWebSocketProvider] and subscribes to WS symbols when
   /// the connection is ready. Re-subscribes on reconnect automatically.
   void _subscribeWhenReady(List<String> symbols) {
+    // Try to subscribe immediately if already connected
+    final wsState = ref.read(quoteWebSocketProvider);
+    wsState.whenData((_) async {
+      if (symbols.isEmpty) return;
+      AppLogger.debug(
+          'WatchlistNotifier: subscribing ${symbols.length} symbols to WS (immediate)');
+      await ref
+          .read(quoteWebSocketProvider.notifier)
+          .subscribe(symbols);
+    });
+
+    // Also listen for future connection state changes
     ref.listen(quoteWebSocketProvider, (_, wsState) {
       wsState.whenData((_) async {
         final current = state.value;
         if (current == null || current.isEmpty) return;
         final toSubscribe = current.map((q) => q.symbol).toList();
         AppLogger.debug(
-            'WatchlistNotifier: subscribing ${toSubscribe.length} symbols to WS');
+            'WatchlistNotifier: subscribing ${toSubscribe.length} symbols to WS (listener)');
         await ref
             .read(quoteWebSocketProvider.notifier)
             .subscribe(toSubscribe);
       });
-    }, fireImmediately: true);
+    }, fireImmediately: false);
   }
 
   /// Attaches a listener on the WS quote broadcast stream to patch state.
