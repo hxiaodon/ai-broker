@@ -348,6 +348,11 @@ class _IntradayChartViewState extends ConsumerState<_IntradayChartView> {
         volume: newLast.v,
       ));
       _prevCandleCount = newCount;
+
+      // Mirror the 390-candle cap from KlineRealtimeNotifier
+      if (_chartData.length > 390) {
+        _chartData.removeAt(0);
+      }
       _lineController?.updateDataSource(
         addedDataIndexes: [_chartData.length - 1],
         updatedDataIndexes: [_chartData.length - 2],
