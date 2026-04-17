@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -252,11 +254,22 @@ class _IntradayChartViewState extends ConsumerState<_IntradayChartView> {
   final _infoNotifier = ValueNotifier<_OhlcvInfo?>(null);
   final _crosshairNotifier = ValueNotifier<({double x, double? y})?>(null);
 
+  // True while a zoom/pan gesture is in progress — suppress crosshair clear
+  bool _isZooming = false;
+
+  void _clearCrosshair() {
+    _crosshairNotifier.value = null;
+    _infoNotifier.value = _buildInfoFromLatest();
+  }
+
   // Candles reference for trackball info
   List<Candle> _candles = [];
 
   // Whether chart has been rendered at least once
   bool _chartReady = false;
+
+  // Timer to sync crosshair dismissal with Syncfusion's hideDelay
+  Timer? _crosshairHideTimer;
 
   // Manual listener — registered once, cancelled on dispose
   ProviderSubscription<AsyncValue<List<Candle>>>? _klineSubscription;
@@ -300,6 +313,7 @@ class _IntradayChartViewState extends ConsumerState<_IntradayChartView> {
   @override
   void dispose() {
     _klineSubscription?.close();
+    _crosshairHideTimer?.cancel();
     _infoNotifier.dispose();
     _crosshairNotifier.dispose();
     super.dispose();
@@ -406,12 +420,9 @@ class _IntradayChartViewState extends ConsumerState<_IntradayChartView> {
             volume: c.v,
           )));
     _prevCandleCount = candles.length;
-    _lineController?.updateDataSource(
-      updatedDataIndexes: List.generate(_chartData.length, (i) => i),
-    );
-    _volumeController?.updateDataSource(
-      updatedDataIndexes: List.generate(_chartData.length, (i) => i),
-    );
+    // Full rebuild is safer than updateDataSource with all indexes
+    // when the chart may be in a zoomed/panned state.
+    if (mounted) setState(() {});
     if (_crosshairNotifier.value == null) {
       _infoNotifier.value = _buildInfoFromLatest();
     }
@@ -422,6 +433,10 @@ class _IntradayChartViewState extends ConsumerState<_IntradayChartView> {
     final idx = point.dataPointIndex ?? -1;
     if (idx < 0 || idx >= _candles.length) return;
 
+    // xPosition can be null during zoom/pan gestures — skip to avoid crash
+    final xPos = point.xPosition;
+    if (xPos == null) return;
+
     final c = _candles[idx];
     final prevClose = idx > 0 ? _candles[idx - 1].c : c.o;
     final change = c.c - prevClose;
@@ -430,7 +445,7 @@ class _IntradayChartViewState extends ConsumerState<_IntradayChartView> {
         : Decimal.zero;
 
     // Update via ValueNotifier — no setState, no rebuild
-    _crosshairNotifier.value = (x: point.xPosition!, y: point.yPosition);
+    _crosshairNotifier.value = (x: xPos, y: point.yPosition);
     _infoNotifier.value = _OhlcvInfo(
       time: intl.DateFormat('MM-dd HH:mm').format(c.t.toLocal()),
       open: c.o,
@@ -442,6 +457,10 @@ class _IntradayChartViewState extends ConsumerState<_IntradayChartView> {
       changePercent: changePercent,
       isUp: c.c >= c.o,
     );
+
+    // Sync our overlay dismissal with Syncfusion's hideDelay (3000ms)
+    _crosshairHideTimer?.cancel();
+    _crosshairHideTimer = Timer(const Duration(milliseconds: 3200), _clearCrosshair);
   }
 
   _OhlcvInfo? _buildInfoFromLatest() {
@@ -542,10 +561,11 @@ class _IntradayChartViewState extends ConsumerState<_IntradayChartView> {
                 SfCartesianChart(
                   plotAreaBorderWidth: 0,
                   onTrackballPositionChanging: _onTrackballChanged,
-                  onChartTouchInteractionUp: (_) {
-                    _crosshairNotifier.value = null;
-                    _infoNotifier.value = _buildInfoFromLatest();
+                  onZoomStart: (_) {
+                    _isZooming = true;
+                    if (_crosshairNotifier.value != null) _clearCrosshair();
                   },
+                  onZoomEnd: (_) { _isZooming = false; },
                   primaryXAxis: DateTimeAxis(
                     intervalType: DateTimeIntervalType.minutes,
                     interval: 60,
