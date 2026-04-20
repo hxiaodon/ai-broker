@@ -108,6 +108,18 @@ class EnvironmentConfig {
         Environment.production => 'https://ams.trading.example.com',
       };
 
+  /// Base URL for Trading Engine API (orders, positions, portfolio)
+  late final String tradingBaseUrl = String.fromEnvironment(
+    'TRADING_BASE_URL',
+    defaultValue: _tradingBaseUrlDefault,
+  );
+
+  String get _tradingBaseUrlDefault => switch (environment) {
+        Environment.development => _localhostUrl(),
+        Environment.staging => 'https://trading-staging.trading.example.com',
+        Environment.production => 'https://trading.trading.example.com',
+      };
+
   /// WebSocket base URL for real-time market data
   late final String wsBaseUrl = String.fromEnvironment(
     'WS_BASE_URL',

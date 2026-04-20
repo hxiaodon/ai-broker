@@ -123,7 +123,7 @@ final class KlineRealtimeNotifierProvider
 }
 
 String _$klineRealtimeNotifierHash() =>
-    r'7f095a6c56a771d0d28412e3e98b604886450780';
+    r'b8ad2d836bc913c513bf4a5a193878ccb8cfb8d6';
 
 /// Manages real-time K-line data for intraday (1min) charts.
 ///

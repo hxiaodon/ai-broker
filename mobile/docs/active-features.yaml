@@ -53,14 +53,17 @@ modules:
 
   - id: trading
     name: 交易模块
-    status: pending
-    phase1_tasks: "0/?"
+    status: in_progress
+    phase1_tasks: "20/20"
     prd: mobile/docs/prd/04-trading.md
-    tracker: mobile/docs/specs/trading.tracker.md  # JIT
+    tracker: mobile/docs/specs/trading.tracker.md
     hifi: mobile/prototypes/04-trading/
     contracts:
       - docs/contracts/trading-to-mobile.md
-    notes: "Phase 1 仅美股现金账户；KYC APPROVED 为前置条件"
+    notes: >
+      Phase 1 实现中：Domain/Data/Application/Presentation 层骨架完成（T01-T19）。
+      待生成 freezed/json_serializable 代码（.g.dart/.freezed.dart），
+      flutter analyze 验证，以及 uuid/crypto pubspec 依赖确认。
 
   - id: portfolio
     name: 持仓模块

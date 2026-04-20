@@ -1,3 +1,4 @@
+import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -13,6 +14,10 @@ import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/market/presentation/screens/market_home_screen.dart';
 import '../../features/market/presentation/screens/search_screen.dart';
 import '../../features/market/presentation/screens/stock_detail_screen.dart';
+import '../../features/trading/domain/entities/order.dart';
+import '../../features/trading/presentation/screens/order_confirm_screen.dart';
+import '../../features/trading/presentation/screens/order_entry_screen.dart';
+import '../../features/trading/presentation/screens/order_list_screen.dart';
 import 'route_names.dart';
 import 'scaffold_with_nav.dart';
 
@@ -110,11 +115,45 @@ GoRouter appRouter(Ref ref) {
             routes: [
               GoRoute(
                 path: RouteNames.trading,
-                builder: (_, _) => const _Placeholder('Trading'),
+                builder: (_, _) => const OrderListScreen(),
                 routes: [
                   GoRoute(
                     path: 'order',
-                    builder: (_, _) => const _Placeholder('Order Entry'),
+                    builder: (_, state) {
+                      final extra =
+                          state.extra as Map<String, dynamic>? ?? {};
+                      return OrderEntryScreen(
+                        symbol: extra['symbol'] as String? ?? '',
+                        market: extra['market'] as String? ?? 'US',
+                        initialSide: extra['side'] as OrderSide? ??
+                            OrderSide.buy,
+                        prefillQty: extra['prefillQty'] as int?,
+                      );
+                    },
+                    routes: [
+                      GoRoute(
+                        path: 'confirm',
+                        builder: (_, state) {
+                          final extra =
+                              state.extra as Map<String, dynamic>;
+                          return OrderConfirmScreen(
+                            symbol: extra['symbol'] as String,
+                            market: extra['market'] as String,
+                            side: extra['side'] as OrderSide,
+                            orderType: extra['orderType'] as OrderType,
+                            qty: extra['qty'] as int,
+                            limitPrice: extra['limitPrice'] as Decimal?,
+                            validity: extra['validity'] as OrderValidity,
+                            extendedHours:
+                                extra['extendedHours'] as bool,
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                  GoRoute(
+                    path: 'orders',
+                    builder: (_, _) => const OrderListScreen(),
                   ),
                 ],
               ),

@@ -4,6 +4,19 @@ import 'core/routing/app_router.dart';
 import 'shared/theme/app_theme.dart';
 import 'shared/theme/trading_color_scheme.dart';
 
+/// Disables the Android stretch overscroll effect that distorts pages on scroll.
+class _NoStretchScrollBehavior extends MaterialScrollBehavior {
+  const _NoStretchScrollBehavior();
+
+  @override
+  Widget buildOverscrollIndicator(
+    BuildContext context,
+    Widget child,
+    ScrollableDetails details,
+  ) =>
+      child;
+}
+
 /// Root widget of the Trading App.
 ///
 /// Injects [appRouterProvider] (go_router) and the dark theme.
@@ -19,6 +32,7 @@ class TradingApp extends ConsumerWidget {
     return MaterialApp.router(
       title: 'Trading App',
       debugShowCheckedModeBanner: false,
+      scrollBehavior: const _NoStretchScrollBehavior(),
       theme: AppTheme.build(
         colorScheme: TradingColorScheme.greenUp,
         brightness: Brightness.light,

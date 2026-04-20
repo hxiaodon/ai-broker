@@ -29,6 +29,8 @@ class RouteNames {
 
   // Trading sub-routes
   static const orderEntry = '/trading/order';
+  static const tradingOrderConfirm = '/trading/order/confirm';
+  static const tradingOrders = '/trading/orders';
   static const orderDetail = '/trading/orders/:orderId';
   static const tradeConfirm = '/trading/confirm';
 
