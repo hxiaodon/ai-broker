@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'trading_repository_impl.dart';
+part of 'session_key_service.dart';
 
 // **************************************************************************
 // RiverpodGenerator
@@ -9,49 +9,49 @@ part of 'trading_repository_impl.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 
-@ProviderFor(tradingRepository)
-final tradingRepositoryProvider = TradingRepositoryProvider._();
+@ProviderFor(sessionKeyService)
+final sessionKeyServiceProvider = SessionKeyServiceProvider._();
 
-final class TradingRepositoryProvider
+final class SessionKeyServiceProvider
     extends
         $FunctionalProvider<
-          TradingRepository,
-          TradingRepository,
-          TradingRepository
+          SessionKeyService,
+          SessionKeyService,
+          SessionKeyService
         >
-    with $Provider<TradingRepository> {
-  TradingRepositoryProvider._()
+    with $Provider<SessionKeyService> {
+  SessionKeyServiceProvider._()
     : super(
         from: null,
         argument: null,
         retry: null,
-        name: r'tradingRepositoryProvider',
+        name: r'sessionKeyServiceProvider',
         isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
 
   @override
-  String debugGetCreateSourceHash() => _$tradingRepositoryHash();
+  String debugGetCreateSourceHash() => _$sessionKeyServiceHash();
 
   @$internal
   @override
-  $ProviderElement<TradingRepository> $createElement(
+  $ProviderElement<SessionKeyService> $createElement(
     $ProviderPointer pointer,
   ) => $ProviderElement(pointer);
 
   @override
-  TradingRepository create(Ref ref) {
-    return tradingRepository(ref);
+  SessionKeyService create(Ref ref) {
+    return sessionKeyService(ref);
   }
 
   /// {@macro riverpod.override_with_value}
-  Override overrideWithValue(TradingRepository value) {
+  Override overrideWithValue(SessionKeyService value) {
     return $ProviderOverride(
       origin: this,
-      providerOverride: $SyncValueProvider<TradingRepository>(value),
+      providerOverride: $SyncValueProvider<SessionKeyService>(value),
     );
   }
 }
 
-String _$tradingRepositoryHash() => r'68a20ba0fb9bcab8d54171d2c7d0512629ee51ad';
+String _$sessionKeyServiceHash() => r'14080f4cf15af2cf86e1209ac5982d43ed7858f9';

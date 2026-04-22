@@ -7,6 +7,7 @@ import '../../../core/auth/token_service.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/network/authenticated_dio.dart';
 import '../../../core/storage/secure_storage_service.dart';
+import '../../../core/config/environment_config.dart';
 import '../domain/entities/auth_token.dart';
 import '../domain/entities/device_info_entity.dart';
 import '../domain/repositories/auth_repository.dart';
@@ -16,18 +17,26 @@ import 'remote/auth_response_models.dart';
 
 part 'auth_repository_impl.g.dart';
 
-// ---------------------------------------------------------------------------
-// Environment base URL — replace with AppConfig in Phase 2
-// ---------------------------------------------------------------------------
-const _kAmsBaseUrl = String.fromEnvironment(
-  'AMS_BASE_URL',
-  defaultValue: 'https://api.example.com',
-);
 
-/// Production implementation of [AuthRepository].
-///
-/// Maps data-layer DTOs to domain entities. Delegates network calls to
-/// [AuthRemoteDataSource]. Stores tokens via [TokenService].
+@Riverpod(keepAlive: true)
+AuthRepository authRepository(Ref ref) {
+  final tokenService = ref.watch(tokenServiceProvider);
+  final deviceInfoService = ref.watch(deviceInfoServiceProvider);
+  final secureStorage = ref.watch(secureStorageServiceProvider);
+
+  final dio = createAuthenticatedDio(
+    baseUrl: EnvironmentConfig.instance.amsBaseUrl,
+    tokenService: tokenService,
+  );
+
+  return AuthRepositoryImpl(
+    remoteDataSource: AuthRemoteDataSource(dio),
+    tokenService: tokenService,
+    deviceInfoService: deviceInfoService,
+    secureStorage: secureStorage,
+  );
+}
+
 class AuthRepositoryImpl implements AuthRepository {
   AuthRepositoryImpl({
     required AuthRemoteDataSource remoteDataSource,
@@ -251,23 +260,4 @@ class AuthRepositoryImpl implements AuthRepository {
       biometricType: dto.biometricType,
     );
   }
-}
-
-/// Wires up [AuthRepositoryImpl] with all required dependencies.
-///
-/// - Creates a dedicated [Dio] instance for the AMS service (SPKI pinned).
-/// - Injects [TokenService], [DeviceInfoService], [SecureStorageService].
-@Riverpod(keepAlive: true)
-AuthRepository authRepository(Ref ref) {
-  final tokenSvc = ref.read(tokenServiceProvider);
-  final dio = createAuthenticatedDio(
-    baseUrl: _kAmsBaseUrl,
-    tokenService: tokenSvc,
-  );
-  return AuthRepositoryImpl(
-    remoteDataSource: AuthRemoteDataSource(dio),
-    tokenService: tokenSvc,
-    deviceInfoService: ref.read(deviceInfoServiceProvider),
-    secureStorage: ref.read(secureStorageServiceProvider),
-  );
 }

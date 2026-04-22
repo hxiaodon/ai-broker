@@ -2,7 +2,7 @@
 
 **日期**: 2026-04-20  
 **作者**: Mobile Engineer  
-**状态**: 📋 DRAFT — 待后端 + Security Engineer 联合评审  
+**状态**: ✅ REVIEWED — 后端评审完成，契约 v3 已同步，待客户端实现  
 **范围**: 交易模块 REST API + WebSocket 通道的客户端-服务端安全协议  
 **方法论**: STRIDE 威胁分析 + DREAD 风险评分
 

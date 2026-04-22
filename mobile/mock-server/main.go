@@ -39,6 +39,21 @@ func main() {
 	http.HandleFunc("/v1/auth/devices", handleGetDevices)
 	http.HandleFunc("/v1/auth/devices/", handleDeleteDevice)
 
+	// Trading endpoints
+	http.HandleFunc("/api/v1/auth/session-key", handleSessionKey)
+	http.HandleFunc("/api/v1/trading/nonce", handleTradingNonce)
+	http.HandleFunc("/api/v1/trading/bio-challenge", handleBioChallenge)
+	http.HandleFunc("/api/v1/orders", handleOrders)
+	http.HandleFunc("/api/v1/orders/", handleOrderByID)
+	http.HandleFunc("/api/v1/positions", handlePositions)
+	http.HandleFunc("/api/v1/positions/", handlePositionBySymbol)
+	http.HandleFunc("/api/v1/portfolio/summary", handlePortfolioSummary)
+	http.HandleFunc("/ws/trading", handleTradingWS)
+
+	// Watchlist endpoints (registered users)
+	http.HandleFunc("/v1/watchlist", handleWatchlist)
+	http.HandleFunc("/v1/watchlist/", handleDeleteWatchlist)
+
 	// Market endpoints
 	// Merge REST and WebSocket on same path
 	http.HandleFunc("/v1/market/quotes", func(w http.ResponseWriter, r *http.Request) {

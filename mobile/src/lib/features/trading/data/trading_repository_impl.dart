@@ -1,11 +1,14 @@
 import 'package:decimal/decimal.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/auth/device_info_service.dart';
 import '../../../core/auth/token_service.dart';
 import '../../../core/config/environment_config.dart';
 import '../../../core/network/authenticated_dio.dart';
 import '../../../core/network/connectivity_service.dart';
 import '../../../core/security/hmac_signer.dart';
+import '../../../core/security/nonce_service.dart';
+import '../../../core/security/session_key_service.dart';
 import '../domain/entities/order.dart';
 import '../domain/entities/order_fill.dart';
 import '../domain/entities/portfolio_summary.dart';
@@ -33,6 +36,8 @@ class TradingRepositoryImpl implements TradingRepository {
     required bool extendedHours,
     required String idempotencyKey,
     required String biometricToken,
+    required String bioChallenge,
+    required String bioTimestamp,
   }) =>
       _remote.submitOrder(
         symbol: symbol,
@@ -45,6 +50,8 @@ class TradingRepositoryImpl implements TradingRepository {
         extendedHours: extendedHours,
         idempotencyKey: idempotencyKey,
         biometricToken: biometricToken,
+        bioChallenge: bioChallenge,
+        bioTimestamp: bioTimestamp,
       );
 
   @override
@@ -84,18 +91,15 @@ class TradingRepositoryImpl implements TradingRepository {
 TradingRepository tradingRepository(Ref ref) {
   final tokenSvc = ref.read(tokenServiceProvider);
   final baseUrl = EnvironmentConfig.instance.tradingBaseUrl;
-  final dio = createAuthenticatedDio(
-    baseUrl: baseUrl,
-    tokenService: tokenSvc,
-  );
-  final connectivity = ref.watch(connectivityServiceProvider);
-  // HMAC secret comes from env; empty string is safe for dev (server validates)
-  const hmacSecret = String.fromEnvironment('TRADING_HMAC_SECRET');
+  final dio = createAuthenticatedDio(baseUrl: baseUrl, tokenService: tokenSvc);
   return TradingRepositoryImpl(
     remote: TradingRemoteDataSource(
       dio: dio,
-      signer: const HmacSigner(hmacSecret),
-      connectivity: connectivity,
+      signer: const HmacSigner(),
+      connectivity: ref.watch(connectivityServiceProvider),
+      sessionKeyService: ref.read(sessionKeyServiceProvider),
+      nonceService: ref.read(nonceServiceProvider),
+      deviceInfoService: ref.read(deviceInfoServiceProvider),
     ),
   );
 }

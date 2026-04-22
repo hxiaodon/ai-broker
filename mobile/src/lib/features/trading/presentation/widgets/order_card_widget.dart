@@ -59,12 +59,17 @@ class OrderCardWidget extends StatelessWidget {
     required this.colors,
     this.onCancel,
     this.onTap,
+    this.isHighlighted = false,
   });
 
   final Order order;
   final ColorTokens colors;
   final VoidCallback? onCancel;
   final VoidCallback? onTap;
+
+  /// When true, render a green accent border to signal this card was the
+  /// order the user just submitted.
+  final bool isHighlighted;
 
   @override
   Widget build(BuildContext context) {
@@ -82,6 +87,9 @@ class OrderCardWidget extends StatelessWidget {
         decoration: BoxDecoration(
           color: colors.cardBackground,
           borderRadius: BorderRadius.circular(12),
+          border: isHighlighted
+              ? Border.all(color: const Color(0xFF0DC582), width: 1.5)
+              : null,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

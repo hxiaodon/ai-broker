@@ -3,10 +3,10 @@ provider: services/trading-engine
 consumer: mobile
 protocol: REST + WebSocket
 status: APPROVED
-version: 2
+version: 3
 created: 2026-03-13
-last_updated: 2026-03-31
-last_reviewed: 2026-03-31
+last_updated: 2026-04-20
+last_reviewed: 2026-04-20
 sync_strategy: provider-owns
 ---
 
@@ -27,6 +27,9 @@ sync_strategy: provider-owns
 | GET | /api/v1/positions | 持仓列表（含实时市值与盈亏） | **<200ms** | 市价走 Redis 缓存（Kafka 消费 Market Data 更新） | [position-pnl.md §6.1](../../services/trading-engine/docs/prd/position-pnl.md#6-rest-api-响应定义) |
 | GET | /api/v1/positions/:symbol | 单只持仓详情 + P&L 明细 | **<100ms** | 同上 | [position-pnl.md §6.2](../../services/trading-engine/docs/prd/position-pnl.md#6-rest-api-响应定义) |
 | GET | /api/v1/portfolio/summary | 组合概览：总资产、日盈亏、持仓分布 | **<150ms** | 现金余额缓存 + 昨日市值缓存（每日 16:30 更新） | [settlement.md §9.2](../../services/trading-engine/docs/prd/settlement.md#9-rest-api-响应定义) |
+| POST | /api/v1/auth/session-key | 获取动态 HMAC session key（登录后 + refresh 时调用） | **<100ms** | Redis 存储，30min TTL，5min 宽限期 | [security-protocol.md §2](../../services/trading-engine/docs/prd/security-protocol.md#2-s-01-动态-hmac-session-key) |
+| GET | /api/v1/trading/nonce | 获取服务端一次性 nonce（下单/撤单前调用） | **<50ms** | Redis SETNX，60s TTL；支持批量 `?count=N`（最多 10） | [security-protocol.md §3](../../services/trading-engine/docs/prd/security-protocol.md#3-s-02-服务端-nonce) |
+| GET | /api/v1/trading/bio-challenge | 获取生物识别 challenge（下单前调用） | **<50ms** | Redis 存储，30s TTL，一次性 | [security-protocol.md §4](../../services/trading-engine/docs/prd/security-protocol.md#4-s-03-生物识别-challenge-response) |
 
 > **SLA 定义**: 仅计算 API Gateway 收到请求到返回响应的后端处理时间，不含客户端网络传输延迟（预估移动端网络 150-300ms）。
 
@@ -136,11 +139,25 @@ sync_strategy: provider-owns
 
 ## 认证与安全
 
+> **完整安全协议**：[security-protocol.md](../../services/trading-engine/docs/prd/security-protocol.md)
+
 - **所有端点均需 JWT Bearer token**
-- 订单提交（POST /orders）额外要求：
-  - **生物识别认证**（biometric confirmation，Mobile 端负责，不计入后端 SLA）
-  - **HMAC-SHA256 请求签名**（覆盖 method + path + timestamp + body hash）
-  - **时间戳校验**：拒绝 > 30 秒的过期请求（防重放）
+- 订单提交（POST /orders）和撤单（DELETE /orders/:id）额外要求以下请求头：
+
+| Header | 说明 | 来源 |
+|--------|------|------|
+| `X-Key-Id` | 动态 session key 标识 | `POST /auth/session-key` 返回 |
+| `X-Timestamp` | Unix 毫秒时间戳 | 客户端生成，服务端校验 ±30s |
+| `X-Nonce` | 服务端签发一次性 nonce | `GET /trading/nonce` 返回，60s TTL |
+| `X-Device-Id` | 已绑定设备 ID | 设备注册时持久化 |
+| `X-Signature` | HMAC-SHA256 签名 | 见 security-protocol.md §7 |
+| `Idempotency-Key` | UUID v4，网络重试幂等 | 客户端生成 |
+| `X-Biometric-Token` | 生物识别 token（仅 POST /orders） | 客户端生物识别后计算 |
+| `X-Bio-Challenge` | 生物识别 challenge（仅 POST /orders） | `GET /trading/bio-challenge` 返回 |
+| `X-Bio-Timestamp` | 生物识别时间戳（仅 POST /orders） | 客户端生成 |
+
+- **HMAC 签名 payload（6 段）**：`METHOD\nPATH\nTIMESTAMP\nNONCE\nDEVICE_ID\nBODY_HASH`
+- **WebSocket 认证**：连接后 10 秒内发送 auth 消息（token 不在 URL 中），见 security-protocol.md §5
 - 限速：**10 orders/sec per user**
 - **所有金额字段使用 string 编码的 decimal**，禁止浮点数
 
@@ -191,6 +208,7 @@ sync_strategy: provider-owns
 | **错误响应格式** | [error-responses.md §1-6](../../services/trading-engine/docs/error-responses.md) | 标准错误格式、HTTP 状态码映射、30+ 错误码示例、前端处理最佳实践 |
 | **数据类型规范** | [type-definitions.md](../../services/trading-engine/docs/type-definitions.md) | Decimal 序列化（4位 US / 3位 HK）、Timestamp ISO 8601、Quantity 整数、Enum 大写下划线 |
 | **买入力计算** | [risk-rules.md](../../services/trading-engine/docs/specs/domains/02-pre-trade-risk.md) | 买入力公式、融资率、维持保证金、现金限制 |
+| **安全协议** | [security-protocol.md](../../services/trading-engine/docs/prd/security-protocol.md) | session-key、nonce、bio-challenge、WS 连接后认证、设备绑定、HMAC payload 规范 |
 
 ---
 
@@ -207,5 +225,6 @@ sync_strategy: provider-owns
 
 | 版本 | 日期 | 变更 | 协商方 |
 |------|------|------|--------|
+| v3 | 2026-04-20 | **安全加固协议同步**。新增 3 个安全端点（session-key、nonce、bio-challenge）；更新认证与安全章节（新增请求头规范表、HMAC 6 段 payload、WS 连接后认证）；权威来源表新增 security-protocol.md | trading-engineer（基于 mobile-engineer TRADING-SECURITY-HARDENING.md 评审） |
 | v2 | 2026-03-31 | **升级为 APPROVED 状态**。补充 REST Endpoints 表的 Domain PRD 交叉引用；增强 WebSocket 消息格式示例（补充完整字段定义）；新增"权威来源"部分，明确每个关注点的权威文档来源 | trading-engineer + mobile-engineer |
 | v1 | 2026-03-30 | 明确 SLA（POST <300ms, DELETE <400ms 异步）；新增 WebSocket 频道定义（position.updated, portfolio.summary, settlement.updated）；补充消息格式；记录 5 个技术依赖 | trading-engineer + mobile-engineer |

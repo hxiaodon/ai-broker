@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -36,23 +37,28 @@ type OtpSendRequest struct {
 }
 
 type OtpSendResponse struct {
-	Success   bool   `json:"success"`
-	Message   string `json:"message"`
-	SessionID string `json:"session_id"`
+	RequestID         string `json:"request_id"`
+	PhoneNumber       string `json:"phone_number"`
+	DeliveryMethod    string `json:"delivery_method"`
+	ExpiresInSeconds  int    `json:"expires_in_seconds"`
+	RetryAfterSeconds int    `json:"retry_after_seconds"`
 }
 
 type OtpVerifyRequest struct {
+	RequestID   string `json:"request_id"`
+	OtpCode     string `json:"otp_code"`
 	PhoneNumber string `json:"phone_number"`
-	OTP         string `json:"otp"`
 }
 
 type OtpVerifyResponse struct {
-	Success      bool   `json:"success"`
-	Message      string `json:"message"`
-	AccessToken  string `json:"access_token,omitempty"`
-	RefreshToken string `json:"refresh_token,omitempty"`
-	ExpiresIn    int    `json:"expires_in,omitempty"`
-	AccountID    string `json:"account_id,omitempty"`
+	Status           string                 `json:"status"`
+	AccessToken      string                 `json:"access_token,omitempty"`
+	RefreshToken     string                 `json:"refresh_token,omitempty"`
+	ExpiresInSeconds int                    `json:"expires_in_seconds,omitempty"`
+	AccountID        string                 `json:"account_id,omitempty"`
+	AccountStatus    string                 `json:"account_status,omitempty"`
+	RequestID        string                 `json:"request_id,omitempty"`
+	DeviceInfo       map[string]interface{} `json:"device_info,omitempty"`
 }
 
 type TokenRefreshRequest struct {
@@ -60,10 +66,10 @@ type TokenRefreshRequest struct {
 }
 
 type TokenRefreshResponse struct {
-	Success      bool   `json:"success"`
-	AccessToken  string `json:"access_token,omitempty"`
-	ExpiresIn    int    `json:"expires_in,omitempty"`
-	Message      string `json:"message,omitempty"`
+	AccessToken      string `json:"access_token"`
+	RefreshToken     string `json:"refresh_token"`
+	ExpiresInSeconds int    `json:"expires_in_seconds"`
+	DeviceStatus     string `json:"device_status"`
 }
 
 type BiometricRegisterRequest struct {
@@ -139,9 +145,9 @@ func handleOtpSend(w http.ResponseWriter, r *http.Request) {
 	if !isValidPhoneNumber(req.PhoneNumber) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(OtpSendResponse{
-			Success: false,
-			Message: "无效的手机号码格式",
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error_code": "INVALID_PHONE_NUMBER",
+			"message":    "无效的手机号码格式",
 		})
 		return
 	}
@@ -155,9 +161,10 @@ func handleOtpSend(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusTooManyRequests)
 		remainingMinutes := int(session.LockedUntil.Sub(time.Now()).Minutes())
-		json.NewEncoder(w).Encode(OtpSendResponse{
-			Success: false,
-			Message: fmt.Sprintf("账户已锁定，请在 %d 分钟后重试", remainingMinutes),
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error_code":          "ACCOUNT_LOCKED",
+			"message":             fmt.Sprintf("账户已锁定，请在 %d 分钟后重试", remainingMinutes),
+			"retry_after_seconds": remainingMinutes * 60,
 		})
 		return
 	}
@@ -188,9 +195,11 @@ func handleOtpSend(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(OtpSendResponse{
-		Success:   true,
-		Message:   "验证码已发送，请在 5 分钟内输入",
-		SessionID: req.PhoneNumber,
+		RequestID:         fmt.Sprintf("req_%d", time.Now().UnixMilli()),
+		PhoneNumber:       req.PhoneNumber,
+		DeliveryMethod:    "SMS",
+		ExpiresInSeconds:  300,
+		RetryAfterSeconds: 60,
 	})
 }
 
@@ -212,10 +221,10 @@ func handleOtpVerify(w http.ResponseWriter, r *http.Request) {
 
 	if !exists {
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(OtpVerifyResponse{
-			Success: false,
-			Message: "验证码不存在或已过期",
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error_code": "REQUEST_NOT_FOUND",
+			"message":    "验证码不存在或已过期",
 		})
 		return
 	}
@@ -223,11 +232,13 @@ func handleOtpVerify(w http.ResponseWriter, r *http.Request) {
 	// Check if account is locked
 	if session.Locked && time.Now().Before(session.LockedUntil) {
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusTooManyRequests)
+		w.WriteHeader(http.StatusUnauthorized)
 		remainingMinutes := int(session.LockedUntil.Sub(time.Now()).Minutes())
-		json.NewEncoder(w).Encode(OtpVerifyResponse{
-			Success: false,
-			Message: fmt.Sprintf("账户已锁定，请在 %d 分钟后重试", remainingMinutes),
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error_code":         "OTP_MAX_ATTEMPTS_EXCEEDED",
+			"message":            fmt.Sprintf("账户已锁定，请在 %d 分钟后重试", remainingMinutes),
+			"remaining_attempts": 0,
+			"lockout_until":      session.LockedUntil.UTC().Format(time.RFC3339),
 		})
 		return
 	}
@@ -235,10 +246,10 @@ func handleOtpVerify(w http.ResponseWriter, r *http.Request) {
 	// Check if OTP expired
 	if time.Now().After(session.ExpiresAt) {
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(OtpVerifyResponse{
-			Success: false,
-			Message: "验证码已过期，请重新申请",
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error_code": "OTP_EXPIRED",
+			"message":    "验证码已过期，请重新申请",
 		})
 		return
 	}
@@ -247,7 +258,7 @@ func handleOtpVerify(w http.ResponseWriter, r *http.Request) {
 	session.Attempts++
 
 	// Check if OTP is correct
-	if req.OTP != session.OTP {
+	if req.OtpCode != session.OTP {
 		otpMutex.Lock()
 		if session.Attempts >= session.MaxAttempts {
 			session.Locked = true
@@ -257,31 +268,31 @@ func handleOtpVerify(w http.ResponseWriter, r *http.Request) {
 		otpMutex.Unlock()
 
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusBadRequest)
+		w.WriteHeader(http.StatusUnauthorized)
 		remainingAttempts := session.MaxAttempts - session.Attempts
 		if remainingAttempts <= 0 {
-			json.NewEncoder(w).Encode(OtpVerifyResponse{
-				Success: false,
-				Message: "验证码错误次数过多，账户已锁定 30 分钟",
-			})
-		} else if remainingAttempts == 1 {
-			json.NewEncoder(w).Encode(OtpVerifyResponse{
-				Success: false,
-				Message: fmt.Sprintf("验证码错误，还有 %d 次尝试机会（超过后账户将锁定）", remainingAttempts),
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"error_code":         "OTP_MAX_ATTEMPTS_EXCEEDED",
+				"message":            "验证码错误次数过多，账户已锁定 30 分钟",
+				"remaining_attempts": 0,
+				"lockout_until":      session.LockedUntil.UTC().Format(time.RFC3339),
 			})
 		} else {
-			json.NewEncoder(w).Encode(OtpVerifyResponse{
-				Success: false,
-				Message: fmt.Sprintf("验证码错误，还有 %d 次尝试机会", remainingAttempts),
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"error_code":         "INVALID_OTP_CODE",
+				"message":            fmt.Sprintf("验证码错误，还有 %d 次尝试机会", remainingAttempts),
+				"remaining_attempts": remainingAttempts,
 			})
 		}
 		return
 	}
 
 	// OTP verified successfully
-	accessToken := generateToken(24)
-	refreshToken := generateToken(32)
 	accountID := fmt.Sprintf("acc_%s_%d", req.PhoneNumber[len(req.PhoneNumber)-4:], time.Now().Unix())
+	requestID := fmt.Sprintf("req_%d", time.Now().UnixMilli())
+	deviceID := r.Header.Get("X-Device-ID")
+	accessToken := generateMockJWT(accountID, deviceID, 15*time.Minute)
+	refreshToken := "rt_" + generateToken(32)
 
 	// Clean up session
 	otpMutex.Lock()
@@ -290,12 +301,22 @@ func handleOtpVerify(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(OtpVerifyResponse{
-		Success:      true,
-		Message:      "登录成功",
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		ExpiresIn:    3600,
-		AccountID:    accountID,
+		Status:           "OTP_VERIFIED_EXISTING_USER",
+		AccessToken:      accessToken,
+		RefreshToken:     refreshToken,
+		ExpiresInSeconds: 3600,
+		AccountID:        accountID,
+		AccountStatus:    "ACTIVE",
+		RequestID:        requestID,
+		DeviceInfo: map[string]interface{}{
+			"device_id":            r.Header.Get("X-Device-ID"),
+			"device_name":          "iPhone Simulator",
+			"os_type":              "iOS",
+			"login_time":           time.Now().UTC().Format(time.RFC3339),
+			"status":               "ACTIVE",
+			"is_current_device":    true,
+			"biometric_registered": false,
+		},
 	})
 }
 
@@ -315,20 +336,22 @@ func handleTokenRefresh(w http.ResponseWriter, r *http.Request) {
 	if currentStrategy.Name() == "error" {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
-		json.NewEncoder(w).Encode(TokenRefreshResponse{
-			Success: false,
-			Message: "刷新令牌已过期",
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error_code": "REFRESH_TOKEN_EXPIRED",
+			"message":    "刷新令牌已过期",
 		})
 		return
 	}
 
-	newAccessToken := generateToken(24)
+	newAccessToken := generateMockJWT("acc-refreshed", r.Header.Get("X-Device-ID"), 15*time.Minute)
+	newRefreshToken := "rt_" + generateToken(32)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(TokenRefreshResponse{
-		Success:     true,
-		AccessToken: newAccessToken,
-		ExpiresIn:   3600,
+		AccessToken:      newAccessToken,
+		RefreshToken:     newRefreshToken,
+		ExpiresInSeconds: 3600,
+		DeviceStatus:     "ACTIVE",
 	})
 }
 
@@ -564,4 +587,24 @@ func generateToken(length int) string {
 	b := make([]byte, length)
 	rand.Read(b)
 	return fmt.Sprintf("%x", b)
+}
+
+func generateMockJWT(accountID, deviceID string, ttl time.Duration) string {
+	now := time.Now().UTC()
+	header := map[string]interface{}{
+		"alg": "RS256",
+		"typ": "JWT",
+	}
+	payload := map[string]interface{}{
+		"sub":        accountID,
+		"account_id": accountID,
+		"device_id":  deviceID,
+		"iat":        now.Unix(),
+		"exp":        now.Add(ttl).Unix(),
+		"jti":        "jwt-" + generateToken(8),
+	}
+	headerBytes, _ := json.Marshal(header)
+	payloadBytes, _ := json.Marshal(payload)
+	return base64.RawURLEncoding.EncodeToString(headerBytes) + "." +
+		base64.RawURLEncoding.EncodeToString(payloadBytes) + ".mock-signature"
 }

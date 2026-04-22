@@ -17,6 +17,8 @@ abstract class TradingRepository {
     required bool extendedHours,
     required String idempotencyKey,
     required String biometricToken,
+    required String bioChallenge,
+    required String bioTimestamp,
   });
 
   Future<void> cancelOrder(String orderId);

@@ -5,8 +5,12 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/routing/route_names.dart';
 import '../../../../shared/theme/color_tokens.dart';
+import '../../../auth/application/auth_notifier.dart';
 import '../../application/order_submit_notifier.dart';
+import '../../application/portfolio_summary_provider.dart';
+import '../../application/recent_order_banner_provider.dart';
 import '../../domain/entities/order.dart';
+import '../../domain/entities/portfolio_summary.dart';
 
 class OrderConfirmScreen extends ConsumerWidget {
   const OrderConfirmScreen({
@@ -35,11 +39,29 @@ class OrderConfirmScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final submitState = ref.watch(orderSubmitProvider);
+    final portfolioAsync = ref.watch(portfolioSummaryProvider);
+    final estimatedTotal = _estimatedTotal();
+    final buyingPower = portfolioAsync.whenOrNull(
+      data: (PortfolioSummary p) => p.buyingPower,
+    );
+    final isBuyInsufficient = side == OrderSide.buy &&
+        estimatedTotal != null &&
+        buyingPower != null &&
+        estimatedTotal > buyingPower;
 
     // Navigate to order list on success
     ref.listen(orderSubmitProvider, (_, next) {
       next.maybeWhen(
         success: (orderId) {
+          // Publish snapshot for OrderListScreen's one-shot banner/highlight.
+          ref.read(recentOrderBannerProvider.notifier).set(RecentOrderInfo(
+                orderId: orderId,
+                symbol: symbol,
+                side: side,
+                orderType: orderType,
+                qty: qty,
+                submittedAt: DateTime.now().toUtc(),
+              ));
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('委托已提交，订单号：$orderId'),
@@ -84,6 +106,8 @@ class OrderConfirmScreen extends ConsumerWidget {
               limitPrice: limitPrice,
               validity: validity,
               extendedHours: extendedHours,
+              estimatedTotal: estimatedTotal,
+              buyingPower: buyingPower,
               colors: _colors,
             ),
             const SizedBox(height: 16),
@@ -95,23 +119,14 @@ class OrderConfirmScreen extends ConsumerWidget {
             // Submit state feedback
             ...submitState.maybeWhen(
               error: (message) => [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: _colors.error.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border:
-                        Border.all(color: _colors.error.withOpacity(0.4)),
-                  ),
-                  child: Text(
-                    message,
-                    style: TextStyle(color: _colors.error, fontSize: 13),
-                  ),
-                ),
+                _buildErrorBanner(message),
               ],
               orElse: () => [],
             ),
+            if (isBuyInsufficient)
+              _buildErrorBanner(
+                '可用资金不足：预计总金额 \$${estimatedTotal!.toStringAsFixed(2)}，可用资金 \$${buyingPower!.toStringAsFixed(2)}',
+              ),
 
             const Spacer(),
 
@@ -123,7 +138,7 @@ class OrderConfirmScreen extends ConsumerWidget {
                 onPressed: submitState.maybeWhen(
                   submitting: () => null,
                   awaitingBiometric: () => null,
-                  orElse: () => () => _submit(ref),
+                  orElse: () => isBuyInsufficient ? null : () => _submit(ref),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: actionColor,
@@ -166,8 +181,42 @@ class OrderConfirmScreen extends ConsumerWidget {
     );
   }
 
+  Decimal? _estimatedTotal() {
+    final perShare = switch (orderType) {
+      OrderType.limit => limitPrice,
+      // Conservative estimate for market order in mock / pre-trade UI:
+      // use a placeholder floor of $100 so zero/empty values don't bypass buying power check.
+      OrderType.market => Decimal.parse('100.00'),
+    };
+    if (perShare == null) return null;
+    return perShare * Decimal.fromInt(qty);
+  }
+
+  Widget _buildErrorBanner(String message) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: _colors.error.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: _colors.error.withOpacity(0.4)),
+      ),
+      child: Text(
+        message,
+        style: TextStyle(color: _colors.error, fontSize: 13),
+      ),
+    );
+  }
+
   void _submit(WidgetRef ref) {
-    // Determine if biometric is available (simplified — check auth state)
+    // Biometric gating derives from AuthState — `_isBiometricRegistered()` is
+    // resolved on login/session-restore. Guest/unauthenticated users can't
+    // reach this screen (router guard), but fall back to `false` defensively.
+    final biometricEnabled = ref.read(authProvider).maybeWhen(
+          authenticated: (String _, String __, bool biometricEnabled) =>
+              biometricEnabled,
+          orElse: () => false,
+        );
     ref.read(orderSubmitProvider.notifier).submit(
           symbol: symbol,
           market: market,
@@ -177,7 +226,7 @@ class OrderConfirmScreen extends ConsumerWidget {
           limitPrice: limitPrice,
           validity: validity,
           extendedHours: extendedHours,
-          biometricEnabled: true,
+          biometricEnabled: biometricEnabled,
         );
   }
 }
@@ -193,6 +242,8 @@ class _OrderSummaryCard extends StatelessWidget {
     this.limitPrice,
     required this.validity,
     required this.extendedHours,
+    required this.estimatedTotal,
+    required this.buyingPower,
     required this.colors,
   });
 
@@ -203,6 +254,8 @@ class _OrderSummaryCard extends StatelessWidget {
   final Decimal? limitPrice;
   final OrderValidity validity;
   final bool extendedHours;
+  final Decimal? estimatedTotal;
+  final Decimal? buyingPower;
   final ColorTokens colors;
 
   @override
@@ -269,11 +322,15 @@ class _OrderSummaryCard extends StatelessWidget {
             const SizedBox(height: 10),
             _row('盘前盘后', '已开启'),
           ],
-          if (limitPrice != null) ...[
+          if (side == OrderSide.buy) ...[
+            Divider(color: colors.divider, height: 20),
+            _row('可用资金', buyingPower != null ? '\$${buyingPower!.toStringAsFixed(2)}' : '--'),
+          ],
+          if (estimatedTotal != null) ...[
             Divider(color: colors.divider, height: 20),
             _row(
               side == OrderSide.buy ? '预计总金额' : '预计到账',
-              '\$${(limitPrice! * Decimal.fromInt(qty)).toStringAsFixed(2)}',
+              '\$${estimatedTotal!.toStringAsFixed(2)}',
               bold: true,
             ),
           ],

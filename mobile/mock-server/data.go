@@ -283,6 +283,45 @@ func generateTickUpdate(symbol, userType string) map[string]interface{} {
 	return tick
 }
 
+var registeredWatchlist = []string{"AAPL", "TSLA", "0700", "9988"}
+
+func buildWatchlistResponse(symbols []string) map[string]interface{} {
+	quotes := map[string]interface{}{}
+	for _, symbol := range symbols {
+		quotes[symbol] = generateQuote(symbol, "registered")
+	}
+	return map[string]interface{}{
+		"symbols": symbols,
+		"quotes":  quotes,
+		"as_of":   time.Now().UTC().Format(time.RFC3339),
+	}
+}
+
+func removeFromRegisteredWatchlist(target string) {
+	filtered := make([]string, 0, len(registeredWatchlist))
+	for _, symbol := range registeredWatchlist {
+		if symbol != target {
+			filtered = append(filtered, symbol)
+		}
+	}
+	registeredWatchlist = filtered
+}
+
+func ensureInRegisteredWatchlist(symbol string) {
+	for _, existing := range registeredWatchlist {
+		if existing == symbol {
+			return
+		}
+	}
+	registeredWatchlist = append(registeredWatchlist, symbol)
+}
+
+func cloneRegisteredWatchlist() []string {
+	cloned := make([]string, len(registeredWatchlist))
+	copy(cloned, registeredWatchlist)
+	return cloned
+}
+
 func formatPrice(f float64) string {
 	return fmt.Sprintf("%.2f", f)
 }

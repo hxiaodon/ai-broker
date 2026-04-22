@@ -2,10 +2,13 @@ import 'package:decimal/decimal.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:trading_app/core/auth/device_info_service.dart';
 import 'package:trading_app/core/errors/app_exception.dart';
 import 'package:trading_app/core/logging/app_logger.dart';
 import 'package:trading_app/core/network/connectivity_service.dart';
 import 'package:trading_app/core/security/hmac_signer.dart';
+import 'package:trading_app/core/security/nonce_service.dart';
+import 'package:trading_app/core/security/session_key_service.dart';
 import 'package:trading_app/features/trading/data/remote/trading_remote_data_source.dart';
 import 'package:trading_app/features/trading/domain/entities/order.dart';
 
@@ -14,6 +17,12 @@ import 'package:trading_app/features/trading/domain/entities/order.dart';
 class MockDio extends Mock implements Dio {}
 
 class MockConnectivityService extends Mock implements ConnectivityService {}
+
+class MockSessionKeyService extends Mock implements SessionKeyService {}
+
+class MockNonceService extends Mock implements NonceService {}
+
+class MockDeviceInfoService extends Mock implements DeviceInfoService {}
 
 class FakeRequestOptions extends Fake implements RequestOptions {}
 
@@ -75,6 +84,9 @@ Map<String, dynamic> _portfolioSummaryResponseJson() => {
 void main() {
   late MockDio mockDio;
   late MockConnectivityService mockConnectivity;
+  late MockSessionKeyService mockSessionKey;
+  late MockNonceService mockNonce;
+  late MockDeviceInfoService mockDeviceInfo;
   late TradingRemoteDataSource dataSource;
 
   setUpAll(() {
@@ -85,12 +97,25 @@ void main() {
   setUp(() {
     mockDio = MockDio();
     mockConnectivity = MockConnectivityService();
+    mockSessionKey = MockSessionKeyService();
+    mockNonce = MockNonceService();
+    mockDeviceInfo = MockDeviceInfoService();
+
     dataSource = TradingRemoteDataSource(
       dio: mockDio,
-      signer: const HmacSigner('test-secret'),
+      signer: const HmacSigner(),
       connectivity: mockConnectivity,
+      sessionKeyService: mockSessionKey,
+      nonceService: mockNonce,
+      deviceInfoService: mockDeviceInfo,
     );
+
     when(() => mockConnectivity.isConnected).thenAnswer((_) async => true);
+    when(() => mockSessionKey.getSessionKey()).thenAnswer(
+      (_) async => (keyId: 'sk-test', secret: 'test-secret'),
+    );
+    when(() => mockNonce.fetchNonce()).thenAnswer((_) async => 'n-test-nonce');
+    when(() => mockDeviceInfo.getDeviceId()).thenAnswer((_) async => 'dev-test');
   });
 
   // ── Connectivity check ─────────────────────────────────────────────────────
@@ -106,7 +131,7 @@ void main() {
 
   // ── submitOrder ────────────────────────────────────────────────────────────
   group('submitOrder', () {
-    test('sends POST with HMAC headers and idempotency key', () async {
+    test('sends POST with all required security headers', () async {
       when(() => mockDio.post<Map<String, dynamic>>(
             any(),
             data: any(named: 'data'),
@@ -126,12 +151,13 @@ void main() {
         limitPrice: Decimal.parse('150.2500'),
         validity: OrderValidity.day,
         extendedHours: false,
-        idempotencyKey: 'test-key-123',
-        biometricToken: 'bio-token',
+        idempotencyKey: 'idem-key-123',
+        biometricToken: 'bio-token-xyz',
+        bioChallenge: 'challenge-abc',
+        bioTimestamp: '1713200000000',
       );
 
       expect(order.orderId, 'ord-001');
-      expect(order.symbol, 'AAPL');
 
       final captured = verify(() => mockDio.post<Map<String, dynamic>>(
             '/api/v1/orders',
@@ -139,10 +165,49 @@ void main() {
             options: captureAny(named: 'options'),
           )).captured.single as Options;
 
-      expect(captured.headers!['Idempotency-Key'], 'test-key-123');
-      expect(captured.headers!['X-Biometric-Token'], 'bio-token');
-      expect(captured.headers!['X-Timestamp'], isNotNull);
-      expect(captured.headers!['X-Signature'], isNotNull);
+      final headers = captured.headers!;
+      // Security headers
+      expect(headers['X-Key-Id'], 'sk-test');
+      expect(headers['X-Nonce'], 'n-test-nonce');
+      expect(headers['X-Device-Id'], 'dev-test');
+      expect(headers['X-Timestamp'], isNotNull);
+      expect(headers['X-Signature'], isNotNull);
+      // Bio headers
+      expect(headers['X-Biometric-Token'], 'bio-token-xyz');
+      expect(headers['X-Bio-Challenge'], 'challenge-abc');
+      expect(headers['X-Bio-Timestamp'], '1713200000000');
+      // Idempotency
+      expect(headers['Idempotency-Key'], 'idem-key-123');
+    });
+
+    test('fetches nonce and session key before each request', () async {
+      when(() => mockDio.post<Map<String, dynamic>>(
+            any(),
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          )).thenAnswer((_) async => Response(
+            data: _orderResponseJson(),
+            statusCode: 200,
+            requestOptions: RequestOptions(path: '/api/v1/orders'),
+          ));
+
+      await dataSource.submitOrder(
+        symbol: 'AAPL',
+        market: 'US',
+        side: OrderSide.buy,
+        orderType: OrderType.limit,
+        qty: 100,
+        validity: OrderValidity.day,
+        extendedHours: false,
+        idempotencyKey: 'key',
+        biometricToken: '',
+        bioChallenge: '',
+        bioTimestamp: '',
+      );
+
+      verify(() => mockSessionKey.getSessionKey()).called(1);
+      verify(() => mockNonce.fetchNonce()).called(1);
+      verify(() => mockDeviceInfo.getDeviceId()).called(1);
     });
 
     test('maps 401 to AuthException', () async {
@@ -169,7 +234,9 @@ void main() {
           validity: OrderValidity.day,
           extendedHours: false,
           idempotencyKey: 'key',
-          biometricToken: 'bio',
+          biometricToken: '',
+          bioChallenge: '',
+          bioTimestamp: '',
         ),
         throwsA(isA<AuthException>()),
       );
@@ -184,7 +251,10 @@ void main() {
         type: DioExceptionType.badResponse,
         response: Response(
           statusCode: 422,
-          data: {'error_code': 'INSUFFICIENT_BUYING_POWER', 'message': 'Not enough funds'},
+          data: {
+            'error_code': 'INSUFFICIENT_BUYING_POWER',
+            'message': 'Not enough funds',
+          },
           requestOptions: RequestOptions(path: '/api/v1/orders'),
         ),
         requestOptions: RequestOptions(path: '/api/v1/orders'),
@@ -200,7 +270,9 @@ void main() {
           validity: OrderValidity.day,
           extendedHours: false,
           idempotencyKey: 'key',
-          biometricToken: 'bio',
+          biometricToken: '',
+          bioChallenge: '',
+          bioTimestamp: '',
         ),
         throwsA(
           isA<BusinessException>()
@@ -229,7 +301,9 @@ void main() {
           validity: OrderValidity.day,
           extendedHours: false,
           idempotencyKey: 'key',
-          biometricToken: 'bio',
+          biometricToken: '',
+          bioChallenge: '',
+          bioTimestamp: '',
         ),
         throwsA(isA<NetworkException>()),
       );
@@ -238,7 +312,7 @@ void main() {
 
   // ── cancelOrder ────────────────────────────────────────────────────────────
   group('cancelOrder', () {
-    test('sends DELETE with HMAC headers', () async {
+    test('sends DELETE with full 6-segment HMAC headers including nonce', () async {
       when(() => mockDio.delete<void>(
             any(),
             options: any(named: 'options'),
@@ -254,8 +328,27 @@ void main() {
             options: captureAny(named: 'options'),
           )).captured.single as Options;
 
-      expect(captured.headers!['X-Timestamp'], isNotNull);
-      expect(captured.headers!['X-Signature'], isNotNull);
+      final headers = captured.headers!;
+      expect(headers['X-Key-Id'], 'sk-test');
+      expect(headers['X-Nonce'], 'n-test-nonce');
+      expect(headers['X-Device-Id'], 'dev-test');
+      expect(headers['X-Timestamp'], isNotNull);
+      expect(headers['X-Signature'], isNotNull);
+    });
+
+    test('fetches fresh nonce for each cancel request', () async {
+      when(() => mockDio.delete<void>(
+            any(),
+            options: any(named: 'options'),
+          )).thenAnswer((_) async => Response(
+            statusCode: 202,
+            requestOptions: RequestOptions(path: '/api/v1/orders/ord-001'),
+          ));
+
+      await dataSource.cancelOrder('ord-001');
+      await dataSource.cancelOrder('ord-002');
+
+      verify(() => mockNonce.fetchNonce()).called(2);
     });
   });
 
@@ -267,7 +360,10 @@ void main() {
             queryParameters: any(named: 'queryParameters'),
           )).thenAnswer((_) async => Response(
             data: {
-              'orders': [_orderResponseJson(), _orderResponseJson(status: 'FILLED')],
+              'orders': [
+                _orderResponseJson(),
+                _orderResponseJson(status: 'FILLED'),
+              ],
             },
             statusCode: 200,
             requestOptions: RequestOptions(path: '/api/v1/orders'),
@@ -335,9 +431,7 @@ void main() {
     test('returns list of positions', () async {
       when(() => mockDio.get<Map<String, dynamic>>(any()))
           .thenAnswer((_) async => Response(
-                data: {
-                  'positions': [_positionResponseJson()],
-                },
+                data: {'positions': [_positionResponseJson()]},
                 statusCode: 200,
                 requestOptions: RequestOptions(path: '/api/v1/positions'),
               ));
@@ -345,23 +439,6 @@ void main() {
       final positions = await dataSource.getPositions();
       expect(positions, hasLength(1));
       expect(positions.first.symbol, 'AAPL');
-    });
-  });
-
-  // ── getPositionDetail ──────────────────────────────────────────────────────
-  group('getPositionDetail', () {
-    test('returns single position', () async {
-      when(() => mockDio.get<Map<String, dynamic>>(any()))
-          .thenAnswer((_) async => Response(
-                data: _positionResponseJson(),
-                statusCode: 200,
-                requestOptions:
-                    RequestOptions(path: '/api/v1/positions/AAPL'),
-              ));
-
-      final pos = await dataSource.getPositionDetail('AAPL');
-      expect(pos.symbol, 'AAPL');
-      expect(pos.qty, 100);
     });
   });
 

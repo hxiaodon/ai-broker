@@ -3,10 +3,13 @@ import 'dart:convert';
 import 'package:decimal/decimal.dart';
 import 'package:dio/dio.dart';
 
+import '../../../../core/auth/device_info_service.dart';
 import '../../../../core/errors/app_exception.dart';
 import '../../../../core/logging/app_logger.dart';
 import '../../../../core/network/connectivity_service.dart';
 import '../../../../core/security/hmac_signer.dart';
+import '../../../../core/security/nonce_service.dart';
+import '../../../../core/security/session_key_service.dart';
 import '../../domain/entities/order.dart';
 import '../../domain/entities/order_fill.dart';
 import '../../domain/entities/portfolio_summary.dart';
@@ -17,17 +20,26 @@ import 'models/position_model.dart';
 import 'trading_mappers.dart';
 
 class TradingRemoteDataSource {
-  final Dio _dio;
-  final HmacSigner _signer;
-  final ConnectivityService _connectivity;
-
   TradingRemoteDataSource({
     required Dio dio,
     required HmacSigner signer,
     required ConnectivityService connectivity,
+    required SessionKeyService sessionKeyService,
+    required NonceService nonceService,
+    required DeviceInfoService deviceInfoService,
   })  : _dio = dio,
         _signer = signer,
-        _connectivity = connectivity;
+        _connectivity = connectivity,
+        _sessionKeyService = sessionKeyService,
+        _nonceService = nonceService,
+        _deviceInfoService = deviceInfoService;
+
+  final Dio _dio;
+  final HmacSigner _signer;
+  final ConnectivityService _connectivity;
+  final SessionKeyService _sessionKeyService;
+  final NonceService _nonceService;
+  final DeviceInfoService _deviceInfoService;
 
   Future<Order> submitOrder({
     required String symbol,
@@ -40,6 +52,8 @@ class TradingRemoteDataSource {
     required bool extendedHours,
     required String idempotencyKey,
     required String biometricToken,
+    required String bioChallenge,
+    required String bioTimestamp,
   }) async {
     await _checkConnectivity();
     const path = '/api/v1/orders';
@@ -54,9 +68,18 @@ class TradingRemoteDataSource {
       'extended_hours': extendedHours,
     };
     final bodyJson = jsonEncode(body);
+
+    final sessionKey = await _sessionKeyService.getSessionKey();
+    final nonce = await _nonceService.fetchNonce();
+    final deviceId = await _deviceInfoService.getDeviceId();
+
     final sigHeaders = _signer.buildHeaders(
+      secret: sessionKey.secret,
+      keyId: sessionKey.keyId,
       method: 'POST',
       path: path,
+      nonce: nonce,
+      deviceId: deviceId,
       body: bodyJson,
     );
 
@@ -68,6 +91,8 @@ class TradingRemoteDataSource {
           ...sigHeaders,
           'Idempotency-Key': idempotencyKey,
           'X-Biometric-Token': biometricToken,
+          'X-Bio-Challenge': bioChallenge,
+          'X-Bio-Timestamp': bioTimestamp,
         }),
       );
       AppLogger.debug('submitOrder success: ${resp.data}');
@@ -80,7 +105,19 @@ class TradingRemoteDataSource {
   Future<void> cancelOrder(String orderId) async {
     await _checkConnectivity();
     final path = '/api/v1/orders/$orderId';
-    final sigHeaders = _signer.buildHeaders(method: 'DELETE', path: path);
+
+    final sessionKey = await _sessionKeyService.getSessionKey();
+    final nonce = await _nonceService.fetchNonce();
+    final deviceId = await _deviceInfoService.getDeviceId();
+
+    final sigHeaders = _signer.buildHeaders(
+      secret: sessionKey.secret,
+      keyId: sessionKey.keyId,
+      method: 'DELETE',
+      path: path,
+      nonce: nonce,
+      deviceId: deviceId,
+    );
 
     try {
       await _dio.delete<void>(
@@ -103,17 +140,16 @@ class TradingRemoteDataSource {
       final resp = await _dio.get<Map<String, dynamic>>(
         '/api/v1/orders',
         queryParameters: {
-          if (status != null) 'status': _statusToString(status),
-          if (fromDate != null) 'from_date': fromDate.toUtc().toIso8601String(),
-          if (toDate != null) 'to_date': toDate.toUtc().toIso8601String(),
-          if (market != null) 'market': market,
-        },
+          'status': status != null ? _statusToString(status) : null,
+          'from_date': fromDate?.toUtc().toIso8601String(),
+          'to_date': toDate?.toUtc().toIso8601String(),
+          'market': market,
+        }..removeWhere((_, v) => v == null),
       );
-      final items = (resp.data!['orders'] as List)
+      return (resp.data!['orders'] as List)
           .cast<Map<String, dynamic>>()
           .map((j) => OrderModel.fromJson(j).toDomain())
           .toList();
-      return items;
     } on DioException catch (e) {
       throw _mapDioError(e, 'getOrders');
     }

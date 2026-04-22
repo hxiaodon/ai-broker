@@ -8,26 +8,13 @@ part of 'auth_repository_impl.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Wires up [AuthRepositoryImpl] with all required dependencies.
-///
-/// - Creates a dedicated [Dio] instance for the AMS service (SPKI pinned).
-/// - Injects [TokenService], [DeviceInfoService], [SecureStorageService].
 
 @ProviderFor(authRepository)
 final authRepositoryProvider = AuthRepositoryProvider._();
 
-/// Wires up [AuthRepositoryImpl] with all required dependencies.
-///
-/// - Creates a dedicated [Dio] instance for the AMS service (SPKI pinned).
-/// - Injects [TokenService], [DeviceInfoService], [SecureStorageService].
-
 final class AuthRepositoryProvider
     extends $FunctionalProvider<AuthRepository, AuthRepository, AuthRepository>
     with $Provider<AuthRepository> {
-  /// Wires up [AuthRepositoryImpl] with all required dependencies.
-  ///
-  /// - Creates a dedicated [Dio] instance for the AMS service (SPKI pinned).
-  /// - Injects [TokenService], [DeviceInfoService], [SecureStorageService].
   AuthRepositoryProvider._()
     : super(
         from: null,
@@ -61,4 +48,4 @@ final class AuthRepositoryProvider
   }
 }
 
-String _$authRepositoryHash() => r'c52b409c6bede34a0543644e0a3b141973216a87';
+String _$authRepositoryHash() => r'f0355022eebd3a5aaf74e79408229c6c378611d9';
