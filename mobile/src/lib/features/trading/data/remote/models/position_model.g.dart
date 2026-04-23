@@ -21,8 +21,8 @@ _PositionModel _$PositionModelFromJson(Map<String, dynamic> json) =>
     _PositionModel(
       symbol: json['symbol'] as String,
       market: json['market'] as String,
-      qty: (json['qty'] as num).toInt(),
-      availableQty: (json['available_qty'] as num).toInt(),
+      qty: (json['quantity'] as num).toInt(),
+      availableQty: (json['settled_qty'] as num).toInt(),
       avgCost: json['avg_cost'] as String,
       currentPrice: json['current_price'] as String,
       marketValue: json['market_value'] as String,
@@ -44,8 +44,8 @@ Map<String, dynamic> _$PositionModelToJson(_PositionModel instance) =>
     <String, dynamic>{
       'symbol': instance.symbol,
       'market': instance.market,
-      'qty': instance.qty,
-      'available_qty': instance.availableQty,
+      'quantity': instance.qty,
+      'settled_qty': instance.availableQty,
       'avg_cost': instance.avgCost,
       'current_price': instance.currentPrice,
       'market_value': instance.marketValue,

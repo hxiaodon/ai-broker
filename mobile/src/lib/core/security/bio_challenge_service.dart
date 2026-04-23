@@ -34,7 +34,9 @@ class BioChallengeService {
     }
   }
 
-  /// HMAC-SHA256(sessionSecret, challenge\ntimestamp\ndeviceId\nactionHash)
+  /// HMAC-SHA256(sessionSecret, challenge|timestamp|deviceId|actionHash)
+  ///
+  /// Uses `|` separators matching the production spec (security-protocol.md §4.2).
   String computeBioToken({
     required String sessionSecret,
     required String challenge,
@@ -42,19 +44,24 @@ class BioChallengeService {
     required String deviceId,
     required String actionHash,
   }) {
-    final payload = '$challenge\n$timestamp\n$deviceId\n$actionHash';
+    final payload = '$challenge|$timestamp|$deviceId|$actionHash';
     final hmac = Hmac(sha256, utf8.encode(sessionSecret));
     return hmac.convert(utf8.encode(payload)).toString();
   }
 
-  /// SHA256(SIDE\nSYMBOL\nQTY\nPRICE) — normalized to avoid serialization issues.
+  /// SHA256(SIDE|SYMBOL|QTY|PRICE|ACCOUNT_ID)
+  ///
+  /// Binds the challenge to a specific account + order, preventing cross-account
+  /// replay (security-protocol.md §4.2). All fields use `|` separator.
   static String computeActionHash({
     required String side,
     required String symbol,
     required int qty,
+    required String accountId,
     String price = '',
   }) {
-    final normalized = '${side.toUpperCase()}\n$symbol\n$qty\n$price';
+    final normalized =
+        '${side.toUpperCase()}|$symbol|$qty|$price|$accountId';
     return sha256.convert(utf8.encode(normalized)).toString();
   }
 }

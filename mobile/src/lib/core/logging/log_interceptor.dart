@@ -8,7 +8,15 @@ import '../logging/app_logger.dart';
 class DioLogInterceptor extends Interceptor {
   const DioLogInterceptor();
 
-  static const _sensitiveHeaders = {'authorization', 'cookie', 'x-api-key'};
+  static const _sensitiveHeaders = {
+    'authorization',
+    'cookie',
+    'x-api-key',
+    'x-signature',
+    'x-biometric-token',
+    'x-key-id',
+    'idempotency-key',
+  };
   static const _sensitiveFields = {
     'password',
     'ssn',

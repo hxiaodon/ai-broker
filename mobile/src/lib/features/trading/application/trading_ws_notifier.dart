@@ -230,7 +230,7 @@ class TradingWsNotifier extends _$TradingWsNotifier {
       totalPnl: _d(m['cumulative_pnl']),
       totalPnlPct: _d(m['cumulative_pnl_pct']),
       buyingPower: _d(m['buying_power']),
-      settledCash: _d(m['unsettled_cash']),
+      unsettledCash: _d(m['unsettled_cash']),
     );
   }
 

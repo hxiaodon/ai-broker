@@ -83,7 +83,7 @@ extension PortfolioSummaryModelMapper on PortfolioSummaryModel {
         totalPnl: Decimal.parse(totalPnl),
         totalPnlPct: Decimal.parse(totalPnlPct),
         buyingPower: Decimal.parse(buyingPower),
-        settledCash: Decimal.parse(settledCash),
+        unsettledCash: Decimal.parse(unsettledCash),
       );
 }
 

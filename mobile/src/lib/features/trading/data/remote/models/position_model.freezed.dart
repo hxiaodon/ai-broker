@@ -281,7 +281,7 @@ as String,
 /// @nodoc
 mixin _$PositionModel {
 
-@JsonKey(name: 'symbol') String get symbol;@JsonKey(name: 'market') String get market;@JsonKey(name: 'qty') int get qty;@JsonKey(name: 'available_qty') int get availableQty;@JsonKey(name: 'avg_cost') String get avgCost;@JsonKey(name: 'current_price') String get currentPrice;@JsonKey(name: 'market_value') String get marketValue;@JsonKey(name: 'unrealized_pnl') String get unrealizedPnl;@JsonKey(name: 'unrealized_pnl_pct') String get unrealizedPnlPct;@JsonKey(name: 'today_pnl') String get todayPnl;@JsonKey(name: 'today_pnl_pct') String get todayPnlPct;@JsonKey(name: 'pending_settlements') List<PendingSettlementModel> get pendingSettlements;
+@JsonKey(name: 'symbol') String get symbol;@JsonKey(name: 'market') String get market;@JsonKey(name: 'quantity') int get qty;@JsonKey(name: 'settled_qty') int get availableQty;@JsonKey(name: 'avg_cost') String get avgCost;@JsonKey(name: 'current_price') String get currentPrice;@JsonKey(name: 'market_value') String get marketValue;@JsonKey(name: 'unrealized_pnl') String get unrealizedPnl;@JsonKey(name: 'unrealized_pnl_pct') String get unrealizedPnlPct;@JsonKey(name: 'today_pnl') String get todayPnl;@JsonKey(name: 'today_pnl_pct') String get todayPnlPct;@JsonKey(name: 'pending_settlements') List<PendingSettlementModel> get pendingSettlements;
 /// Create a copy of PositionModel
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -314,7 +314,7 @@ abstract mixin class $PositionModelCopyWith<$Res>  {
   factory $PositionModelCopyWith(PositionModel value, $Res Function(PositionModel) _then) = _$PositionModelCopyWithImpl;
 @useResult
 $Res call({
-@JsonKey(name: 'symbol') String symbol,@JsonKey(name: 'market') String market,@JsonKey(name: 'qty') int qty,@JsonKey(name: 'available_qty') int availableQty,@JsonKey(name: 'avg_cost') String avgCost,@JsonKey(name: 'current_price') String currentPrice,@JsonKey(name: 'market_value') String marketValue,@JsonKey(name: 'unrealized_pnl') String unrealizedPnl,@JsonKey(name: 'unrealized_pnl_pct') String unrealizedPnlPct,@JsonKey(name: 'today_pnl') String todayPnl,@JsonKey(name: 'today_pnl_pct') String todayPnlPct,@JsonKey(name: 'pending_settlements') List<PendingSettlementModel> pendingSettlements
+@JsonKey(name: 'symbol') String symbol,@JsonKey(name: 'market') String market,@JsonKey(name: 'quantity') int qty,@JsonKey(name: 'settled_qty') int availableQty,@JsonKey(name: 'avg_cost') String avgCost,@JsonKey(name: 'current_price') String currentPrice,@JsonKey(name: 'market_value') String marketValue,@JsonKey(name: 'unrealized_pnl') String unrealizedPnl,@JsonKey(name: 'unrealized_pnl_pct') String unrealizedPnlPct,@JsonKey(name: 'today_pnl') String todayPnl,@JsonKey(name: 'today_pnl_pct') String todayPnlPct,@JsonKey(name: 'pending_settlements') List<PendingSettlementModel> pendingSettlements
 });
 
 
@@ -430,7 +430,7 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'symbol')  String symbol, @JsonKey(name: 'market')  String market, @JsonKey(name: 'qty')  int qty, @JsonKey(name: 'available_qty')  int availableQty, @JsonKey(name: 'avg_cost')  String avgCost, @JsonKey(name: 'current_price')  String currentPrice, @JsonKey(name: 'market_value')  String marketValue, @JsonKey(name: 'unrealized_pnl')  String unrealizedPnl, @JsonKey(name: 'unrealized_pnl_pct')  String unrealizedPnlPct, @JsonKey(name: 'today_pnl')  String todayPnl, @JsonKey(name: 'today_pnl_pct')  String todayPnlPct, @JsonKey(name: 'pending_settlements')  List<PendingSettlementModel> pendingSettlements)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'symbol')  String symbol, @JsonKey(name: 'market')  String market, @JsonKey(name: 'quantity')  int qty, @JsonKey(name: 'settled_qty')  int availableQty, @JsonKey(name: 'avg_cost')  String avgCost, @JsonKey(name: 'current_price')  String currentPrice, @JsonKey(name: 'market_value')  String marketValue, @JsonKey(name: 'unrealized_pnl')  String unrealizedPnl, @JsonKey(name: 'unrealized_pnl_pct')  String unrealizedPnlPct, @JsonKey(name: 'today_pnl')  String todayPnl, @JsonKey(name: 'today_pnl_pct')  String todayPnlPct, @JsonKey(name: 'pending_settlements')  List<PendingSettlementModel> pendingSettlements)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _PositionModel() when $default != null:
 return $default(_that.symbol,_that.market,_that.qty,_that.availableQty,_that.avgCost,_that.currentPrice,_that.marketValue,_that.unrealizedPnl,_that.unrealizedPnlPct,_that.todayPnl,_that.todayPnlPct,_that.pendingSettlements);case _:
@@ -451,7 +451,7 @@ return $default(_that.symbol,_that.market,_that.qty,_that.availableQty,_that.avg
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'symbol')  String symbol, @JsonKey(name: 'market')  String market, @JsonKey(name: 'qty')  int qty, @JsonKey(name: 'available_qty')  int availableQty, @JsonKey(name: 'avg_cost')  String avgCost, @JsonKey(name: 'current_price')  String currentPrice, @JsonKey(name: 'market_value')  String marketValue, @JsonKey(name: 'unrealized_pnl')  String unrealizedPnl, @JsonKey(name: 'unrealized_pnl_pct')  String unrealizedPnlPct, @JsonKey(name: 'today_pnl')  String todayPnl, @JsonKey(name: 'today_pnl_pct')  String todayPnlPct, @JsonKey(name: 'pending_settlements')  List<PendingSettlementModel> pendingSettlements)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'symbol')  String symbol, @JsonKey(name: 'market')  String market, @JsonKey(name: 'quantity')  int qty, @JsonKey(name: 'settled_qty')  int availableQty, @JsonKey(name: 'avg_cost')  String avgCost, @JsonKey(name: 'current_price')  String currentPrice, @JsonKey(name: 'market_value')  String marketValue, @JsonKey(name: 'unrealized_pnl')  String unrealizedPnl, @JsonKey(name: 'unrealized_pnl_pct')  String unrealizedPnlPct, @JsonKey(name: 'today_pnl')  String todayPnl, @JsonKey(name: 'today_pnl_pct')  String todayPnlPct, @JsonKey(name: 'pending_settlements')  List<PendingSettlementModel> pendingSettlements)  $default,) {final _that = this;
 switch (_that) {
 case _PositionModel():
 return $default(_that.symbol,_that.market,_that.qty,_that.availableQty,_that.avgCost,_that.currentPrice,_that.marketValue,_that.unrealizedPnl,_that.unrealizedPnlPct,_that.todayPnl,_that.todayPnlPct,_that.pendingSettlements);case _:
@@ -471,7 +471,7 @@ return $default(_that.symbol,_that.market,_that.qty,_that.availableQty,_that.avg
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'symbol')  String symbol, @JsonKey(name: 'market')  String market, @JsonKey(name: 'qty')  int qty, @JsonKey(name: 'available_qty')  int availableQty, @JsonKey(name: 'avg_cost')  String avgCost, @JsonKey(name: 'current_price')  String currentPrice, @JsonKey(name: 'market_value')  String marketValue, @JsonKey(name: 'unrealized_pnl')  String unrealizedPnl, @JsonKey(name: 'unrealized_pnl_pct')  String unrealizedPnlPct, @JsonKey(name: 'today_pnl')  String todayPnl, @JsonKey(name: 'today_pnl_pct')  String todayPnlPct, @JsonKey(name: 'pending_settlements')  List<PendingSettlementModel> pendingSettlements)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'symbol')  String symbol, @JsonKey(name: 'market')  String market, @JsonKey(name: 'quantity')  int qty, @JsonKey(name: 'settled_qty')  int availableQty, @JsonKey(name: 'avg_cost')  String avgCost, @JsonKey(name: 'current_price')  String currentPrice, @JsonKey(name: 'market_value')  String marketValue, @JsonKey(name: 'unrealized_pnl')  String unrealizedPnl, @JsonKey(name: 'unrealized_pnl_pct')  String unrealizedPnlPct, @JsonKey(name: 'today_pnl')  String todayPnl, @JsonKey(name: 'today_pnl_pct')  String todayPnlPct, @JsonKey(name: 'pending_settlements')  List<PendingSettlementModel> pendingSettlements)?  $default,) {final _that = this;
 switch (_that) {
 case _PositionModel() when $default != null:
 return $default(_that.symbol,_that.market,_that.qty,_that.availableQty,_that.avgCost,_that.currentPrice,_that.marketValue,_that.unrealizedPnl,_that.unrealizedPnlPct,_that.todayPnl,_that.todayPnlPct,_that.pendingSettlements);case _:
@@ -486,13 +486,13 @@ return $default(_that.symbol,_that.market,_that.qty,_that.availableQty,_that.avg
 @JsonSerializable()
 
 class _PositionModel implements PositionModel {
-  const _PositionModel({@JsonKey(name: 'symbol') required this.symbol, @JsonKey(name: 'market') required this.market, @JsonKey(name: 'qty') required this.qty, @JsonKey(name: 'available_qty') required this.availableQty, @JsonKey(name: 'avg_cost') required this.avgCost, @JsonKey(name: 'current_price') required this.currentPrice, @JsonKey(name: 'market_value') required this.marketValue, @JsonKey(name: 'unrealized_pnl') required this.unrealizedPnl, @JsonKey(name: 'unrealized_pnl_pct') required this.unrealizedPnlPct, @JsonKey(name: 'today_pnl') required this.todayPnl, @JsonKey(name: 'today_pnl_pct') required this.todayPnlPct, @JsonKey(name: 'pending_settlements') final  List<PendingSettlementModel> pendingSettlements = const []}): _pendingSettlements = pendingSettlements;
+  const _PositionModel({@JsonKey(name: 'symbol') required this.symbol, @JsonKey(name: 'market') required this.market, @JsonKey(name: 'quantity') required this.qty, @JsonKey(name: 'settled_qty') required this.availableQty, @JsonKey(name: 'avg_cost') required this.avgCost, @JsonKey(name: 'current_price') required this.currentPrice, @JsonKey(name: 'market_value') required this.marketValue, @JsonKey(name: 'unrealized_pnl') required this.unrealizedPnl, @JsonKey(name: 'unrealized_pnl_pct') required this.unrealizedPnlPct, @JsonKey(name: 'today_pnl') required this.todayPnl, @JsonKey(name: 'today_pnl_pct') required this.todayPnlPct, @JsonKey(name: 'pending_settlements') final  List<PendingSettlementModel> pendingSettlements = const []}): _pendingSettlements = pendingSettlements;
   factory _PositionModel.fromJson(Map<String, dynamic> json) => _$PositionModelFromJson(json);
 
 @override@JsonKey(name: 'symbol') final  String symbol;
 @override@JsonKey(name: 'market') final  String market;
-@override@JsonKey(name: 'qty') final  int qty;
-@override@JsonKey(name: 'available_qty') final  int availableQty;
+@override@JsonKey(name: 'quantity') final  int qty;
+@override@JsonKey(name: 'settled_qty') final  int availableQty;
 @override@JsonKey(name: 'avg_cost') final  String avgCost;
 @override@JsonKey(name: 'current_price') final  String currentPrice;
 @override@JsonKey(name: 'market_value') final  String marketValue;
@@ -541,7 +541,7 @@ abstract mixin class _$PositionModelCopyWith<$Res> implements $PositionModelCopy
   factory _$PositionModelCopyWith(_PositionModel value, $Res Function(_PositionModel) _then) = __$PositionModelCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(name: 'symbol') String symbol,@JsonKey(name: 'market') String market,@JsonKey(name: 'qty') int qty,@JsonKey(name: 'available_qty') int availableQty,@JsonKey(name: 'avg_cost') String avgCost,@JsonKey(name: 'current_price') String currentPrice,@JsonKey(name: 'market_value') String marketValue,@JsonKey(name: 'unrealized_pnl') String unrealizedPnl,@JsonKey(name: 'unrealized_pnl_pct') String unrealizedPnlPct,@JsonKey(name: 'today_pnl') String todayPnl,@JsonKey(name: 'today_pnl_pct') String todayPnlPct,@JsonKey(name: 'pending_settlements') List<PendingSettlementModel> pendingSettlements
+@JsonKey(name: 'symbol') String symbol,@JsonKey(name: 'market') String market,@JsonKey(name: 'quantity') int qty,@JsonKey(name: 'settled_qty') int availableQty,@JsonKey(name: 'avg_cost') String avgCost,@JsonKey(name: 'current_price') String currentPrice,@JsonKey(name: 'market_value') String marketValue,@JsonKey(name: 'unrealized_pnl') String unrealizedPnl,@JsonKey(name: 'unrealized_pnl_pct') String unrealizedPnlPct,@JsonKey(name: 'today_pnl') String todayPnl,@JsonKey(name: 'today_pnl_pct') String todayPnlPct,@JsonKey(name: 'pending_settlements') List<PendingSettlementModel> pendingSettlements
 });
 
 

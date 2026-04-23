@@ -48,8 +48,8 @@ Map<String, dynamic> _orderFillJson() => {
 Map<String, dynamic> _positionJson() => {
       'symbol': 'AAPL',
       'market': 'US',
-      'qty': 100,
-      'available_qty': 80,
+      'quantity': 100,
+      'settled_qty': 80,
       'avg_cost': '150.2500',
       'current_price': '155.0000',
       'market_value': '15500.0000',
@@ -65,13 +65,13 @@ Map<String, dynamic> _positionJson() => {
 Map<String, dynamic> _portfolioSummaryJson() => {
       'total_equity': '100000.00',
       'cash_balance': '50000.00',
-      'market_value': '50000.00',
+      'total_market_value': '50000.00',
       'day_pnl': '1200.50',
       'day_pnl_pct': '1.22',
-      'total_pnl': '5000.00',
-      'total_pnl_pct': '5.26',
+      'cumulative_pnl': '5000.00',
+      'cumulative_pnl_pct': '5.26',
       'buying_power': '75000.00',
-      'settled_cash': '45000.00',
+      'unsettled_cash': '45000.00',
     };
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -173,7 +173,7 @@ void main() {
       expect(model.totalEquity, '100000.00');
       expect(model.cashBalance, '50000.00');
       expect(model.buyingPower, '75000.00');
-      expect(model.settledCash, '45000.00');
+      expect(model.unsettledCash, '45000.00');
     });
   });
 }

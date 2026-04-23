@@ -14,6 +14,6 @@ abstract class PortfolioSummary with _$PortfolioSummary {
     required Decimal totalPnl,
     required Decimal totalPnlPct,
     required Decimal buyingPower,
-    required Decimal settledCash,
+    required Decimal unsettledCash,
   }) = _PortfolioSummary;
 }

@@ -282,7 +282,7 @@ class _StubTradingRepository implements TradingRepository {
   }
 
   @override
-  Future<void> cancelOrder(String orderId) async {}
+  Future<void> cancelOrder(String orderId, {required String idempotencyKey}) async {}
 
   @override
   Future<List<Order>> getOrders({
@@ -326,7 +326,7 @@ class _StubTradingRepository implements TradingRepository {
       totalPnl: Decimal.parse('7425.50'),
       totalPnlPct: Decimal.parse('8.35'),
       buyingPower: Decimal.parse('10064.40'),
-      settledCash: Decimal.parse('0.00'),
+      unsettledCash: Decimal.parse('0.00'),
     );
   }
 

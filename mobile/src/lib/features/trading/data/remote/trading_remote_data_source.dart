@@ -86,8 +86,9 @@ class TradingRemoteDataSource {
     try {
       final resp = await _dio.post<Map<String, dynamic>>(
         path,
-        data: body,
+        data: bodyJson,
         options: Options(headers: {
+          'Content-Type': 'application/json',
           ...sigHeaders,
           'Idempotency-Key': idempotencyKey,
           'X-Biometric-Token': biometricToken,
@@ -95,14 +96,14 @@ class TradingRemoteDataSource {
           'X-Bio-Timestamp': bioTimestamp,
         }),
       );
-      AppLogger.debug('submitOrder success: ${resp.data}');
+      AppLogger.debug('submitOrder success: orderId=${resp.data?['order_id']}');
       return OrderModel.fromJson(resp.data!).toDomain();
     } on DioException catch (e) {
       throw _mapDioError(e, 'submitOrder');
     }
   }
 
-  Future<void> cancelOrder(String orderId) async {
+  Future<void> cancelOrder(String orderId, {required String idempotencyKey}) async {
     await _checkConnectivity();
     final path = '/api/v1/orders/$orderId';
 
@@ -122,7 +123,10 @@ class TradingRemoteDataSource {
     try {
       await _dio.delete<void>(
         path,
-        options: Options(headers: sigHeaders),
+        options: Options(headers: {
+          ...sigHeaders,
+          'Idempotency-Key': idempotencyKey,
+        }),
       );
     } on DioException catch (e) {
       throw _mapDioError(e, 'cancelOrder');

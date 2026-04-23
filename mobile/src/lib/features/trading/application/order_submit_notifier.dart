@@ -5,9 +5,11 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/auth/device_info_service.dart';
+import '../../../core/auth/token_service.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/security/bio_challenge_service.dart';
 import '../../../core/security/session_key_service.dart';
+import '../../auth/application/auth_notifier.dart';
 import '../data/trading_repository_impl.dart';
 import '../domain/entities/order.dart';
 import 'orders_notifier.dart';
@@ -27,6 +29,11 @@ sealed class OrderSubmitState with _$OrderSubmitState {
 @riverpod
 class OrderSubmitNotifier extends _$OrderSubmitNotifier {
   final _localAuth = LocalAuthentication();
+
+  // Idempotency key is generated once per submit attempt and persisted until
+  // reset() is called. This ensures network-timeout retries reuse the same key
+  // and don't create duplicate orders.
+  String? _pendingIdempotencyKey;
 
   @override
   OrderSubmitState build() => const OrderSubmitState.idle();
@@ -76,6 +83,10 @@ class OrderSubmitNotifier extends _$OrderSubmitNotifier {
           symbol: symbol,
           qty: qty,
           price: limitPrice?.toString() ?? '',
+          accountId: ref.read(authProvider).maybeWhen(
+                authenticated: (accountId, _, __) => accountId,
+                orElse: () => '',
+              ),
         );
         biometricToken = ref
             .read(bioChallengeServiceProvider)
@@ -94,7 +105,9 @@ class OrderSubmitNotifier extends _$OrderSubmitNotifier {
     }
 
     state = const OrderSubmitState.submitting();
-    final idempotencyKey = const Uuid().v4();
+    // Reuse existing key on retry; generate new key only on fresh submission.
+    _pendingIdempotencyKey ??= const Uuid().v4();
+    final idempotencyKey = _pendingIdempotencyKey!;
 
     try {
       final order = await ref.read(tradingRepositoryProvider).submitOrder(
@@ -113,6 +126,7 @@ class OrderSubmitNotifier extends _$OrderSubmitNotifier {
           );
 
       ref.invalidate(ordersProvider);
+      _pendingIdempotencyKey = null; // order reached terminal state
       state = OrderSubmitState.success(orderId: order.orderId);
     } on Object catch (e) {
       AppLogger.warning('Order submit failed: $e');
@@ -120,5 +134,8 @@ class OrderSubmitNotifier extends _$OrderSubmitNotifier {
     }
   }
 
-  void reset() => state = const OrderSubmitState.idle();
+  void reset() {
+    _pendingIdempotencyKey = null;
+    state = const OrderSubmitState.idle();
+  }
 }

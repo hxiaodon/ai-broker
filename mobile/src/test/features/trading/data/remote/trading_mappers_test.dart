@@ -264,14 +264,14 @@ void main() {
         totalPnl: '5000.00',
         totalPnlPct: '5.26',
         buyingPower: '75000.00',
-        settledCash: '45000.00',
+        unsettledCash: '45000.00',
       );
       final summary = model.toDomain();
       expect(summary.totalEquity, Decimal.parse('100000.00'));
       expect(summary.cashBalance, Decimal.parse('50000.00'));
       expect(summary.dayPnl, Decimal.parse('1200.50'));
       expect(summary.buyingPower, Decimal.parse('75000.00'));
-      expect(summary.settledCash, Decimal.parse('45000.00'));
+      expect(summary.unsettledCash, Decimal.parse('45000.00'));
     });
   });
 }

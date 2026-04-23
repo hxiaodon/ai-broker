@@ -14,7 +14,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$PortfolioSummary {
 
- Decimal get totalEquity; Decimal get cashBalance; Decimal get marketValue; Decimal get dayPnl; Decimal get dayPnlPct; Decimal get totalPnl; Decimal get totalPnlPct; Decimal get buyingPower; Decimal get settledCash;
+ Decimal get totalEquity; Decimal get cashBalance; Decimal get marketValue; Decimal get dayPnl; Decimal get dayPnlPct; Decimal get totalPnl; Decimal get totalPnlPct; Decimal get buyingPower; Decimal get unsettledCash;
 /// Create a copy of PortfolioSummary
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -25,16 +25,16 @@ $PortfolioSummaryCopyWith<PortfolioSummary> get copyWith => _$PortfolioSummaryCo
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is PortfolioSummary&&(identical(other.totalEquity, totalEquity) || other.totalEquity == totalEquity)&&(identical(other.cashBalance, cashBalance) || other.cashBalance == cashBalance)&&(identical(other.marketValue, marketValue) || other.marketValue == marketValue)&&(identical(other.dayPnl, dayPnl) || other.dayPnl == dayPnl)&&(identical(other.dayPnlPct, dayPnlPct) || other.dayPnlPct == dayPnlPct)&&(identical(other.totalPnl, totalPnl) || other.totalPnl == totalPnl)&&(identical(other.totalPnlPct, totalPnlPct) || other.totalPnlPct == totalPnlPct)&&(identical(other.buyingPower, buyingPower) || other.buyingPower == buyingPower)&&(identical(other.settledCash, settledCash) || other.settledCash == settledCash));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is PortfolioSummary&&(identical(other.totalEquity, totalEquity) || other.totalEquity == totalEquity)&&(identical(other.cashBalance, cashBalance) || other.cashBalance == cashBalance)&&(identical(other.marketValue, marketValue) || other.marketValue == marketValue)&&(identical(other.dayPnl, dayPnl) || other.dayPnl == dayPnl)&&(identical(other.dayPnlPct, dayPnlPct) || other.dayPnlPct == dayPnlPct)&&(identical(other.totalPnl, totalPnl) || other.totalPnl == totalPnl)&&(identical(other.totalPnlPct, totalPnlPct) || other.totalPnlPct == totalPnlPct)&&(identical(other.buyingPower, buyingPower) || other.buyingPower == buyingPower)&&(identical(other.unsettledCash, unsettledCash) || other.unsettledCash == unsettledCash));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,totalEquity,cashBalance,marketValue,dayPnl,dayPnlPct,totalPnl,totalPnlPct,buyingPower,settledCash);
+int get hashCode => Object.hash(runtimeType,totalEquity,cashBalance,marketValue,dayPnl,dayPnlPct,totalPnl,totalPnlPct,buyingPower,unsettledCash);
 
 @override
 String toString() {
-  return 'PortfolioSummary(totalEquity: $totalEquity, cashBalance: $cashBalance, marketValue: $marketValue, dayPnl: $dayPnl, dayPnlPct: $dayPnlPct, totalPnl: $totalPnl, totalPnlPct: $totalPnlPct, buyingPower: $buyingPower, settledCash: $settledCash)';
+  return 'PortfolioSummary(totalEquity: $totalEquity, cashBalance: $cashBalance, marketValue: $marketValue, dayPnl: $dayPnl, dayPnlPct: $dayPnlPct, totalPnl: $totalPnl, totalPnlPct: $totalPnlPct, buyingPower: $buyingPower, unsettledCash: $unsettledCash)';
 }
 
 
@@ -45,7 +45,7 @@ abstract mixin class $PortfolioSummaryCopyWith<$Res>  {
   factory $PortfolioSummaryCopyWith(PortfolioSummary value, $Res Function(PortfolioSummary) _then) = _$PortfolioSummaryCopyWithImpl;
 @useResult
 $Res call({
- Decimal totalEquity, Decimal cashBalance, Decimal marketValue, Decimal dayPnl, Decimal dayPnlPct, Decimal totalPnl, Decimal totalPnlPct, Decimal buyingPower, Decimal settledCash
+ Decimal totalEquity, Decimal cashBalance, Decimal marketValue, Decimal dayPnl, Decimal dayPnlPct, Decimal totalPnl, Decimal totalPnlPct, Decimal buyingPower, Decimal unsettledCash
 });
 
 
@@ -62,7 +62,7 @@ class _$PortfolioSummaryCopyWithImpl<$Res>
 
 /// Create a copy of PortfolioSummary
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? totalEquity = null,Object? cashBalance = null,Object? marketValue = null,Object? dayPnl = null,Object? dayPnlPct = null,Object? totalPnl = null,Object? totalPnlPct = null,Object? buyingPower = null,Object? settledCash = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? totalEquity = null,Object? cashBalance = null,Object? marketValue = null,Object? dayPnl = null,Object? dayPnlPct = null,Object? totalPnl = null,Object? totalPnlPct = null,Object? buyingPower = null,Object? unsettledCash = null,}) {
   return _then(_self.copyWith(
 totalEquity: null == totalEquity ? _self.totalEquity : totalEquity // ignore: cast_nullable_to_non_nullable
 as Decimal,cashBalance: null == cashBalance ? _self.cashBalance : cashBalance // ignore: cast_nullable_to_non_nullable
@@ -72,7 +72,7 @@ as Decimal,dayPnlPct: null == dayPnlPct ? _self.dayPnlPct : dayPnlPct // ignore:
 as Decimal,totalPnl: null == totalPnl ? _self.totalPnl : totalPnl // ignore: cast_nullable_to_non_nullable
 as Decimal,totalPnlPct: null == totalPnlPct ? _self.totalPnlPct : totalPnlPct // ignore: cast_nullable_to_non_nullable
 as Decimal,buyingPower: null == buyingPower ? _self.buyingPower : buyingPower // ignore: cast_nullable_to_non_nullable
-as Decimal,settledCash: null == settledCash ? _self.settledCash : settledCash // ignore: cast_nullable_to_non_nullable
+as Decimal,unsettledCash: null == unsettledCash ? _self.unsettledCash : unsettledCash // ignore: cast_nullable_to_non_nullable
 as Decimal,
   ));
 }
@@ -158,10 +158,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( Decimal totalEquity,  Decimal cashBalance,  Decimal marketValue,  Decimal dayPnl,  Decimal dayPnlPct,  Decimal totalPnl,  Decimal totalPnlPct,  Decimal buyingPower,  Decimal settledCash)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( Decimal totalEquity,  Decimal cashBalance,  Decimal marketValue,  Decimal dayPnl,  Decimal dayPnlPct,  Decimal totalPnl,  Decimal totalPnlPct,  Decimal buyingPower,  Decimal unsettledCash)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _PortfolioSummary() when $default != null:
-return $default(_that.totalEquity,_that.cashBalance,_that.marketValue,_that.dayPnl,_that.dayPnlPct,_that.totalPnl,_that.totalPnlPct,_that.buyingPower,_that.settledCash);case _:
+return $default(_that.totalEquity,_that.cashBalance,_that.marketValue,_that.dayPnl,_that.dayPnlPct,_that.totalPnl,_that.totalPnlPct,_that.buyingPower,_that.unsettledCash);case _:
   return orElse();
 
 }
@@ -179,10 +179,10 @@ return $default(_that.totalEquity,_that.cashBalance,_that.marketValue,_that.dayP
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( Decimal totalEquity,  Decimal cashBalance,  Decimal marketValue,  Decimal dayPnl,  Decimal dayPnlPct,  Decimal totalPnl,  Decimal totalPnlPct,  Decimal buyingPower,  Decimal settledCash)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( Decimal totalEquity,  Decimal cashBalance,  Decimal marketValue,  Decimal dayPnl,  Decimal dayPnlPct,  Decimal totalPnl,  Decimal totalPnlPct,  Decimal buyingPower,  Decimal unsettledCash)  $default,) {final _that = this;
 switch (_that) {
 case _PortfolioSummary():
-return $default(_that.totalEquity,_that.cashBalance,_that.marketValue,_that.dayPnl,_that.dayPnlPct,_that.totalPnl,_that.totalPnlPct,_that.buyingPower,_that.settledCash);case _:
+return $default(_that.totalEquity,_that.cashBalance,_that.marketValue,_that.dayPnl,_that.dayPnlPct,_that.totalPnl,_that.totalPnlPct,_that.buyingPower,_that.unsettledCash);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -199,10 +199,10 @@ return $default(_that.totalEquity,_that.cashBalance,_that.marketValue,_that.dayP
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( Decimal totalEquity,  Decimal cashBalance,  Decimal marketValue,  Decimal dayPnl,  Decimal dayPnlPct,  Decimal totalPnl,  Decimal totalPnlPct,  Decimal buyingPower,  Decimal settledCash)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( Decimal totalEquity,  Decimal cashBalance,  Decimal marketValue,  Decimal dayPnl,  Decimal dayPnlPct,  Decimal totalPnl,  Decimal totalPnlPct,  Decimal buyingPower,  Decimal unsettledCash)?  $default,) {final _that = this;
 switch (_that) {
 case _PortfolioSummary() when $default != null:
-return $default(_that.totalEquity,_that.cashBalance,_that.marketValue,_that.dayPnl,_that.dayPnlPct,_that.totalPnl,_that.totalPnlPct,_that.buyingPower,_that.settledCash);case _:
+return $default(_that.totalEquity,_that.cashBalance,_that.marketValue,_that.dayPnl,_that.dayPnlPct,_that.totalPnl,_that.totalPnlPct,_that.buyingPower,_that.unsettledCash);case _:
   return null;
 
 }
@@ -214,7 +214,7 @@ return $default(_that.totalEquity,_that.cashBalance,_that.marketValue,_that.dayP
 
 
 class _PortfolioSummary implements PortfolioSummary {
-  const _PortfolioSummary({required this.totalEquity, required this.cashBalance, required this.marketValue, required this.dayPnl, required this.dayPnlPct, required this.totalPnl, required this.totalPnlPct, required this.buyingPower, required this.settledCash});
+  const _PortfolioSummary({required this.totalEquity, required this.cashBalance, required this.marketValue, required this.dayPnl, required this.dayPnlPct, required this.totalPnl, required this.totalPnlPct, required this.buyingPower, required this.unsettledCash});
   
 
 @override final  Decimal totalEquity;
@@ -225,7 +225,7 @@ class _PortfolioSummary implements PortfolioSummary {
 @override final  Decimal totalPnl;
 @override final  Decimal totalPnlPct;
 @override final  Decimal buyingPower;
-@override final  Decimal settledCash;
+@override final  Decimal unsettledCash;
 
 /// Create a copy of PortfolioSummary
 /// with the given fields replaced by the non-null parameter values.
@@ -237,16 +237,16 @@ _$PortfolioSummaryCopyWith<_PortfolioSummary> get copyWith => __$PortfolioSummar
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _PortfolioSummary&&(identical(other.totalEquity, totalEquity) || other.totalEquity == totalEquity)&&(identical(other.cashBalance, cashBalance) || other.cashBalance == cashBalance)&&(identical(other.marketValue, marketValue) || other.marketValue == marketValue)&&(identical(other.dayPnl, dayPnl) || other.dayPnl == dayPnl)&&(identical(other.dayPnlPct, dayPnlPct) || other.dayPnlPct == dayPnlPct)&&(identical(other.totalPnl, totalPnl) || other.totalPnl == totalPnl)&&(identical(other.totalPnlPct, totalPnlPct) || other.totalPnlPct == totalPnlPct)&&(identical(other.buyingPower, buyingPower) || other.buyingPower == buyingPower)&&(identical(other.settledCash, settledCash) || other.settledCash == settledCash));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _PortfolioSummary&&(identical(other.totalEquity, totalEquity) || other.totalEquity == totalEquity)&&(identical(other.cashBalance, cashBalance) || other.cashBalance == cashBalance)&&(identical(other.marketValue, marketValue) || other.marketValue == marketValue)&&(identical(other.dayPnl, dayPnl) || other.dayPnl == dayPnl)&&(identical(other.dayPnlPct, dayPnlPct) || other.dayPnlPct == dayPnlPct)&&(identical(other.totalPnl, totalPnl) || other.totalPnl == totalPnl)&&(identical(other.totalPnlPct, totalPnlPct) || other.totalPnlPct == totalPnlPct)&&(identical(other.buyingPower, buyingPower) || other.buyingPower == buyingPower)&&(identical(other.unsettledCash, unsettledCash) || other.unsettledCash == unsettledCash));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,totalEquity,cashBalance,marketValue,dayPnl,dayPnlPct,totalPnl,totalPnlPct,buyingPower,settledCash);
+int get hashCode => Object.hash(runtimeType,totalEquity,cashBalance,marketValue,dayPnl,dayPnlPct,totalPnl,totalPnlPct,buyingPower,unsettledCash);
 
 @override
 String toString() {
-  return 'PortfolioSummary(totalEquity: $totalEquity, cashBalance: $cashBalance, marketValue: $marketValue, dayPnl: $dayPnl, dayPnlPct: $dayPnlPct, totalPnl: $totalPnl, totalPnlPct: $totalPnlPct, buyingPower: $buyingPower, settledCash: $settledCash)';
+  return 'PortfolioSummary(totalEquity: $totalEquity, cashBalance: $cashBalance, marketValue: $marketValue, dayPnl: $dayPnl, dayPnlPct: $dayPnlPct, totalPnl: $totalPnl, totalPnlPct: $totalPnlPct, buyingPower: $buyingPower, unsettledCash: $unsettledCash)';
 }
 
 
@@ -257,7 +257,7 @@ abstract mixin class _$PortfolioSummaryCopyWith<$Res> implements $PortfolioSumma
   factory _$PortfolioSummaryCopyWith(_PortfolioSummary value, $Res Function(_PortfolioSummary) _then) = __$PortfolioSummaryCopyWithImpl;
 @override @useResult
 $Res call({
- Decimal totalEquity, Decimal cashBalance, Decimal marketValue, Decimal dayPnl, Decimal dayPnlPct, Decimal totalPnl, Decimal totalPnlPct, Decimal buyingPower, Decimal settledCash
+ Decimal totalEquity, Decimal cashBalance, Decimal marketValue, Decimal dayPnl, Decimal dayPnlPct, Decimal totalPnl, Decimal totalPnlPct, Decimal buyingPower, Decimal unsettledCash
 });
 
 
@@ -274,7 +274,7 @@ class __$PortfolioSummaryCopyWithImpl<$Res>
 
 /// Create a copy of PortfolioSummary
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? totalEquity = null,Object? cashBalance = null,Object? marketValue = null,Object? dayPnl = null,Object? dayPnlPct = null,Object? totalPnl = null,Object? totalPnlPct = null,Object? buyingPower = null,Object? settledCash = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? totalEquity = null,Object? cashBalance = null,Object? marketValue = null,Object? dayPnl = null,Object? dayPnlPct = null,Object? totalPnl = null,Object? totalPnlPct = null,Object? buyingPower = null,Object? unsettledCash = null,}) {
   return _then(_PortfolioSummary(
 totalEquity: null == totalEquity ? _self.totalEquity : totalEquity // ignore: cast_nullable_to_non_nullable
 as Decimal,cashBalance: null == cashBalance ? _self.cashBalance : cashBalance // ignore: cast_nullable_to_non_nullable
@@ -284,7 +284,7 @@ as Decimal,dayPnlPct: null == dayPnlPct ? _self.dayPnlPct : dayPnlPct // ignore:
 as Decimal,totalPnl: null == totalPnl ? _self.totalPnl : totalPnl // ignore: cast_nullable_to_non_nullable
 as Decimal,totalPnlPct: null == totalPnlPct ? _self.totalPnlPct : totalPnlPct // ignore: cast_nullable_to_non_nullable
 as Decimal,buyingPower: null == buyingPower ? _self.buyingPower : buyingPower // ignore: cast_nullable_to_non_nullable
-as Decimal,settledCash: null == settledCash ? _self.settledCash : settledCash // ignore: cast_nullable_to_non_nullable
+as Decimal,unsettledCash: null == unsettledCash ? _self.unsettledCash : unsettledCash // ignore: cast_nullable_to_non_nullable
 as Decimal,
   ));
 }

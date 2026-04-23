@@ -14,12 +14,12 @@ void main() {
         totalPnl: Decimal.parse('5000.00'),
         totalPnlPct: Decimal.parse('5.26'),
         buyingPower: Decimal.parse('75000.00'),
-        settledCash: Decimal.parse('45000.00'),
+        unsettledCash: Decimal.parse('45000.00'),
       );
       expect(summary.totalEquity, isA<Decimal>());
       expect(summary.cashBalance, isA<Decimal>());
       expect(summary.buyingPower, isA<Decimal>());
-      expect(summary.settledCash, isA<Decimal>());
+      expect(summary.unsettledCash, isA<Decimal>());
     });
 
     test('negative P&L values', () {
@@ -32,7 +32,7 @@ void main() {
         totalPnl: Decimal.parse('-5000.00'),
         totalPnlPct: Decimal.parse('-5.00'),
         buyingPower: Decimal.parse('70000.00'),
-        settledCash: Decimal.parse('45000.00'),
+        unsettledCash: Decimal.parse('45000.00'),
       );
       expect(summary.dayPnl, Decimal.parse('-800.00'));
       expect(summary.totalPnlPct, Decimal.parse('-5.00'));

@@ -21,7 +21,7 @@ abstract class TradingRepository {
     required String bioTimestamp,
   });
 
-  Future<void> cancelOrder(String orderId);
+  Future<void> cancelOrder(String orderId, {required String idempotencyKey});
 
   Future<List<Order>> getOrders({
     OrderStatus? status,

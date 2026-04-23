@@ -55,8 +55,8 @@ Map<String, dynamic> _orderResponseJson({String status = 'PENDING'}) => {
 Map<String, dynamic> _positionResponseJson() => {
       'symbol': 'AAPL',
       'market': 'US',
-      'qty': 100,
-      'available_qty': 80,
+      'quantity': 100,
+      'settled_qty': 80,
       'avg_cost': '150.2500',
       'current_price': '155.0000',
       'market_value': '15500.0000',
@@ -70,13 +70,13 @@ Map<String, dynamic> _positionResponseJson() => {
 Map<String, dynamic> _portfolioSummaryResponseJson() => {
       'total_equity': '100000.00',
       'cash_balance': '50000.00',
-      'market_value': '50000.00',
+      'total_market_value': '50000.00',
       'day_pnl': '1200.50',
       'day_pnl_pct': '1.22',
-      'total_pnl': '5000.00',
-      'total_pnl_pct': '5.26',
+      'cumulative_pnl': '5000.00',
+      'cumulative_pnl_pct': '5.26',
       'buying_power': '75000.00',
-      'settled_cash': '45000.00',
+      'unsettled_cash': '45000.00',
     };
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -321,7 +321,7 @@ void main() {
             requestOptions: RequestOptions(path: '/api/v1/orders/ord-001'),
           ));
 
-      await dataSource.cancelOrder('ord-001');
+      await dataSource.cancelOrder('ord-001', idempotencyKey: 'idem-test-001');
 
       final captured = verify(() => mockDio.delete<void>(
             '/api/v1/orders/ord-001',
@@ -334,6 +334,7 @@ void main() {
       expect(headers['X-Device-Id'], 'dev-test');
       expect(headers['X-Timestamp'], isNotNull);
       expect(headers['X-Signature'], isNotNull);
+      expect(headers['Idempotency-Key'], 'idem-test-001');
     });
 
     test('fetches fresh nonce for each cancel request', () async {
@@ -345,8 +346,8 @@ void main() {
             requestOptions: RequestOptions(path: '/api/v1/orders/ord-001'),
           ));
 
-      await dataSource.cancelOrder('ord-001');
-      await dataSource.cancelOrder('ord-002');
+      await dataSource.cancelOrder('ord-001', idempotencyKey: 'idem-001');
+      await dataSource.cancelOrder('ord-002', idempotencyKey: 'idem-002');
 
       verify(() => mockNonce.fetchNonce()).called(2);
     });

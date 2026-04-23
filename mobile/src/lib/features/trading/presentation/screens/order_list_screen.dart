@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../../shared/theme/color_tokens.dart';
 import '../../application/orders_notifier.dart';
@@ -184,7 +185,10 @@ class _OrderTab extends ConsumerWidget {
               Navigator.pop(context);
               await ref
                   .read(tradingRepositoryProvider)
-                  .cancelOrder(order.orderId);
+                  .cancelOrder(
+                    order.orderId,
+                    idempotencyKey: const Uuid().v4(),
+                  );
               ref.invalidate(
                   ordersProvider(filterStatus: filterStatus));
             },

@@ -16,12 +16,14 @@ void main() {
         symbol: 'AAPL',
         qty: 100,
         price: '150.2500',
+        accountId: 'acc-123',
       );
       final h2 = BioChallengeService.computeActionHash(
         side: 'buy',
         symbol: 'AAPL',
         qty: 100,
         price: '150.2500',
+        accountId: 'acc-123',
       );
       expect(h1, h2);
     });
@@ -31,11 +33,13 @@ void main() {
         side: 'buy',
         symbol: 'AAPL',
         qty: 100,
+        accountId: 'acc-123',
       );
       final upper = BioChallengeService.computeActionHash(
         side: 'BUY',
         symbol: 'AAPL',
         qty: 100,
+        accountId: 'acc-123',
       );
       expect(lower, upper);
     });
@@ -46,12 +50,14 @@ void main() {
         symbol: 'AAPL',
         qty: 100,
         price: '150.00',
+        accountId: 'acc-123',
       );
       final sell = BioChallengeService.computeActionHash(
         side: 'sell',
         symbol: 'AAPL',
         qty: 100,
         price: '150.00',
+        accountId: 'acc-123',
       );
       expect(buy, isNot(sell));
     });
@@ -61,41 +67,61 @@ void main() {
         side: 'buy',
         symbol: 'AAPL',
         qty: 100,
+        accountId: 'acc-123',
       );
       final h2 = BioChallengeService.computeActionHash(
         side: 'buy',
         symbol: 'AAPL',
         qty: 200,
+        accountId: 'acc-123',
       );
       expect(h1, isNot(h2));
     });
 
-    test('matches manual SHA256 of normalized format', () {
+    test('different accountId produces different hash (cross-account replay prevention)', () {
+      final h1 = BioChallengeService.computeActionHash(
+        side: 'buy',
+        symbol: 'AAPL',
+        qty: 100,
+        accountId: 'acc-111',
+      );
+      final h2 = BioChallengeService.computeActionHash(
+        side: 'buy',
+        symbol: 'AAPL',
+        qty: 100,
+        accountId: 'acc-222',
+      );
+      expect(h1, isNot(h2));
+    });
+
+    test('matches manual SHA256 of | separated format', () {
       const side = 'BUY';
       const symbol = 'TSLA';
       const qty = 50;
       const price = '200.0000';
+      const accountId = 'acc-test';
 
       final hash = BioChallengeService.computeActionHash(
         side: side,
         symbol: symbol,
         qty: qty,
         price: price,
+        accountId: accountId,
       );
 
       final expected = sha256
-          .convert(utf8.encode('$side\n$symbol\n$qty\n$price'))
+          .convert(utf8.encode('$side|$symbol|$qty|$price|$accountId'))
           .toString();
       expect(hash, expected);
     });
 
     test('empty price defaults to empty string — not null', () {
-      // Should not throw
       expect(
         () => BioChallengeService.computeActionHash(
           side: 'buy',
           symbol: 'AAPL',
           qty: 100,
+          accountId: 'acc-123',
         ),
         returnsNormally,
       );
@@ -145,7 +171,7 @@ void main() {
         actionHash: actionHash,
       );
 
-      final payload = '$challenge\n$timestamp\n$deviceId\n$actionHash';
+      final payload = '$challenge|$timestamp|$deviceId|$actionHash';
       final expected = Hmac(sha256, utf8.encode(sessionSecret))
           .convert(utf8.encode(payload))
           .toString();

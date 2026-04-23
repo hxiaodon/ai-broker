@@ -55,7 +55,8 @@ class TradingRepositoryImpl implements TradingRepository {
       );
 
   @override
-  Future<void> cancelOrder(String orderId) => _remote.cancelOrder(orderId);
+  Future<void> cancelOrder(String orderId, {required String idempotencyKey}) =>
+      _remote.cancelOrder(orderId, idempotencyKey: idempotencyKey);
 
   @override
   Future<List<Order>> getOrders({

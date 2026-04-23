@@ -19,8 +19,8 @@ abstract class PositionModel with _$PositionModel {
   const factory PositionModel({
     @JsonKey(name: 'symbol') required String symbol,
     @JsonKey(name: 'market') required String market,
-    @JsonKey(name: 'qty') required int qty,
-    @JsonKey(name: 'available_qty') required int availableQty,
+    @JsonKey(name: 'quantity') required int qty,
+    @JsonKey(name: 'settled_qty') required int availableQty,
     @JsonKey(name: 'avg_cost') required String avgCost,
     @JsonKey(name: 'current_price') required String currentPrice,
     @JsonKey(name: 'market_value') required String marketValue,
