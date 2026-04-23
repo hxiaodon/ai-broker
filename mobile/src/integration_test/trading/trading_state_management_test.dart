@@ -16,6 +16,7 @@ import 'package:trading_app/features/trading/application/order_submit_notifier.d
 import 'package:trading_app/features/trading/application/orders_notifier.dart';
 import 'package:trading_app/features/trading/application/portfolio_summary_provider.dart';
 import 'package:trading_app/features/trading/application/positions_provider.dart';
+import 'package:trading_app/features/trading/application/trading_ws_notifier.dart';
 import 'package:trading_app/features/trading/data/trading_repository_impl.dart';
 import 'package:trading_app/features/trading/domain/entities/order.dart';
 import 'package:trading_app/features/trading/domain/entities/order_fill.dart';
@@ -323,6 +324,91 @@ void main() {
       print('✅ T8: portfolioSummaryProvider loaded (equity: ${summary.totalEquity})');
     });
   });
+
+  // ── OrdersNotifier WS path tests ─────────────────────────────────────────────
+
+  group('Trading Module - OrdersNotifier WS Updates', () {
+    late ProviderContainer container;
+
+    setUp(() {
+      container = ProviderContainer(
+        overrides: [
+          tradingRepositoryProvider.overrideWithValue(_StubTradingRepository()),
+          sessionKeyServiceProvider.overrideWithValue(_StubSessionKeyService()),
+          nonceServiceProvider.overrideWithValue(_StubNonceService()),
+          bioChallengeServiceProvider.overrideWithValue(_StubBioChallengeService()),
+        ],
+      );
+    });
+
+    tearDown(() => container.dispose());
+
+    test('T12: WS update for known orderId patches status in-place', () async {
+      final orders = await container.read(ordersProvider().future);
+      expect(orders.first.symbol, 'AAPL');
+      expect(orders.first.status, OrderStatus.filled); // ord-001 starts FILLED
+
+      // Inject a WS update that changes AAPL to CANCELLED
+      container
+          .read(tradingWsProvider.notifier)
+          .injectOrderUpdate(TradingWsOrderUpdate(
+            orderId: 'ord-001',
+            status: OrderStatus.cancelled,
+          ));
+
+      // Give the stream listener one microtask to process
+      await Future<void>.microtask(() {});
+
+      final updated = container.read(ordersProvider()).value;
+      expect(updated, isNotNull);
+      expect(updated!.first.status, OrderStatus.cancelled,
+          reason: 'Known orderId WS update must patch status in-place');
+      print('✅ T12: WS patch for ord-001 FILLED → CANCELLED');
+    });
+
+    test('T13: WS update for unknown orderId triggers list refresh', () async {
+      int getOrdersFetchCount = 0;
+      final patchedContainer = ProviderContainer(
+        overrides: [
+          tradingRepositoryProvider.overrideWithValue(
+            _CountingTradingRepository(onGetOrders: () => getOrdersFetchCount++),
+          ),
+          sessionKeyServiceProvider.overrideWithValue(_StubSessionKeyService()),
+          nonceServiceProvider.overrideWithValue(_StubNonceService()),
+          bioChallengeServiceProvider.overrideWithValue(_StubBioChallengeService()),
+        ],
+      );
+
+      // Keep ordersProvider alive via a listener so its WS subscription
+      // stays active when we inject the update (autoDispose would cancel it).
+      final sub = patchedContainer.listen<AsyncValue<List<Order>>>(
+        ordersProvider(),
+        (_, __) {},
+      );
+
+      // Wait for initial load (count = 1)
+      await patchedContainer.read(ordersProvider().future);
+      expect(getOrdersFetchCount, 1);
+
+      // Inject WS update for an orderId NOT in the list
+      patchedContainer
+          .read(tradingWsProvider.notifier)
+          .injectOrderUpdate(TradingWsOrderUpdate(
+            orderId: 'ord-brand-new',
+            status: OrderStatus.pending,
+          ));
+
+      // Allow invalidateSelf + async rebuild to complete
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      expect(getOrdersFetchCount, greaterThan(1),
+          reason: 'Unknown orderId must trigger a full list refresh');
+
+      sub.close();
+      patchedContainer.dispose();
+      print('✅ T13: Unknown orderId WS update → list refreshed (fetches: $getOrdersFetchCount)');
+    });
+  });
 }
 
 // ─── Stub implementations ─────────────────────────────────────────────────────
@@ -528,3 +614,29 @@ class _StubLocalAuthService extends LocalAuthService {
   @override
   Future<bool> isAvailable() async => !_throws;
 }
+
+/// TradingRepository that counts getOrders() calls — used to verify
+/// that OrdersNotifier.invalidateSelf() triggers a refresh.
+class _CountingTradingRepository extends _StubTradingRepository {
+  _CountingTradingRepository({required void Function() onGetOrders})
+      : _onGetOrders = onGetOrders;
+
+  final void Function() _onGetOrders;
+
+  @override
+  Future<List<Order>> getOrders({
+    OrderStatus? status,
+    DateTime? fromDate,
+    DateTime? toDate,
+    String? market,
+  }) async {
+    _onGetOrders();
+    return super.getOrders(
+      status: status,
+      fromDate: fromDate,
+      toDate: toDate,
+      market: market,
+    );
+  }
+}
+

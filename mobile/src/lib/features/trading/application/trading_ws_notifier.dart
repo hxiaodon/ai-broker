@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 import 'package:decimal/decimal.dart';
+import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -54,6 +55,15 @@ class TradingWsNotifier extends _$TradingWsNotifier {
   Stream<TradingWsOrderUpdate> get orderUpdates => _orderController.stream;
   Stream<TradingWsPositionUpdate> get positionUpdates =>
       _positionController.stream;
+
+  /// Injects an order update into the stream for testing.
+  ///
+  /// Allows state management tests to simulate WS pushes without a real
+  /// WebSocket connection.
+  @visibleForTesting
+  void injectOrderUpdate(TradingWsOrderUpdate update) {
+    _orderController.add(update);
+  }
   Stream<TradingWsPortfolioUpdate> get portfolioUpdates =>
       _portfolioController.stream;
 
@@ -89,6 +99,10 @@ class TradingWsNotifier extends _$TradingWsNotifier {
 
   /// Sends auth message within 10s window per contract v3 §S-04.
   /// Signature: HMAC-SHA256(sessionSecret, "WS_AUTH\n{timestamp}\n{deviceId}")
+  ///
+  /// `SessionKeyService.getSessionKey()` auto-rotates when the cached key is
+  /// within 5 min of expiry, so calling this after a long reconnect always
+  /// uses a fresh key even if the previous session expired during downtime.
   Future<void> _sendAuth(String token) async {
     final sessionKey = await ref.read(sessionKeyServiceProvider).getSessionKey();
     final deviceId = await ref.read(deviceInfoServiceProvider).getDeviceId();

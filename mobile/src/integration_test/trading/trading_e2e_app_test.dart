@@ -131,7 +131,12 @@ void main() {
       await tester.pumpAndSettle(const Duration(seconds: 2));
 
       expect(find.byType(OrderListScreen), findsOneWidget);
-      print('✅ Journey 4: OrderListScreen rendered without crash');
+      // Preset orders from Mock Server: ord-001 AAPL FILLED, ord-002 TSLA PENDING
+      expect(find.text('AAPL'), findsWidgets,
+          reason: 'Preset order AAPL (ord-001) should be visible');
+      expect(find.text('TSLA'), findsWidgets,
+          reason: 'Preset order TSLA (ord-002) should be visible');
+      print('✅ Journey 4: OrderListScreen rendered with AAPL + TSLA orders');
     },
   );
 
@@ -152,9 +157,11 @@ void main() {
       await tester.pump(const Duration(seconds: 3));
       await tester.pumpAndSettle(const Duration(seconds: 2));
 
+      // First build: verify data rendered
       expect(find.byType(OrderListScreen), findsOneWidget);
+      expect(find.text('AAPL'), findsWidgets);
 
-      // Force a rebuild to ensure provider-driven screen remains stable
+      // Force a rebuild
       await tester.pumpWidget(
         ProviderScope(
           overrides: _securityOverrides,
@@ -166,8 +173,11 @@ void main() {
       await tester.pump(const Duration(seconds: 2));
       await tester.pumpAndSettle(const Duration(seconds: 1));
 
+      // Second build: orders still visible (no loss of data on rebuild)
       expect(find.byType(OrderListScreen), findsOneWidget);
-      print('✅ Journey 5: OrderListScreen rebuilt without crash');
+      expect(find.text('AAPL'), findsWidgets,
+          reason: 'AAPL order should still be visible after rebuild');
+      print('✅ Journey 5: OrderListScreen rebuilt without data loss');
     },
   );
 }

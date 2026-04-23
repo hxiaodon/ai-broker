@@ -290,10 +290,12 @@ void main() {
       expect(submit.data!['status'], 'PENDING');
       final orderId = submit.data!['order_id'] as String;
 
-      // Poll for up to 5s waiting for auto-fill.
+      // Poll every 300ms for up to 6s. Short interval avoids large sleep while
+      // staying robust under CI load. Early-break on FILLED keeps the happy
+      // path fast (~2s on a healthy machine).
       Map<String, dynamic>? order;
-      for (var i = 0; i < 10; i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 500));
+      for (var i = 0; i < 20; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 300));
         final resp = await dio.get<Map<String, dynamic>>('/api/v1/orders/$orderId');
         order = resp.data!['order'] as Map<String, dynamic>;
         if (order['status'] == 'FILLED') break;
@@ -328,13 +330,14 @@ void main() {
       expect(submit.statusCode, 201);
       final orderId = submit.data!['order_id'] as String;
 
-      // Wait beyond the market auto-fill window.
-      await Future<void>.delayed(const Duration(milliseconds: 2500));
+      // Wait just past the 2s auto-fill window. Using 2.1s (not 2.5s) keeps CI
+      // time tight; still safely beyond the goroutine sleep.
+      await Future<void>.delayed(const Duration(milliseconds: 2100));
 
       final resp = await dio.get<Map<String, dynamic>>('/api/v1/orders/$orderId');
       final order = resp.data!['order'] as Map<String, dynamic>;
       expect(order['status'], 'PENDING',
-          reason: 'Limit order should remain PENDING after 2.5s');
+          reason: 'Limit order should remain PENDING after 2.1s');
       print('✅ TA8c: Limit order $orderId stayed PENDING');
     });
   });
@@ -411,6 +414,84 @@ void main() {
         expect(e.response?.statusCode, 400);
         print('✅ TA10: Cancel without nonce → 400');
       }
+    });
+
+    testWidgets('TA10b: cancel-while-auto-fill race resolves cleanly', (tester) async {
+      // Submit a market order then cancel before the 2s auto-fill fires.
+      // Expected outcome: either CANCELLED (cancel won) or FILLED (fill won).
+      // No intermediate corruption in either case.
+      final submitNonce = await dio.get<Map<String, dynamic>>('/api/v1/trading/nonce');
+      final skResp = await dio.post<Map<String, dynamic>>('/api/v1/auth/session-key');
+      final bioResp = await dio.get<Map<String, dynamic>>('/api/v1/trading/bio-challenge');
+
+      final submitResp = await dio.post<Map<String, dynamic>>(
+        '/api/v1/orders',
+        data: {
+          'symbol': 'AAPL',
+          'market': 'US',
+          'side': 'buy',
+          'order_type': 'market',
+          'qty': 5,
+          'validity': 'day',
+          'extended_hours': false,
+        },
+        options: Options(headers: {
+          'Authorization': 'Bearer test-token',
+          'X-Key-Id': skResp.data!['key_id'],
+          'X-Nonce': submitNonce.data!['nonce'],
+          'X-Signature': 'stub-sig',
+          'X-Timestamp': DateTime.now().millisecondsSinceEpoch.toString(),
+          'X-Device-Id': 'dev-test-001',
+          'X-Biometric-Token': 'stub-bio',
+          'X-Bio-Challenge': bioResp.data!['challenge'],
+          'X-Bio-Timestamp': DateTime.now().millisecondsSinceEpoch.toString(),
+          'Idempotency-Key': 'idem-race-${DateTime.now().millisecondsSinceEpoch}',
+        }),
+      );
+      expect(submitResp.statusCode, 201);
+      final orderId = submitResp.data!['order_id'] as String;
+      expect(submitResp.data!['status'], 'PENDING');
+
+      // Cancel immediately — race with auto-fill goroutine (2s)
+      final cancelNonce = await dio.get<Map<String, dynamic>>('/api/v1/trading/nonce');
+      try {
+        final cancelResp = await dio.delete<void>(
+          '/api/v1/orders/$orderId',
+          options: Options(headers: {
+            'Authorization': 'Bearer test-token',
+            'X-Key-Id': skResp.data!['key_id'],
+            'X-Nonce': cancelNonce.data!['nonce'],
+            'X-Signature': 'stub-sig',
+            'X-Timestamp': DateTime.now().millisecondsSinceEpoch.toString(),
+            'X-Device-Id': 'dev-test-001',
+            'Idempotency-Key': 'idem-cancel-race-${DateTime.now().millisecondsSinceEpoch}',
+          }),
+        );
+        // Cancel succeeded before fill
+        expect(cancelResp.statusCode, 202);
+      } on DioException catch (e) {
+        // 422 = order already FILLED (fill won the race) — also valid
+        expect(e.response?.statusCode, 422,
+            reason: 'Only acceptable non-202 is 422 (already filled)');
+      }
+
+      // Wait past the auto-fill window then verify terminal state
+      await Future<void>.delayed(const Duration(milliseconds: 2200));
+      final finalResp = await dio.get<Map<String, dynamic>>('/api/v1/orders/$orderId');
+      final finalOrder = finalResp.data!['order'] as Map<String, dynamic>;
+      final finalStatus = finalOrder['status'] as String;
+
+      expect(
+        ['CANCELLED', 'FILLED'].contains(finalStatus),
+        isTrue,
+        reason: 'Race must resolve to CANCELLED or FILLED, got $finalStatus',
+      );
+      // Key: filled_qty must be consistent with status (no partial corruption)
+      final filledQty = finalOrder['filled_qty'] as int;
+      if (finalStatus == 'CANCELLED') expect(filledQty, 0);
+      if (finalStatus == 'FILLED') expect(filledQty, 5);
+
+      print('✅ TA10b: cancel-while-fill race → $finalStatus (filled_qty=$filledQty)');
     });
   });
 
