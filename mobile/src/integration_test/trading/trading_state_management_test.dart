@@ -5,11 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:trading_app/core/auth/local_auth_service.dart';
 import 'package:trading_app/core/logging/app_logger.dart';
 import 'package:trading_app/core/security/bio_challenge_service.dart';
 import 'package:trading_app/core/security/nonce_service.dart';
 import 'package:trading_app/core/security/session_key_service.dart';
 import 'package:trading_app/core/storage/secure_storage_service.dart';
+import 'package:trading_app/features/auth/application/auth_notifier.dart';
 import 'package:trading_app/features/trading/application/order_submit_notifier.dart';
 import 'package:trading_app/features/trading/application/orders_notifier.dart';
 import 'package:trading_app/features/trading/application/portfolio_summary_provider.dart';
@@ -79,7 +81,7 @@ void main() {
         idle: () => print('✅ T2: OrderSubmitState initial = idle'),
         awaitingBiometric: () => fail('Expected idle'),
         submitting: () => fail('Expected idle'),
-        success: (_) => fail('Expected idle'),
+        success: (_, __) => fail('Expected idle or error'),
         error: (_) => fail('Expected idle'),
       );
     });
@@ -104,7 +106,7 @@ void main() {
         idle: () => fail('Expected success'),
         awaitingBiometric: () => fail('Expected success'),
         submitting: () => fail('Expected success'),
-        success: (orderId) {
+        success: (orderId, requestId) {
           expect(orderId, isNotEmpty);
           print('✅ T3: idle → submitting → success (orderId: $orderId)');
         },
@@ -130,7 +132,7 @@ void main() {
         idle: () => print('✅ T4: reset() returns to idle'),
         awaitingBiometric: () => fail('Expected idle after reset'),
         submitting: () => fail('Expected idle after reset'),
-        success: (_) => fail('Expected idle after reset'),
+        success: (_, __) => fail('Expected idle after reset'),
         error: (_) => fail('Expected idle after reset'),
       );
     });
@@ -162,9 +164,123 @@ void main() {
         idle: () => fail('Expected error'),
         awaitingBiometric: () => fail('Expected error'),
         submitting: () => fail('Expected error'),
-        success: (_) => fail('Expected error'),
+        success: (_, __) => fail('Expected error'),
         error: (msg) => print('✅ T5: repository error → OrderSubmitState.error: $msg'),
       );
+    });
+  });
+
+  // ── Biometric branch tests ────────────────────────────────────────────────────
+
+  group('Trading Module - Biometric Path', () {
+    ProviderContainer _makeContainer({
+      required bool biometricResult,
+      bool throwOnAuth = false,
+    }) {
+      return ProviderContainer(
+        overrides: [
+          authProvider.overrideWithValue(const AuthState.authenticated(
+            accountId: 'test-acc-bio',
+            accountStatus: 'ACTIVE',
+            biometricEnabled: true,
+          )),
+          tradingRepositoryProvider.overrideWithValue(_StubTradingRepository()),
+          sessionKeyServiceProvider.overrideWithValue(_StubSessionKeyService()),
+          nonceServiceProvider.overrideWithValue(_StubNonceService()),
+          bioChallengeServiceProvider.overrideWithValue(_StubBioChallengeService()),
+          localAuthServiceProvider.overrideWithValue(
+            _StubLocalAuthService(
+              result: biometricResult,
+              throws: throwOnAuth,
+            ),
+          ),
+        ],
+      );
+    }
+
+    test('T9: biometric approved → idle → awaitingBiometric → submitting → success', () async {
+      final container = _makeContainer(biometricResult: true);
+
+      await container.read(orderSubmitProvider.notifier).submit(
+            symbol: 'AAPL',
+            market: 'US',
+            side: OrderSide.buy,
+            orderType: OrderType.limit,
+            qty: 100,
+            limitPrice: Decimal.parse('150.25'),
+            validity: OrderValidity.day,
+            extendedHours: false,
+            biometricEnabled: true,
+          );
+
+      container.read(orderSubmitProvider).when(
+            idle: () => fail('Expected success'),
+            awaitingBiometric: () => fail('Expected success'),
+            submitting: () => fail('Expected success'),
+            success: (orderId, requestId) =>
+                print('✅ T9: biometric approved → success (orderId: $orderId)'),
+            error: (msg) => fail('Expected success, got error: $msg'),
+          );
+      // Drain the ordersProvider rebuild triggered by ref.invalidate before
+      // disposing — otherwise the async rebuild outlives the container.
+      await container
+          .read(ordersProvider().future)
+          .catchError((_) => <Order>[]);
+      container.dispose();
+    });
+
+    test('T10: user rejects biometric → OrderSubmitState.error (验证失败)', () async {
+      final container = _makeContainer(biometricResult: false);
+      addTearDown(container.dispose);
+
+      await container.read(orderSubmitProvider.notifier).submit(
+            symbol: 'AAPL',
+            market: 'US',
+            side: OrderSide.sell,
+            orderType: OrderType.market,
+            qty: 10,
+            validity: OrderValidity.day,
+            extendedHours: false,
+            biometricEnabled: true,
+          );
+
+      container.read(orderSubmitProvider).when(
+            idle: () => fail('Expected error'),
+            awaitingBiometric: () => fail('Expected error'),
+            submitting: () => fail('Expected error'),
+            success: (_, __) => fail('Expected error'),
+            error: (msg) {
+              expect(msg, contains('验证失败'));
+              print('✅ T10: rejected biometric → error: $msg');
+            },
+          );
+    });
+
+    test('T11: biometric platform exception → OrderSubmitState.error (不可用)', () async {
+      final container = _makeContainer(biometricResult: false, throwOnAuth: true);
+      addTearDown(container.dispose);
+
+      await container.read(orderSubmitProvider.notifier).submit(
+            symbol: 'TSLA',
+            market: 'US',
+            side: OrderSide.buy,
+            orderType: OrderType.market,
+            qty: 5,
+            validity: OrderValidity.day,
+            extendedHours: false,
+            biometricEnabled: true,
+          );
+
+      container.read(orderSubmitProvider).when(
+            idle: () => fail('Expected error'),
+            awaitingBiometric: () => fail('Expected error'),
+            submitting: () => fail('Expected error'),
+            success: (_, __) => fail('Expected error'),
+            error: (msg) {
+              expect(msg, contains('不可用'));
+              print('✅ T11: biometric platform exception → error: $msg');
+            },
+          );
     });
   });
 
@@ -242,7 +358,7 @@ class _StubBioChallengeService extends BioChallengeService {
 
 class _StubTradingRepository implements TradingRepository {
   @override
-  Future<Order> submitOrder({
+  Future<(Order, String?)> submitOrder({
     required String symbol,
     required String market,
     required OrderSide side,
@@ -256,28 +372,31 @@ class _StubTradingRepository implements TradingRepository {
     required String bioChallenge,
     required String bioTimestamp,
   }) async {
-    return Order(
-      orderId: 'ord-stub-${DateTime.now().millisecondsSinceEpoch}',
-      symbol: symbol,
-      market: market,
-      side: side,
-      orderType: orderType,
-      status: OrderStatus.pending,
-      qty: qty,
-      filledQty: 0,
-      limitPrice: limitPrice,
-      avgFillPrice: null,
-      validity: validity,
-      extendedHours: extendedHours,
-      fees: OrderFees(
-        commission: Decimal.zero,
-        exchangeFee: Decimal.zero,
-        secFee: Decimal.zero,
-        finraFee: Decimal.zero,
-        total: Decimal.zero,
+    return (
+      Order(
+        orderId: 'ord-stub-${DateTime.now().millisecondsSinceEpoch}',
+        symbol: symbol,
+        market: market,
+        side: side,
+        orderType: orderType,
+        status: OrderStatus.pending,
+        qty: qty,
+        filledQty: 0,
+        limitPrice: limitPrice,
+        avgFillPrice: null,
+        validity: validity,
+        extendedHours: extendedHours,
+        fees: OrderFees(
+          commission: Decimal.zero,
+          exchangeFee: Decimal.zero,
+          secFee: Decimal.zero,
+          finraFee: Decimal.zero,
+          total: Decimal.zero,
+        ),
+        createdAt: DateTime.now().toUtc(),
+        updatedAt: DateTime.now().toUtc(),
       ),
-      createdAt: DateTime.now().toUtc(),
-      updatedAt: DateTime.now().toUtc(),
+      null, // no requestId from stub
     );
   }
 
@@ -372,7 +491,7 @@ class _StubTradingRepository implements TradingRepository {
 
 class _ErrorTradingRepository extends _StubTradingRepository {
   @override
-  Future<Order> submitOrder({
+  Future<(Order, String?)> submitOrder({
     required String symbol,
     required String market,
     required OrderSide side,
@@ -388,4 +507,24 @@ class _ErrorTradingRepository extends _StubTradingRepository {
   }) async {
     throw Exception('Simulated network error');
   }
+}
+
+/// Stub for LocalAuthService — returns a configurable biometric result
+/// without touching platform channels.
+class _StubLocalAuthService extends LocalAuthService {
+  _StubLocalAuthService({required bool result, bool throws = false})
+      : _result = result,
+        _throws = throws;
+
+  final bool _result;
+  final bool _throws;
+
+  @override
+  Future<bool> authenticate({required String localizedReason}) async {
+    if (_throws) throw Exception('Platform biometric unavailable');
+    return _result;
+  }
+
+  @override
+  Future<bool> isAvailable() async => !_throws;
 }

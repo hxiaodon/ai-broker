@@ -25,7 +25,7 @@ class TradingRepositoryImpl implements TradingRepository {
   final TradingRemoteDataSource _remote;
 
   @override
-  Future<Order> submitOrder({
+  Future<(Order, String? requestId)> submitOrder({
     required String symbol,
     required String market,
     required OrderSide side,

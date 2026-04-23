@@ -42,7 +42,7 @@ final class OrderSubmitNotifierProvider
 }
 
 String _$orderSubmitNotifierHash() =>
-    r'f3403ff2afdd7b19fb8a083c5c710ce7290cb67c';
+    r'f428d83e6f0344ac6a3e39c182a99b8af4e5a37c';
 
 abstract class _$OrderSubmitNotifier extends $Notifier<OrderSubmitState> {
   OrderSubmitState build();

@@ -142,7 +142,7 @@ void main() {
             requestOptions: RequestOptions(path: '/api/v1/orders'),
           ));
 
-      final order = await dataSource.submitOrder(
+      final (order, requestId) = await dataSource.submitOrder(
         symbol: 'AAPL',
         market: 'US',
         side: OrderSide.buy,
@@ -158,6 +158,7 @@ void main() {
       );
 
       expect(order.orderId, 'ord-001');
+      expect(requestId, isNull); // mock Dio doesn't set X-Request-ID
 
       final captured = verify(() => mockDio.post<Map<String, dynamic>>(
             '/api/v1/orders',

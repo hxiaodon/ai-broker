@@ -41,7 +41,7 @@ class TradingRemoteDataSource {
   final NonceService _nonceService;
   final DeviceInfoService _deviceInfoService;
 
-  Future<Order> submitOrder({
+  Future<(Order, String?)> submitOrder({
     required String symbol,
     required String market,
     required OrderSide side,
@@ -97,7 +97,9 @@ class TradingRemoteDataSource {
         }),
       );
       AppLogger.debug('submitOrder success: orderId=${resp.data?['order_id']}');
-      return OrderModel.fromJson(resp.data!).toDomain();
+      final requestId =
+          resp.requestOptions.headers['X-Request-ID'] as String?;
+      return (OrderModel.fromJson(resp.data!).toDomain(), requestId);
     } on DioException catch (e) {
       throw _mapDioError(e, 'submitOrder');
     }

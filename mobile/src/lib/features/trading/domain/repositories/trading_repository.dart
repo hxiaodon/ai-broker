@@ -6,7 +6,7 @@ import '../entities/portfolio_summary.dart';
 import '../entities/position.dart';
 
 abstract class TradingRepository {
-  Future<Order> submitOrder({
+  Future<(Order, String? requestId)> submitOrder({
     required String symbol,
     required String market,
     required OrderSide side,

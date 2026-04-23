@@ -128,13 +128,13 @@ return error(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  idle,TResult Function()?  awaitingBiometric,TResult Function()?  submitting,TResult Function( String orderId)?  success,TResult Function( String message)?  error,required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  idle,TResult Function()?  awaitingBiometric,TResult Function()?  submitting,TResult Function( String orderId,  String? requestId)?  success,TResult Function( String message)?  error,required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Idle() when idle != null:
 return idle();case _AwaitingBiometric() when awaitingBiometric != null:
 return awaitingBiometric();case _Submitting() when submitting != null:
 return submitting();case _Success() when success != null:
-return success(_that.orderId);case _Error() when error != null:
+return success(_that.orderId,_that.requestId);case _Error() when error != null:
 return error(_that.message);case _:
   return orElse();
 
@@ -153,13 +153,13 @@ return error(_that.message);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  idle,required TResult Function()  awaitingBiometric,required TResult Function()  submitting,required TResult Function( String orderId)  success,required TResult Function( String message)  error,}) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  idle,required TResult Function()  awaitingBiometric,required TResult Function()  submitting,required TResult Function( String orderId,  String? requestId)  success,required TResult Function( String message)  error,}) {final _that = this;
 switch (_that) {
 case _Idle():
 return idle();case _AwaitingBiometric():
 return awaitingBiometric();case _Submitting():
 return submitting();case _Success():
-return success(_that.orderId);case _Error():
+return success(_that.orderId,_that.requestId);case _Error():
 return error(_that.message);}
 }
 /// A variant of `when` that fallback to returning `null`
@@ -174,13 +174,13 @@ return error(_that.message);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  idle,TResult? Function()?  awaitingBiometric,TResult? Function()?  submitting,TResult? Function( String orderId)?  success,TResult? Function( String message)?  error,}) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  idle,TResult? Function()?  awaitingBiometric,TResult? Function()?  submitting,TResult? Function( String orderId,  String? requestId)?  success,TResult? Function( String message)?  error,}) {final _that = this;
 switch (_that) {
 case _Idle() when idle != null:
 return idle();case _AwaitingBiometric() when awaitingBiometric != null:
 return awaitingBiometric();case _Submitting() when submitting != null:
 return submitting();case _Success() when success != null:
-return success(_that.orderId);case _Error() when error != null:
+return success(_that.orderId,_that.requestId);case _Error() when error != null:
 return error(_that.message);case _:
   return null;
 
@@ -289,10 +289,13 @@ String toString() {
 
 
 class _Success implements OrderSubmitState {
-  const _Success({required this.orderId});
+  const _Success({required this.orderId, this.requestId});
   
 
  final  String orderId;
+// Correlation ID from X-Request-ID header — links client log to server
+// audit record (SEC Rule 17a-4 traceability requirement).
+ final  String? requestId;
 
 /// Create a copy of OrderSubmitState
 /// with the given fields replaced by the non-null parameter values.
@@ -304,16 +307,16 @@ _$SuccessCopyWith<_Success> get copyWith => __$SuccessCopyWithImpl<_Success>(thi
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Success&&(identical(other.orderId, orderId) || other.orderId == orderId));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Success&&(identical(other.orderId, orderId) || other.orderId == orderId)&&(identical(other.requestId, requestId) || other.requestId == requestId));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,orderId);
+int get hashCode => Object.hash(runtimeType,orderId,requestId);
 
 @override
 String toString() {
-  return 'OrderSubmitState.success(orderId: $orderId)';
+  return 'OrderSubmitState.success(orderId: $orderId, requestId: $requestId)';
 }
 
 
@@ -324,7 +327,7 @@ abstract mixin class _$SuccessCopyWith<$Res> implements $OrderSubmitStateCopyWit
   factory _$SuccessCopyWith(_Success value, $Res Function(_Success) _then) = __$SuccessCopyWithImpl;
 @useResult
 $Res call({
- String orderId
+ String orderId, String? requestId
 });
 
 
@@ -341,10 +344,11 @@ class __$SuccessCopyWithImpl<$Res>
 
 /// Create a copy of OrderSubmitState
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') $Res call({Object? orderId = null,}) {
+@pragma('vm:prefer-inline') $Res call({Object? orderId = null,Object? requestId = freezed,}) {
   return _then(_Success(
 orderId: null == orderId ? _self.orderId : orderId // ignore: cast_nullable_to_non_nullable
-as String,
+as String,requestId: freezed == requestId ? _self.requestId : requestId // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 

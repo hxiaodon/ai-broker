@@ -52,7 +52,7 @@ class OrderConfirmScreen extends ConsumerWidget {
     // Navigate to order list on success
     ref.listen(orderSubmitProvider, (_, next) {
       next.maybeWhen(
-        success: (orderId) {
+        success: (orderId, requestId) {
           // Publish snapshot for OrderListScreen's one-shot banner/highlight.
           ref.read(recentOrderBannerProvider.notifier).set(RecentOrderInfo(
                 orderId: orderId,

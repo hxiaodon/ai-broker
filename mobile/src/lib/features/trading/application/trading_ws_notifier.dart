@@ -107,7 +107,7 @@ class TradingWsNotifier extends _$TradingWsNotifier {
     }));
   }
 
-  void _onMessage(dynamic raw) {
+  Future<void> _onMessage(dynamic raw) async {
     try {
       final msg = jsonDecode(raw as String) as Map<String, dynamic>;
       final channel = msg['channel'] as String?;
@@ -121,6 +121,19 @@ class TradingWsNotifier extends _$TradingWsNotifier {
       if (type == 'auth.error') {
         AppLogger.warning('TradingWS: auth rejected, reconnecting');
         _scheduleReconnect();
+        return;
+      }
+      // Server pushes token_expiring 2 min before JWT expiry (spec §5.2).
+      // Proactively re-authenticate to keep the session alive without dropping.
+      if (type == 'token_expiring') {
+        AppLogger.debug('TradingWS: token expiring — proactive reauth');
+        final freshToken =
+            await ref.read(tokenServiceProvider).getAccessToken();
+        if (freshToken != null && freshToken.isNotEmpty) {
+          await _sendAuth(freshToken);
+        } else {
+          _scheduleReconnect();
+        }
         return;
       }
 
