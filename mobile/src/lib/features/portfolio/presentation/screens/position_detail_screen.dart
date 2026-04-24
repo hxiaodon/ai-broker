@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/errors/app_exception.dart';
 import '../../../../core/routing/route_names.dart';
+import '../../../../core/security/screen_protection_service.dart';
 import '../../../../shared/extensions/decimal_extensions.dart';
 import '../../../../shared/theme/color_tokens.dart';
 import '../../../trading/domain/entities/order.dart';
@@ -10,16 +12,23 @@ import '../../application/position_detail_provider.dart';
 import '../../domain/entities/position_detail.dart';
 import '../../domain/entities/trade_record.dart';
 
-class PositionDetailScreen extends ConsumerWidget {
+class PositionDetailScreen extends ConsumerStatefulWidget {
   const PositionDetailScreen({super.key, required this.symbol});
 
   final String symbol;
 
+  @override
+  ConsumerState<PositionDetailScreen> createState() =>
+      _PositionDetailScreenState();
+}
+
+class _PositionDetailScreenState extends ConsumerState<PositionDetailScreen>
+    with ScreenProtectionMixin {
   static const _colors = ColorTokens.greenUp;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final detailAsync = ref.watch(positionDetailProvider(symbol));
+  Widget build(BuildContext context) {
+    final detailAsync = ref.watch(positionDetailProvider(widget.symbol));
 
     return Scaffold(
       backgroundColor: _colors.background,
@@ -27,7 +36,7 @@ class PositionDetailScreen extends ConsumerWidget {
         backgroundColor: _colors.surface,
         iconTheme: IconThemeData(color: _colors.onSurface),
         title: Text(
-          symbol,
+          widget.symbol,
           style: TextStyle(
             color: _colors.onSurface,
             fontWeight: FontWeight.w700,
@@ -45,8 +54,24 @@ class PositionDetailScreen extends ConsumerWidget {
                 Icon(Icons.error_outline, size: 48, color: _colors.error),
                 const SizedBox(height: 12),
                 Text(
-                  '加载持仓详情失败',
+                  switch (e) {
+                    AuthException() => '登录已过期，请重新登录',
+                    NetworkException() => '网络连接失败，请检查网络后重试',
+                    ServerException() => '服务暂时不可用，请稍后重试',
+                    _ => '加载持仓详情失败',
+                  },
                   style: TextStyle(color: _colors.onSurface, fontSize: 16),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () =>
+                      ref.invalidate(positionDetailProvider(widget.symbol)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _colors.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('重试'),
                 ),
               ],
             ),
@@ -438,7 +463,7 @@ class _SettlementCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: 4),
               child: Text(
-                '预计 ${_formatDate(pending.first.settleDate)} 结算后可卖',
+                '预计 ${_formatLocalDate(pending.first.settleDate)} 结算后可卖',
                 style: TextStyle(
                   color: colors.onSurfaceVariant,
                   fontSize: 11,
@@ -450,8 +475,11 @@ class _SettlementCard extends StatelessWidget {
     );
   }
 
-  String _formatDate(DateTime d) =>
-      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  // Convert UTC settle date to local timezone before display (MED-04).
+  String _formatLocalDate(DateTime utc) {
+    final local = utc.toLocal();
+    return '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
+  }
 }
 
 class _TradeRow extends StatelessWidget {
@@ -464,7 +492,8 @@ class _TradeRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final isBuy = trade.side == TradeSide.buy;
     final sideColor = isBuy ? colors.priceUp : colors.priceDown;
-    final d = trade.executedAt;
+    // Convert UTC execution time to local timezone before display (MED-05).
+    final d = trade.executedAt.toLocal();
     final dateStr =
         '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 

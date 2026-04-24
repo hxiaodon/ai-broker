@@ -7,9 +7,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:mocktail/mocktail.dart';
-
-import 'package:trading_app/core/auth/token_service.dart';
+import 'package:mocktail/mocktail.dart';import 'package:trading_app/core/auth/token_service.dart';
 import 'package:trading_app/features/auth/application/auth_notifier.dart';
 import 'package:trading_app/features/market/application/quote_websocket_notifier.dart';
 import 'package:trading_app/features/market/data/watchlist_repository_impl.dart';

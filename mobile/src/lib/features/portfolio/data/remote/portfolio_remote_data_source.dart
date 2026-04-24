@@ -7,6 +7,10 @@ import '../../domain/entities/position_detail.dart';
 import 'models/position_detail_model.dart';
 import 'portfolio_mappers.dart';
 
+/// US stock symbols: 1–5 uppercase letters.
+/// HK stock symbols: 4–5 digit codes.
+final _symbolPattern = RegExp(r'^([A-Z]{1,5}|\d{4,5})$');
+
 class PortfolioRemoteDataSource {
   PortfolioRemoteDataSource({
     required Dio dio,
@@ -18,6 +22,9 @@ class PortfolioRemoteDataSource {
   final ConnectivityService _connectivity;
 
   Future<PositionDetail> getPositionDetail(String symbol) async {
+    if (!_symbolPattern.hasMatch(symbol)) {
+      throw const ValidationException(message: 'Invalid symbol format');
+    }
     await _checkConnectivity();
     try {
       final resp = await _dio.get<Map<String, dynamic>>(
@@ -26,6 +33,9 @@ class PortfolioRemoteDataSource {
       return PositionDetailModel.fromJson(resp.data!).toDomain();
     } on DioException catch (e) {
       throw _mapDioError(e, 'getPositionDetail');
+    } on FormatException catch (e) {
+      AppLogger.warning('getPositionDetail: invalid response format: ${e.message}');
+      throw ServerException(statusCode: 0, message: 'Invalid response format: ${e.message}');
     }
   }
 
@@ -45,7 +55,11 @@ class PortfolioRemoteDataSource {
     if (statusCode == 401 || statusCode == 403) {
       return AuthException(message: 'Unauthorized', cause: e);
     }
-    if (statusCode != null && statusCode >= 400 && statusCode < 500) {
+    if (statusCode != null && statusCode >= 500) {
+      return ServerException(
+          statusCode: statusCode, message: 'Server error ($statusCode)');
+    }
+    if (statusCode != null && statusCode >= 400) {
       final body = e.response?.data;
       final msg = body is Map ? body['message'] as String? : null;
       return ServerException(

@@ -26,6 +26,25 @@ class DioLogInterceptor extends Interceptor {
     'refresh_token',
     'id_number',
     'tax_id',
+    // Financial position data — masked in debug builds to prevent
+    // leakage via logcat / crash reporting SDKs.
+    'market_value',
+    'total_market_value',
+    'unrealized_pnl',
+    'unrealized_pnl_pct',
+    'realized_pnl',
+    'today_pnl',
+    'today_pnl_pct',
+    'cumulative_pnl',
+    'cumulative_pnl_pct',
+    'cost_basis',
+    'avg_cost',
+    'quantity',
+    'settled_qty',
+    'total_equity',
+    'cash_balance',
+    'buying_power',
+    'unsettled_cash',
   };
 
   @override

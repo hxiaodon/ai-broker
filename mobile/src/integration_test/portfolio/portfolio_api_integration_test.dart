@@ -204,14 +204,15 @@ void main() {
     );
 
     testWidgets(
-      'TPA8: getPositionDetail(NONEXIST) throws ServerException (not generic Exception)',
+      'TPA8: getPositionDetail with non-existent symbol throws typed AppException',
       (tester) async {
+        // ZZZZ is valid US format (4 uppercase letters) but not served by mock server → 404 → ServerException
         try {
-          await repo.getPositionDetail('NONEXIST_SYMBOL');
+          await repo.getPositionDetail('ZZZZ');
           fail('Expected ServerException to be thrown');
         } on ServerException catch (e) {
           expect(e.statusCode, 404);
-          print('✅ TPA8: NONEXIST throws ServerException(404): ${e.message}');
+          print('✅ TPA8: ZZZZ throws ServerException(404): ${e.message}');
         } on Exception catch (e) {
           fail('Expected ServerException but got: ${e.runtimeType}');
         }

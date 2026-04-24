@@ -62,6 +62,11 @@ class StockDetailNotifier extends _$StockDetailNotifier {
   // ─── WS wiring ────────────────────────────────────────────────────────────
 
   void _setupLiveUpdates(String symbol) {
+    // Capture notifier reference before onDispose — calling ref.read inside
+    // onDispose triggers Riverpod's reentrancy assertion during container disposal.
+    final wsNotifier = ref.read(quoteWebSocketProvider.notifier);
+    ref.onDispose(() => wsNotifier.unsubscribe([symbol]));
+
     // Subscribe to WS when connected (handles reconnects).
     ref.listen(quoteWebSocketProvider, (_, wsState) {
       wsState.whenData((_) async {

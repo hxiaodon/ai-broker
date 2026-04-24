@@ -224,8 +224,9 @@ class _UnsettledItem extends StatelessWidget {
       builder: (_) => AlertDialog(
         title: const Text('待结算资金说明'),
         content: const Text(
-          '美股实行 T+1 结算制度——您卖出股票所得的资金，将在下一个工作日完成清算后才可提现或再次购买。\n\n'
-          '例如：今日卖出，明日结算，明日可用。',
+          '待结算资金是指卖出证券所得款项尚未完成清算的部分，在结算完成前无法提现或用于购买。\n\n'
+          '• 美股（NYSE/NASDAQ）：T+1 结算，卖出次个工作日可用\n'
+          '• 港股（HKEX）：T+2 结算，卖出后第二个工作日可用',
         ),
         actions: [
           TextButton(

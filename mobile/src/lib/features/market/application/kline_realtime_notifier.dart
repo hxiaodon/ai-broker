@@ -68,10 +68,13 @@ class KlineRealtimeNotifier extends _$KlineRealtimeNotifier {
 
   @override
   Future<List<Candle>> build(KlineParams params) async {
+    // Capture notifier reference before onDispose — calling ref.read inside
+    // onDispose triggers Riverpod's reentrancy assertion during container disposal.
+    final wsNotifier = ref.read(quoteWebSocketProvider.notifier);
     ref.onDispose(() {
       _quoteSubscription?.cancel();
       if (_currentSymbol != null) {
-        _unsubscribeFromWs(_currentSymbol!);
+        wsNotifier.unsubscribe([_currentSymbol!]);
       }
     });
 
@@ -190,10 +193,5 @@ class KlineRealtimeNotifier extends _$KlineRealtimeNotifier {
       updated[updated.length - 1] = lastCandle;
       state = AsyncData(updated);
     }
-  }
-
-  void _unsubscribeFromWs(String symbol) {
-    AppLogger.debug('KlineRealtimeNotifier: unsubscribing $symbol from WS');
-    ref.read(quoteWebSocketProvider.notifier).unsubscribe([symbol]);
   }
 }

@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/errors/app_exception.dart';
 import '../../../../core/routing/route_names.dart';
+import '../../../../core/security/screen_protection_service.dart';
 import '../../../../shared/extensions/decimal_extensions.dart';
 import '../../../../shared/theme/color_tokens.dart';
 import '../../../trading/application/portfolio_summary_provider.dart';
@@ -25,7 +27,7 @@ class PortfolioScreen extends ConsumerStatefulWidget {
 }
 
 class _PortfolioScreenState extends ConsumerState<PortfolioScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, ScreenProtectionMixin {
   late TabController _tabController;
   _SortMode _sortMode = _SortMode.marketValue;
 
@@ -125,7 +127,13 @@ class _PositionsTab extends ConsumerWidget {
           );
           final sorted = _sorted(positions, sortMode);
 
-          return CustomScrollView(
+          return RefreshIndicator(
+            onRefresh: () async {
+              ref.invalidate(portfolioSummaryProvider);
+              ref.invalidate(positionsProvider);
+              await ref.read(positionsProvider.future);
+            },
+            child: CustomScrollView(
             slivers: [
               SliverToBoxAdapter(
                 child: Padding(
@@ -207,6 +215,7 @@ class _PositionsTab extends ConsumerWidget {
                 ),
               ),
             ],
+          ),
           );
         },
       ),
@@ -328,14 +337,21 @@ class _SortSheet extends StatelessWidget {
 // Error view
 // ---------------------------------------------------------------------------
 
-class _ErrorView extends StatelessWidget {
+class _ErrorView extends ConsumerWidget {
   const _ErrorView({required this.error, required this.colors});
 
   final Object error;
   final ColorTokens colors;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final message = switch (error) {
+      AuthException() => '登录已过期，请重新登录',
+      NetworkException() => '网络连接失败，请检查网络后重试',
+      ServerException() => '服务暂时不可用，请稍后重试',
+      _ => '加载失败，请重试',
+    };
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -345,8 +361,21 @@ class _ErrorView extends StatelessWidget {
             Icon(Icons.error_outline, size: 48, color: colors.error),
             const SizedBox(height: 12),
             Text(
-              '加载失败，请重试',
+              message,
               style: TextStyle(color: colors.onSurface, fontSize: 16),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                ref.invalidate(portfolioSummaryProvider);
+                ref.invalidate(positionsProvider);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: colors.primary,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('重试'),
             ),
           ],
         ),

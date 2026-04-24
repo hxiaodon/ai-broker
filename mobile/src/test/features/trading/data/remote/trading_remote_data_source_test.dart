@@ -431,7 +431,8 @@ void main() {
   // ── getPositions ───────────────────────────────────────────────────────────
   group('getPositions', () {
     test('returns list of positions', () async {
-      when(() => mockDio.get<Map<String, dynamic>>(any()))
+      when(() => mockDio.get<Map<String, dynamic>>(any(),
+              options: any(named: 'options')))
           .thenAnswer((_) async => Response(
                 data: {'positions': [_positionResponseJson()]},
                 statusCode: 200,
@@ -447,7 +448,8 @@ void main() {
   // ── getPortfolioSummary ────────────────────────────────────────────────────
   group('getPortfolioSummary', () {
     test('returns portfolio summary', () async {
-      when(() => mockDio.get<Map<String, dynamic>>(any()))
+      when(() => mockDio.get<Map<String, dynamic>>(any(),
+              options: any(named: 'options')))
           .thenAnswer((_) async => Response(
                 data: _portfolioSummaryResponseJson(),
                 statusCode: 200,

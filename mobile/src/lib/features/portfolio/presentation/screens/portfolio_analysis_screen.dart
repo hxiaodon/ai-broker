@@ -3,19 +3,29 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/routing/route_names.dart';
+import '../../../../core/security/screen_protection_service.dart';
 import '../../../../shared/theme/color_tokens.dart';
 import '../../application/pnl_ranking_provider.dart';
 import '../../application/sector_allocation_provider.dart';
 import '../widgets/pnl_ranking_item.dart';
 import '../widgets/sector_allocation_bar.dart';
 
-class PortfolioAnalysisScreen extends ConsumerWidget {
+class PortfolioAnalysisScreen extends ConsumerStatefulWidget {
   const PortfolioAnalysisScreen({super.key, required this.colors});
 
   final ColorTokens colors;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PortfolioAnalysisScreen> createState() =>
+      _PortfolioAnalysisScreenState();
+}
+
+class _PortfolioAnalysisScreenState
+    extends ConsumerState<PortfolioAnalysisScreen>
+    with ScreenProtectionMixin {
+  @override
+  Widget build(BuildContext context) {
+    final colors = widget.colors;
     final sectorAsync = ref.watch(sectorAllocationProvider);
     final pnlAsync = ref.watch(pnlRankingProvider);
 

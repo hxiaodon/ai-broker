@@ -12,5 +12,9 @@ Future<List<Position>> pnlRanking(Ref ref) async {
   final positions = await ref.watch(positionsProvider.future);
   if (positions.isEmpty) return [];
   return [...positions]
-    ..sort((a, b) => b.unrealizedPnl.compareTo(a.unrealizedPnl));
+    ..sort((a, b) {
+      final pnlCmp = b.unrealizedPnl.compareTo(a.unrealizedPnl);
+      // Secondary sort by symbol for stable order when P&L values are equal.
+      return pnlCmp != 0 ? pnlCmp : a.symbol.compareTo(b.symbol);
+    });
 }

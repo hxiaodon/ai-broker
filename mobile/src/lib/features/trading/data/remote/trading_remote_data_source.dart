@@ -180,7 +180,21 @@ class TradingRemoteDataSource {
   Future<List<Position>> getPositions() async {
     await _checkConnectivity();
     try {
-      final resp = await _dio.get<Map<String, dynamic>>('/api/v1/positions');
+      final nonce = await _nonceService.fetchNonce();
+      final deviceId = await _deviceInfoService.getDeviceId();
+      final sessionKey = await _sessionKeyService.getSessionKey();
+      final hmacHeaders = _signer.buildHeaders(
+        secret: sessionKey.secret,
+        keyId: sessionKey.keyId,
+        method: 'GET',
+        path: '/api/v1/positions',
+        nonce: nonce,
+        deviceId: deviceId,
+      );
+      final resp = await _dio.get<Map<String, dynamic>>(
+        '/api/v1/positions',
+        options: Options(headers: hmacHeaders),
+      );
       return (resp.data!['positions'] as List)
           .cast<Map<String, dynamic>>()
           .map((j) => PositionModel.fromJson(j).toDomain())
@@ -193,8 +207,20 @@ class TradingRemoteDataSource {
   Future<Position> getPositionDetail(String symbol) async {
     await _checkConnectivity();
     try {
+      final nonce = await _nonceService.fetchNonce();
+      final deviceId = await _deviceInfoService.getDeviceId();
+      final sessionKey = await _sessionKeyService.getSessionKey();
+      final hmacHeaders = _signer.buildHeaders(
+        secret: sessionKey.secret,
+        keyId: sessionKey.keyId,
+        method: 'GET',
+        path: '/api/v1/positions/$symbol',
+        nonce: nonce,
+        deviceId: deviceId,
+      );
       final resp = await _dio.get<Map<String, dynamic>>(
         '/api/v1/positions/$symbol',
+        options: Options(headers: hmacHeaders),
       );
       return PositionModel.fromJson(resp.data!).toDomain();
     } on DioException catch (e) {
@@ -205,8 +231,20 @@ class TradingRemoteDataSource {
   Future<PortfolioSummary> getPortfolioSummary() async {
     await _checkConnectivity();
     try {
+      final nonce = await _nonceService.fetchNonce();
+      final deviceId = await _deviceInfoService.getDeviceId();
+      final sessionKey = await _sessionKeyService.getSessionKey();
+      final hmacHeaders = _signer.buildHeaders(
+        secret: sessionKey.secret,
+        keyId: sessionKey.keyId,
+        method: 'GET',
+        path: '/api/v1/portfolio/summary',
+        nonce: nonce,
+        deviceId: deviceId,
+      );
       final resp = await _dio.get<Map<String, dynamic>>(
         '/api/v1/portfolio/summary',
+        options: Options(headers: hmacHeaders),
       );
       return PortfolioSummaryModel.fromJson(resp.data!).toDomain();
     } on DioException catch (e) {
@@ -229,6 +267,10 @@ class TradingRemoteDataSource {
     final statusCode = e.response?.statusCode;
     if (statusCode == 401 || statusCode == 403) {
       return AuthException(message: 'Unauthorized', cause: e);
+    }
+    if (statusCode != null && statusCode >= 500) {
+      return ServerException(
+          statusCode: statusCode, message: 'Server error ($statusCode)');
     }
     if (statusCode != null && statusCode >= 400 && statusCode < 500) {
       final body = e.response?.data;

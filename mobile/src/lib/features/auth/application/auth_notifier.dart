@@ -4,8 +4,9 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../../core/auth/jwt_decoder.dart';
 import '../../../core/auth/token_service.dart';
 import '../../../core/logging/app_logger.dart';
+import '../../portfolio/data/portfolio_repository_impl.dart';
+import '../../trading/application/trading_ws_notifier.dart';
 import '../data/auth_repository_impl.dart';
-import '../domain/repositories/auth_repository.dart';
 import '../domain/entities/auth_token.dart';
 
 part 'auth_notifier.freezed.dart';
@@ -164,6 +165,7 @@ class AuthNotifier extends _$AuthNotifier {
         stackTrace: st,
       );
     }
+    _clearFinancialProviders();
     state = const AuthState.unauthenticated();
   }
 
@@ -171,6 +173,7 @@ class AuthNotifier extends _$AuthNotifier {
 
   Future<void> handleRemoteKick() async {
     await ref.read(tokenServiceProvider).clearTokens();
+    _clearFinancialProviders();
     state = const AuthState.unauthenticated();
     AppLogger.security('Session invalidated by remote kick / device revocation');
   }
@@ -189,6 +192,14 @@ class AuthNotifier extends _$AuthNotifier {
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────────
+
+  /// Invalidates keepAlive financial providers on logout/kick so that:
+  /// 1. The WS connection is closed (no cross-user data leak on shared devices).
+  /// 2. The next session gets a fresh portfolio repository with a clean Dio instance.
+  void _clearFinancialProviders() {
+    ref.invalidate(tradingWsProvider);
+    ref.invalidate(portfolioRepositoryProvider);
+  }
 
   Future<bool> _isBiometricRegistered() async {
     final repo = ref.read(authRepositoryProvider);
