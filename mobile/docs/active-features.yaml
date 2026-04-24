@@ -12,8 +12,8 @@
 #   shipped     — 审核通过，合并至 main
 
 domain: mobile
-last_updated: 2026-04-07
-current_focus: market
+last_updated: 2026-04-24
+current_focus: portfolio
 
 development_order:
   - auth
@@ -53,7 +53,7 @@ modules:
 
   - id: trading
     name: 交易模块
-    status: in_progress
+    status: review
     phase1_tasks: "20/20"
     prd: mobile/docs/prd/04-trading.md
     tracker: mobile/docs/specs/trading.tracker.md
@@ -61,20 +61,25 @@ modules:
     contracts:
       - docs/contracts/trading-to-mobile.md
     notes: >
-      Phase 1 实现中：Domain/Data/Application/Presentation 层骨架完成（T01-T19）。
-      待生成 freezed/json_serializable 代码（.g.dart/.freezed.dart），
-      flutter analyze 验证，以及 uuid/crypto pubspec 依赖确认。
+      Phase 1 实现完成（T01-T20），完整三层测试套件通过（state/api/e2e）。
+      HMAC 签名、nonce 防重放、生物识别、WS token_expiring 全部覆盖。
+      待 security-engineer + code-reviewer 审核。
 
   - id: portfolio
     name: 持仓模块
-    status: pending
-    phase1_tasks: "0/?"
+    status: in_progress
+    phase1_tasks: "18/18"
     prd: mobile/docs/prd/06-portfolio.md
-    tracker: mobile/docs/specs/portfolio.tracker.md  # JIT
+    tracker: mobile/docs/specs/portfolio.tracker.md
     hifi: mobile/prototypes/06-portfolio/
     contracts:
       - docs/contracts/trading-to-mobile.md   # 持仓/P&L 接口
-    notes: ""
+    notes: >
+      Phase 1 实现完成（T01-T18），flutter analyze 0 errors。
+      复用 trading 模块 positions/portfolioSummary providers，
+      新增 PositionDetail（含 sector/wash sale/trade history）、
+      SectorAllocationProvider、PnlRankingProvider、全部 screens + widgets。
+      待 security-engineer + code-reviewer 审核。
 
   - id: funding
     name: 资金模块

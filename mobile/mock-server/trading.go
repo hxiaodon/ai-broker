@@ -101,7 +101,9 @@ func initOrders() []map[string]interface{} {
 var mockPositions = []map[string]interface{}{
 	{
 		"symbol":              "AAPL",
+		"company_name":        "Apple Inc.",
 		"market":              "US",
+		"sector":              "Technology",
 		"quantity":            100,
 		"settled_qty":         100,
 		"unsettled_qty":       0,
@@ -114,11 +116,28 @@ var mockPositions = []map[string]interface{}{
 		"unrealized_pnl_pct":  "16.81",
 		"today_pnl":           "230.00",
 		"today_pnl_pct":       "1.33",
-		"updated_at":          time.Now().UTC().Format(time.RFC3339Nano),
+		"realized_pnl":        "250.00",
+		"wash_sale_status":    "clean",
+		"pending_settlements": []interface{}{},
+		"recent_trades": []map[string]interface{}{
+			{
+				"trade_id":    "trd-aapl-001",
+				"side":        "BUY",
+				"quantity":    100,
+				"price":       "150.2500",
+				"amount":      "15025.00",
+				"fee":         "1.00",
+				"executed_at": time.Now().UTC().Add(-7 * 24 * time.Hour).Format(time.RFC3339Nano),
+				"wash_sale":   false,
+			},
+		},
+		"updated_at": time.Now().UTC().Format(time.RFC3339Nano),
 	},
 	{
 		"symbol":              "0700",
+		"company_name":        "Tencent Holdings",
 		"market":              "HK",
+		"sector":              "Communication Services",
 		"quantity":            200,
 		"settled_qty":         200,
 		"unsettled_qty":       0,
@@ -131,7 +150,22 @@ var mockPositions = []map[string]interface{}{
 		"unrealized_pnl_pct":  "5.29",
 		"today_pnl":           "840.00",
 		"today_pnl_pct":       "1.15",
-		"updated_at":          time.Now().UTC().Format(time.RFC3339Nano),
+		"realized_pnl":        "0.00",
+		"wash_sale_status":    "clean",
+		"pending_settlements": []interface{}{},
+		"recent_trades": []map[string]interface{}{
+			{
+				"trade_id":    "trd-0700-001",
+				"side":        "BUY",
+				"quantity":    200,
+				"price":       "350.000",
+				"amount":      "70000.00",
+				"fee":         "2.00",
+				"executed_at": time.Now().UTC().Add(-14 * 24 * time.Hour).Format(time.RFC3339Nano),
+				"wash_sale":   false,
+			},
+		},
+		"updated_at": time.Now().UTC().Format(time.RFC3339Nano),
 	},
 }
 

@@ -64,6 +64,18 @@ class TradingWsNotifier extends _$TradingWsNotifier {
   void injectOrderUpdate(TradingWsOrderUpdate update) {
     _orderController.add(update);
   }
+
+  /// Injects a position update into the stream for testing.
+  @visibleForTesting
+  void injectPositionUpdate(TradingWsPositionUpdate update) {
+    _positionController.add(update);
+  }
+
+  /// Injects a portfolio summary update into the stream for testing.
+  @visibleForTesting
+  void injectPortfolioUpdate(TradingWsPortfolioUpdate update) {
+    _portfolioController.add(update);
+  }
   Stream<TradingWsPortfolioUpdate> get portfolioUpdates =>
       _portfolioController.stream;
 

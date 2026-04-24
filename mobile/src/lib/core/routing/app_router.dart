@@ -18,6 +18,8 @@ import '../../features/trading/domain/entities/order.dart';
 import '../../features/trading/presentation/screens/order_confirm_screen.dart';
 import '../../features/trading/presentation/screens/order_entry_screen.dart';
 import '../../features/trading/presentation/screens/order_list_screen.dart';
+import '../../features/portfolio/presentation/screens/portfolio_screen.dart';
+import '../../features/portfolio/presentation/screens/position_detail_screen.dart';
 import 'route_names.dart';
 import 'scaffold_with_nav.dart';
 
@@ -165,7 +167,15 @@ GoRouter appRouter(Ref ref) {
             routes: [
               GoRoute(
                 path: RouteNames.portfolio,
-                builder: (_, _) => const _Placeholder('Portfolio'),
+                builder: (_, _) => const PortfolioScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'position/:symbol',
+                    builder: (_, state) => PositionDetailScreen(
+                      symbol: state.pathParameters['symbol']!,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
