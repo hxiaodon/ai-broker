@@ -14,7 +14,7 @@ class OrderStatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
@@ -109,7 +109,7 @@ class OrderCardWidget extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: sideColor.withOpacity(0.15),
+                    color: sideColor.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
@@ -175,7 +175,7 @@ class OrderCardWidget extends StatelessWidget {
                           horizontal: 12, vertical: 4),
                       decoration: BoxDecoration(
                         border: Border.all(
-                            color: colors.onSurfaceVariant.withOpacity(0.4)),
+                            color: colors.onSurfaceVariant.withValues(alpha: 0.4)),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(

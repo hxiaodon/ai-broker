@@ -101,7 +101,11 @@ class _PositionsTab extends ConsumerWidget {
     return summaryAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => _ErrorView(error: e, colors: colors),
-      data: (summary) => positionsAsync.when(
+      data: (summary) {
+          // Color convention (green=up/red=down) is fixed to Chinese market standard.
+          // Phase 2: make configurable per user preference.
+          const colors = ColorTokens.greenUp;
+          return positionsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => _ErrorView(error: e, colors: colors),
         data: (positions) {
@@ -121,10 +125,6 @@ class _PositionsTab extends ConsumerWidget {
             );
           }
 
-          final totalMv = positions.fold<Decimal>(
-            Decimal.zero,
-            (Decimal acc, p) => acc + p.marketValue,
-          );
           final sorted = _sorted(positions, sortMode);
 
           return RefreshIndicator(
@@ -180,8 +180,9 @@ class _PositionsTab extends ConsumerWidget {
                   delegate: SliverChildBuilderDelegate(
                     (ctx, i) {
                       final pos = sorted[i];
-                      final weight = totalMv > Decimal.zero
-                          ? Decimal.parse((pos.marketValue / totalMv).toDecimal(scaleOnInfinitePrecision: 6).toString())
+                      final weight = summary.totalEquity > Decimal.zero
+                          ? (pos.marketValue / summary.totalEquity)
+                              .toDecimal(scaleOnInfinitePrecision: 6)
                           : Decimal.zero;
                       return PositionListCard(
                         position: pos,
@@ -218,7 +219,8 @@ class _PositionsTab extends ConsumerWidget {
           ),
           );
         },
-      ),
+      );
+      },
     );
   }
 

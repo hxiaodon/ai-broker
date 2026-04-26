@@ -246,7 +246,7 @@ class _BuySellToggle extends StatelessWidget {
       child: Container(
         height: 44,
         decoration: BoxDecoration(
-          color: selected ? color.withOpacity(0.15) : const Color(0xFF1A1C2A),
+          color: selected ? color.withValues(alpha: 0.15) : const Color(0xFF1A1C2A),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: selected ? color : const Color(0xFF2C2E3E),
@@ -276,8 +276,8 @@ class _BalanceCard extends StatelessWidget {
   });
 
   final OrderSide side;
-  final AsyncValue portfolioAsync;
-  final AsyncValue positionsAsync;
+  final AsyncValue<dynamic> portfolioAsync;
+  final AsyncValue<dynamic> positionsAsync;
   final String symbol;
   final ColorTokens colors;
 
@@ -292,7 +292,7 @@ class _BalanceCard extends StatelessWidget {
       child: side == OrderSide.buy
           ? portfolioAsync.when(
               loading: () => _label('可用资金', '加载中...', colors),
-              error: (_, __) => _label('可用资金', '--', colors),
+              error: (_, _) => _label('可用资金', '--', colors),
               data: (p) => _label(
                 '可用资金',
                 '\$${p.buyingPower.toStringAsFixed(2)}',
@@ -301,7 +301,7 @@ class _BalanceCard extends StatelessWidget {
             )
           : positionsAsync.when(
               loading: () => _label('可卖数量', '加载中...', colors),
-              error: (_, __) => _label('可卖数量', '--', colors),
+              error: (_, _) => _label('可卖数量', '--', colors),
               data: (positions) {
                 final pos = (positions as List).cast<dynamic>().firstWhere(
                       (p) => p.symbol == symbol,
@@ -374,7 +374,7 @@ class _OrderTypeSelector extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: sel ? colors.primary.withOpacity(0.15) : colors.surfaceVariant,
+          color: sel ? colors.primary.withValues(alpha: 0.15) : colors.surfaceVariant,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: sel ? colors.primary : colors.divider,
@@ -492,7 +492,7 @@ class _ValiditySelector extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: sel ? colors.primary.withOpacity(0.15) : colors.surfaceVariant,
+          color: sel ? colors.primary.withValues(alpha: 0.15) : colors.surfaceVariant,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: sel ? colors.primary : colors.divider),
         ),
@@ -529,7 +529,7 @@ class _ExtendedHoursRow extends StatelessWidget {
         Switch(
           value: enabled,
           onChanged: onChanged,
-          activeColor: colors.primary,
+          activeThumbColor: colors.primary,
         ),
       ],
     );
@@ -546,9 +546,9 @@ class _ExtHoursWarningBanner extends StatelessWidget {
       margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFF9800).withOpacity(0.1),
+        color: const Color(0xFFFF9800).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFFF9800).withOpacity(0.4)),
+        border: Border.all(color: const Color(0xFFFF9800).withValues(alpha: 0.4)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

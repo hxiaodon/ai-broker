@@ -10,7 +10,6 @@ import '../../../../shared/theme/color_tokens.dart';
 import '../../application/auth_notifier.dart';
 import '../../application/otp_timer_notifier.dart';
 import '../../data/auth_repository_impl.dart';
-import '../../domain/repositories/auth_repository.dart';
 import '../widgets/country_code_picker.dart';
 import '../widgets/phone_input_widget.dart';
 

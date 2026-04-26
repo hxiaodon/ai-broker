@@ -105,7 +105,7 @@ class _SlideToConfirmWidgetState extends State<SlideToConfirmWidget>
                     child: FractionallySizedBox(
                       widthFactor: progress,
                       child: Container(
-                        color: widget.thumbColor.withOpacity(0.2),
+                        color: widget.thumbColor.withValues(alpha: 0.2),
                       ),
                     ),
                   ),
@@ -141,7 +141,7 @@ class _SlideToConfirmWidgetState extends State<SlideToConfirmWidget>
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: widget.thumbColor.withOpacity(0.4),
+                          color: widget.thumbColor.withValues(alpha: 0.4),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),

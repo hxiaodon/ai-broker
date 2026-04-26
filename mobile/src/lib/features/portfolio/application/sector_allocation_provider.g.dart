@@ -10,12 +10,18 @@ part of 'sector_allocation_provider.dart';
 // ignore_for_file: type=lint, type=warning
 /// Loads all position details in parallel and aggregates by sector.
 /// Only active when the analysis tab is visible (autoDispose).
+///
+/// Individual position detail failures are tolerated — the allocation is
+/// computed from whichever positions succeeded (graceful degradation).
 
 @ProviderFor(sectorAllocation)
 final sectorAllocationProvider = SectorAllocationProvider._();
 
 /// Loads all position details in parallel and aggregates by sector.
 /// Only active when the analysis tab is visible (autoDispose).
+///
+/// Individual position detail failures are tolerated — the allocation is
+/// computed from whichever positions succeeded (graceful degradation).
 
 final class SectorAllocationProvider
     extends
@@ -29,6 +35,9 @@ final class SectorAllocationProvider
         $FutureProvider<List<SectorAllocation>> {
   /// Loads all position details in parallel and aggregates by sector.
   /// Only active when the analysis tab is visible (autoDispose).
+  ///
+  /// Individual position detail failures are tolerated — the allocation is
+  /// computed from whichever positions succeeded (graceful degradation).
   SectorAllocationProvider._()
     : super(
         from: null,
@@ -55,4 +64,4 @@ final class SectorAllocationProvider
   }
 }
 
-String _$sectorAllocationHash() => r'f91e31ce783f8d43ae1360d23a38322b544a2c37';
+String _$sectorAllocationHash() => r'3df9e9aabb6b46b70a7baaa3f7392d1fb337ab93';

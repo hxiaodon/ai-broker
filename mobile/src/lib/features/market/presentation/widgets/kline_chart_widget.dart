@@ -195,7 +195,7 @@ class _KLineChartWidgetState extends ConsumerState<KLineChartWidget> {
     final klineAsync = ref.watch(_klineDataProvider(_params));
     return klineAsync.when(
       loading: () => _buildPlaceholder(context, loading: true),
-      error: (_, __) => _buildPlaceholder(context, loading: false),
+      error: (_, _) => _buildPlaceholder(context, loading: false),
       data: (candles) => _ChartView(candles: candles, period: _period),
     );
   }
@@ -247,15 +247,12 @@ class _IntradayChartViewState extends ConsumerState<_IntradayChartView> {
   int _prevCandleCount = 0;
 
   // Series controllers for incremental updates
-  ChartSeriesController? _lineController;
-  ChartSeriesController? _volumeController;
+  ChartSeriesController<_CandleChartData, DateTime>? _lineController;
+  ChartSeriesController<_CandleChartData, DateTime>? _volumeController;
 
   // ValueNotifiers — updates these never trigger a widget rebuild
   final _infoNotifier = ValueNotifier<_OhlcvInfo?>(null);
   final _crosshairNotifier = ValueNotifier<({double x, double? y})?>(null);
-
-  // True while a zoom/pan gesture is in progress — suppress crosshair clear
-  bool _isZooming = false;
 
   void _clearCrosshair() {
     _crosshairNotifier.value = null;
@@ -547,7 +544,7 @@ class _IntradayChartViewState extends ConsumerState<_IntradayChartView> {
           // Info bar — rebuilt only when ValueNotifier changes, not on tick
           ValueListenableBuilder<_OhlcvInfo?>(
             valueListenable: _infoNotifier,
-            builder: (_, info, __) => info != null
+            builder: (_, info, _) => info != null
                 ? _OhlcvInfoBar(
                     info: info,
                     isHovering: _crosshairNotifier.value != null,
@@ -562,10 +559,8 @@ class _IntradayChartViewState extends ConsumerState<_IntradayChartView> {
                   plotAreaBorderWidth: 0,
                   onTrackballPositionChanging: _onTrackballChanged,
                   onZoomStart: (_) {
-                    _isZooming = true;
                     if (_crosshairNotifier.value != null) _clearCrosshair();
                   },
-                  onZoomEnd: (_) { _isZooming = false; },
                   primaryXAxis: DateTimeAxis(
                     intervalType: DateTimeIntervalType.minutes,
                     interval: 60,
@@ -643,7 +638,7 @@ class _IntradayChartViewState extends ConsumerState<_IntradayChartView> {
                 // Crosshair overlay — rebuilt only when ValueNotifier changes
                 ValueListenableBuilder<({double x, double? y})?>(
                   valueListenable: _crosshairNotifier,
-                  builder: (_, pos, __) => pos != null
+                  builder: (_, pos, _) => pos != null
                       ? _CrosshairOverlay(x: pos.x, y: pos.y)
                       : const SizedBox.shrink(),
                 ),
@@ -675,7 +670,6 @@ class _ChartViewState extends State<_ChartView> {
   late ZoomPanBehavior _zoomPanBehavior;
 
   _OhlcvInfo? _hoveredInfo;
-  int? _lastHoveredIdx;
   double? _crosshairX;
   double? _crosshairY;
 
@@ -705,9 +699,6 @@ class _ChartViewState extends State<_ChartView> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final lineColor = isDark ? Colors.white70 : Colors.black54;
-    final markerColor = isDark ? Colors.white : Colors.black87;
 
     _trackballBehavior = TrackballBehavior(
       enable: true,
@@ -728,7 +719,6 @@ class _ChartViewState extends State<_ChartView> {
     final point = args.chartPointInfo;
     final idx = point.dataPointIndex ?? -1;
     if (idx < 0 || idx >= widget.candles.length) return;
-    _lastHoveredIdx = idx;
 
     final c = widget.candles[idx];
     final prevClose = idx > 0 ? widget.candles[idx - 1].c : c.o;
@@ -833,7 +823,6 @@ class _ChartViewState extends State<_ChartView> {
                   if (_hoveredInfo != null || _crosshairX != null) {
                     setState(() {
                       _hoveredInfo = null;
-                      _lastHoveredIdx = null;
                       _crosshairX = null;
                       _crosshairY = null;
                     });
@@ -914,7 +903,7 @@ class _ChartViewState extends State<_ChartView> {
     );
   }
 
-  List<CartesianSeries> _buildSeries(List<_CandleChartData> chartData, double maxVolume) {
+  List<CartesianSeries<dynamic, dynamic>> _buildSeries(List<_CandleChartData> chartData, double maxVolume) {
     if (widget.period.isIntraday) {
       return _buildIntradaySeries(chartData);
     }
@@ -922,7 +911,7 @@ class _ChartViewState extends State<_ChartView> {
   }
 
   /// 分时图: 折线 + 渐变填充 + 成交量
-  List<CartesianSeries> _buildIntradaySeries(List<_CandleChartData> chartData) {
+  List<CartesianSeries<dynamic, dynamic>> _buildIntradaySeries(List<_CandleChartData> chartData) {
     final refPrice = chartData.isNotEmpty ? chartData.first.open : 0.0;
     final lastPrice = chartData.isNotEmpty ? chartData.last.close : 0.0;
     final lineColor = lastPrice >= refPrice ? _bullish : _bearish;
@@ -958,7 +947,7 @@ class _ChartViewState extends State<_ChartView> {
   }
 
   /// 日K/周K/月K: 蜡烛图 + MA均线 + 成交量
-  List<CartesianSeries> _buildKlineSeries(List<_CandleChartData> chartData) {
+  List<CartesianSeries<dynamic, dynamic>> _buildKlineSeries(List<_CandleChartData> chartData) {
     // Use cached MA values if data hasn't changed
     if (_cachedDataLength != chartData.length) {
       _cachedMa5 = _calcMA(chartData, 5);
@@ -1258,9 +1247,7 @@ class _CrosshairPainter extends CustomPainter {
     final dx = end.dx - start.dx;
     final dy = end.dy - start.dy;
     final len = (dx * dx + dy * dy) > 0 ? (dx * dx + dy * dy) : 1.0;
-    final total = len < 1 ? 1.0 : len;
-    // Use distance
-    final dist = (Offset(dx, dy)).distance;
+    final dist = len < 1 ? 1.0 : (Offset(dx, dy)).distance;
     if (dist == 0) return;
     final ux = dx / dist;
     final uy = dy / dist;

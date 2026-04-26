@@ -37,7 +37,7 @@ Future<List<SectorAllocation>> sectorAllocation(Ref ref) async {
   if (totals.isEmpty) return [];
 
   final total = totals.values.fold(Decimal.zero, (a, b) => a + b);
-  if (total == Decimal.zero) return [];
+  if (total <= Decimal.zero) return [];
 
   return totals.entries
       .map((e) => SectorAllocation(

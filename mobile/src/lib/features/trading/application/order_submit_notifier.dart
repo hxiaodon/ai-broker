@@ -5,7 +5,6 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/auth/device_info_service.dart';
 import '../../../core/auth/local_auth_service.dart';
-import '../../../core/auth/token_service.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/security/bio_challenge_service.dart';
 import '../../../core/security/session_key_service.dart';
@@ -92,7 +91,7 @@ class OrderSubmitNotifier extends _$OrderSubmitNotifier {
           qty: qty,
           price: limitPrice?.toString() ?? '',
           accountId: ref.read(authProvider).maybeWhen(
-                authenticated: (accountId, _, __) => accountId,
+                authenticated: (accountId, _, _) => accountId,
                 orElse: () => '',
               ),
         );

@@ -238,6 +238,7 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   /// Check whether biometric has been registered on this device.
+  @override
   Future<bool> isBiometricRegistered() async {
     final val = await _secureStorage.read(_biometricRegisteredKey);
     return val == 'true';

@@ -8,7 +8,6 @@ import '../../../../core/routing/route_names.dart';
 import '../../../../core/storage/secure_storage_service.dart';
 import '../../../../shared/theme/color_tokens.dart';
 import '../../data/auth_repository_impl.dart';
-import '../../domain/repositories/auth_repository.dart';
 
 /// BiometricSetupScreen — first-time biometric enrollment guide (T04).
 ///

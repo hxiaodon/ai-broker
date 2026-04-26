@@ -53,4 +53,4 @@ final class PnlRankingProvider
   }
 }
 
-String _$pnlRankingHash() => r'fcdae603aff7891d79b45433e9b1c03f30474c6f';
+String _$pnlRankingHash() => r'a6b074de3455cbbce461feaf22340c711a0664dd';

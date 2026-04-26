@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:trading_app/core/errors/app_exception.dart';
 import 'package:trading_app/core/logging/app_logger.dart';
 import 'package:trading_app/core/security/bio_challenge_service.dart';
 import 'package:trading_app/core/security/nonce_service.dart';
@@ -402,6 +403,160 @@ void main() {
       },
     );
   });
+
+  // ── Edge Cases & Invariants ───────────────────────────────────────────────
+
+  group('Portfolio Module - Edge Cases & Invariants', () {
+    // TP13: sectorAllocationProvider partial failure → graceful degradation
+    test(
+      'TP13: sectorAllocationProvider degrades gracefully when one position detail fails',
+      () async {
+        final container = ProviderContainer(
+          overrides: [
+            tradingRepositoryProvider.overrideWithValue(_StubTradingRepository()),
+            portfolioRepositoryProvider
+                .overrideWithValue(_FailingPortfolioRepository()),
+            sessionKeyServiceProvider.overrideWithValue(_StubSessionKeyService()),
+            nonceServiceProvider.overrideWithValue(_StubNonceService()),
+            bioChallengeServiceProvider
+                .overrideWithValue(_StubBioChallengeService()),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        final allocations =
+            await container.read(sectorAllocationProvider.future);
+        // 0700 throws → only AAPL's Technology sector survives
+        expect(allocations, isNotEmpty,
+            reason: 'Partial failure must not empty the analysis tab');
+        expect(allocations.any((a) => a.sector == 'Technology'), isTrue,
+            reason: 'AAPL Technology sector must survive 0700 failure');
+        print(
+            '✅ TP13: Partial failure — ${allocations.length} sector(s) returned');
+      },
+    );
+
+    // TP14: positionDetailProvider: availableQty > qty — documents raw domain value
+    test(
+      'TP14: positionDetailProvider returns raw availableQty > qty (UI layer clamps)',
+      () async {
+        final container = ProviderContainer(
+          overrides: [
+            tradingRepositoryProvider
+                .overrideWithValue(_CorruptedQtyTradingRepository()),
+            portfolioRepositoryProvider
+                .overrideWithValue(_CorruptedQtyPortfolioRepository()),
+            sessionKeyServiceProvider.overrideWithValue(_StubSessionKeyService()),
+            nonceServiceProvider.overrideWithValue(_StubNonceService()),
+            bioChallengeServiceProvider
+                .overrideWithValue(_StubBioChallengeService()),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        final detail =
+            await container.read(positionDetailProvider('AAPL').future);
+        // Provider returns the raw unclamped value — clamp is at UI layer
+        expect(detail.availableQty, greaterThan(detail.qty),
+            reason:
+                'Provider must pass through server data unchanged; '
+                'UI layer (position_detail_screen) clamps availableQty.clamp(0, qty)');
+        print(
+            '✅ TP14: availableQty=${detail.availableQty} > qty=${detail.qty} — '
+            'UI clamp is the safety net');
+      },
+    );
+
+    // TP15: pnlRankingProvider with equal unrealizedPnl → stable sort by symbol
+    test(
+      'TP15: pnlRankingProvider produces stable sort by symbol when P&L values are equal',
+      () async {
+        final container = ProviderContainer(
+          overrides: [
+            tradingRepositoryProvider
+                .overrideWithValue(_EqualPnlTradingRepository()),
+            portfolioRepositoryProvider
+                .overrideWithValue(_StubPortfolioRepository()),
+            sessionKeyServiceProvider.overrideWithValue(_StubSessionKeyService()),
+            nonceServiceProvider.overrideWithValue(_StubNonceService()),
+            bioChallengeServiceProvider
+                .overrideWithValue(_StubBioChallengeService()),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        final ranked = await container.read(pnlRankingProvider.future);
+        expect(ranked, hasLength(3));
+        // All have equal P&L → secondary sort is by symbol ascending
+        final symbols = ranked.map((p) => p.symbol).toList();
+        expect(symbols, equals(['AAPL', 'GOOG', 'TSLA']),
+            reason: 'Equal P&L → stable sort by symbol alphabetically');
+        print('✅ TP15: Equal P&L stable sort: $symbols');
+      },
+    );
+
+    // TP16: sectorAllocationProvider with all-negative market values → returns empty
+    test(
+      'TP16: sectorAllocationProvider returns empty list when all market values are non-positive',
+      () async {
+        final container = ProviderContainer(
+          overrides: [
+            tradingRepositoryProvider
+                .overrideWithValue(_NegativeMarketValueTradingRepository()),
+            portfolioRepositoryProvider
+                .overrideWithValue(_NegativeMarketValuePortfolioRepository()),
+            sessionKeyServiceProvider.overrideWithValue(_StubSessionKeyService()),
+            nonceServiceProvider.overrideWithValue(_StubNonceService()),
+            bioChallengeServiceProvider
+                .overrideWithValue(_StubBioChallengeService()),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        final allocations =
+            await container.read(sectorAllocationProvider.future);
+        expect(allocations, isEmpty,
+            reason:
+                'Non-positive total market value must return empty to avoid '
+                'invalid weight calculations');
+        print('✅ TP16: All-negative market values → empty allocation list');
+      },
+    );
+
+    // TP17: portfolioRepositoryProvider is invalidated after ref.invalidate → fresh state
+    test(
+      'TP17: portfolioRepositoryProvider rebuilds after invalidation (no stale state)',
+      () async {
+        final container = ProviderContainer(
+          overrides: [
+            tradingRepositoryProvider.overrideWithValue(_StubTradingRepository()),
+            // Use overrideWith (factory) so that invalidate() creates a new instance
+            portfolioRepositoryProvider
+                .overrideWith((_) => _StubPortfolioRepository()),
+            sessionKeyServiceProvider.overrideWithValue(_StubSessionKeyService()),
+            nonceServiceProvider.overrideWithValue(_StubNonceService()),
+            bioChallengeServiceProvider
+                .overrideWithValue(_StubBioChallengeService()),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        // Read once to populate cache
+        final repo1 = container.read(portfolioRepositoryProvider);
+
+        // Simulate logout: invalidate the keepAlive provider
+        container.invalidate(portfolioRepositoryProvider);
+
+        // After invalidation the factory re-runs — next read creates a new instance
+        final repo2 = container.read(portfolioRepositoryProvider);
+        expect(identical(repo1, repo2), isFalse,
+            reason:
+                'invalidate() on a factory override must create a new instance; '
+                'stale repo with old tokens must not be reused after logout');
+        print('✅ TP17: portfolioRepositoryProvider rebuilt after invalidation');
+      },
+    );
+  });
 }
 
 // ─── Stub implementations ─────────────────────────────────────────────────────
@@ -561,6 +716,60 @@ class _SinglePositionPortfolioRepository implements PortfolioRepository {
   @override
   Future<PositionDetail> getPositionDetail(String symbol) async =>
       _makeDetail('AAPL', 'Apple Inc.', 100);
+}
+
+// TP13: Fails for 0700, succeeds for AAPL
+class _FailingPortfolioRepository implements PortfolioRepository {
+  @override
+  Future<PositionDetail> getPositionDetail(String symbol) async {
+    if (symbol == '0700') {
+      throw const ServerException(statusCode: 500, message: 'Simulated failure');
+    }
+    return _makeDetail('AAPL', 'Apple Inc.', 100);
+  }
+}
+
+// TP14: Returns availableQty > qty to simulate server data corruption
+class _CorruptedQtyPortfolioRepository implements PortfolioRepository {
+  @override
+  Future<PositionDetail> getPositionDetail(String symbol) async {
+    return _makeDetail('AAPL', 'Apple Inc.', 100).copyWith(availableQty: 150);
+  }
+}
+
+class _CorruptedQtyTradingRepository extends _StubTradingRepository {
+  @override
+  Future<List<Position>> getPositions() async =>
+      [_makePosition('AAPL', 'US', 100)];
+}
+
+// TP15: Three positions with identical unrealizedPnl
+class _EqualPnlTradingRepository extends _StubTradingRepository {
+  @override
+  Future<List<Position>> getPositions() async => [
+        _makePosition('TSLA', 'US', 10, unrealizedPnl: Decimal.parse('100.00')),
+        _makePosition('AAPL', 'US', 10, unrealizedPnl: Decimal.parse('100.00')),
+        _makePosition('GOOG', 'US', 10, unrealizedPnl: Decimal.parse('100.00')),
+      ];
+}
+
+// TP16: Negative market values
+class _NegativeMarketValuePortfolioRepository implements PortfolioRepository {
+  @override
+  Future<PositionDetail> getPositionDetail(String symbol) async {
+    return _makeDetail('AAPL', 'Apple Inc.', 100).copyWith(
+      marketValue: Decimal.parse('-500.00'),
+    );
+  }
+}
+
+class _NegativeMarketValueTradingRepository extends _StubTradingRepository {
+  @override
+  Future<List<Position>> getPositions() async => [
+        _makePosition('AAPL', 'US', 100,
+            marketValue: Decimal.parse('-500.00'),
+            unrealizedPnl: Decimal.parse('-5000.00')),
+      ];
 }
 
 // ─── Shared factory helpers ────────────────────────────────────────────────────

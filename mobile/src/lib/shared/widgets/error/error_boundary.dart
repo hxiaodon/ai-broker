@@ -18,6 +18,7 @@ import '../../.././core/errors/global_error_handler.dart';
 /// ```
 class ErrorBoundary extends StatefulWidget {
   const ErrorBoundary({
+    super.key,
     required this.child,
     this.onError,
   });
@@ -93,6 +94,7 @@ class _ErrorBoundaryState extends State<ErrorBoundary> {
 /// User feedback dialog for reporting errors.
 class UserFeedbackDialog extends StatefulWidget {
   const UserFeedbackDialog({
+    super.key,
     required this.error,
     this.defaultMessage,
   });
@@ -166,7 +168,7 @@ class _UserFeedbackDialogState extends State<UserFeedbackDialog> {
     try {
       final feedback = SentryFeedback(
         message: _controller.text,
-        associatedEventId: Sentry.lastEventId ?? SentryId.empty(),
+        associatedEventId: Sentry.lastEventId,
       );
 
       await Sentry.captureFeedback(feedback);

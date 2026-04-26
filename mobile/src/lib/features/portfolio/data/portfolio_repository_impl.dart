@@ -1,9 +1,13 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/auth/device_info_service.dart';
 import '../../../core/auth/token_service.dart';
 import '../../../core/config/environment_config.dart';
 import '../../../core/network/authenticated_dio.dart';
 import '../../../core/network/connectivity_service.dart';
+import '../../../core/security/hmac_signer.dart';
+import '../../../core/security/nonce_service.dart';
+import '../../../core/security/session_key_service.dart';
 import '../domain/entities/position_detail.dart';
 import '../domain/repositories/portfolio_repository.dart';
 import 'remote/portfolio_remote_data_source.dart';
@@ -30,6 +34,10 @@ PortfolioRepository portfolioRepository(Ref ref) {
     remote: PortfolioRemoteDataSource(
       dio: dio,
       connectivity: ref.watch(connectivityServiceProvider),
+      signer: const HmacSigner(),
+      sessionKeyService: ref.read(sessionKeyServiceProvider),
+      nonceService: ref.read(nonceServiceProvider),
+      deviceInfoService: ref.read(deviceInfoServiceProvider),
     ),
   );
 }

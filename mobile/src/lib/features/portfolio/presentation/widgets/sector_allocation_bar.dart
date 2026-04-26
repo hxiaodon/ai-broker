@@ -60,6 +60,7 @@ class SectorAllocationBar extends StatelessWidget {
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
+              // LinearProgressIndicator.value requires double; display-layer cast is safe here.
               value: allocation.weight.toDouble(),
               minHeight: 6,
               backgroundColor: colors.surfaceVariant,

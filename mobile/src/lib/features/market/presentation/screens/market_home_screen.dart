@@ -9,8 +9,6 @@ import '../../../auth/application/auth_notifier.dart';
 import '../../../auth/presentation/widgets/login_guidance_sheet.dart';
 import '../../application/index_quotes_notifier.dart';
 import '../../application/movers_provider.dart';
-import '../../application/watchlist_notifier.dart';
-import '../../domain/entities/quote.dart';
 import '../widgets/delayed_quote_banner.dart';
 import '../widgets/movers_tab.dart';
 import '../widgets/watchlist_tab.dart';

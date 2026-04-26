@@ -125,7 +125,7 @@ class OrderConfirmScreen extends ConsumerWidget {
             ),
             if (isBuyInsufficient)
               _buildErrorBanner(
-                '可用资金不足：预计总金额 \$${estimatedTotal!.toStringAsFixed(2)}，可用资金 \$${buyingPower!.toStringAsFixed(2)}',
+                '可用资金不足：预计总金额 \$${estimatedTotal.toStringAsFixed(2)}，可用资金 \$${buyingPower.toStringAsFixed(2)}',
               ),
 
             const Spacer(),
@@ -146,7 +146,7 @@ class OrderConfirmScreen extends ConsumerWidget {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  disabledBackgroundColor: actionColor.withOpacity(0.4),
+                  disabledBackgroundColor: actionColor.withValues(alpha: 0.4),
                 ),
             child: submitState.maybeWhen(
                   submitting: () => const SizedBox(
@@ -197,9 +197,9 @@ class OrderConfirmScreen extends ConsumerWidget {
       padding: const EdgeInsets.all(12),
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: _colors.error.withOpacity(0.1),
+        color: _colors.error.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _colors.error.withOpacity(0.4)),
+        border: Border.all(color: _colors.error.withValues(alpha: 0.4)),
       ),
       child: Text(
         message,
@@ -213,7 +213,7 @@ class OrderConfirmScreen extends ConsumerWidget {
     // resolved on login/session-restore. Guest/unauthenticated users can't
     // reach this screen (router guard), but fall back to `false` defensively.
     final biometricEnabled = ref.read(authProvider).maybeWhen(
-          authenticated: (String _, String __, bool biometricEnabled) =>
+          authenticated: (String _, String _, bool biometricEnabled) =>
               biometricEnabled,
           orElse: () => false,
         );
@@ -288,7 +288,7 @@ class _OrderSummaryCard extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: sideColor.withOpacity(0.15),
+                  color: sideColor.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(

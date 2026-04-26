@@ -55,4 +55,4 @@ final class PortfolioRepositoryProvider
 }
 
 String _$portfolioRepositoryHash() =>
-    r'a08023d5b277af5b2a7aa01109c143b95a73c99c';
+    r'5740abf7bdeb8dd707aedd02605284aca939b922';

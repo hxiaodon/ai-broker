@@ -270,7 +270,7 @@ class _DetailBody extends StatelessWidget {
                               'symbol': detail.symbol,
                               'market': detail.market,
                               'side': OrderSide.sell,
-                              'prefillQty': detail.availableQty,
+                              'prefillQty': detail.availableQty.clamp(0, detail.qty),
                             },
                           )
                       : null,
