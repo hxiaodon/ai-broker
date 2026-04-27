@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:clock/clock.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
@@ -86,8 +87,8 @@ class OtpTimerNotifier extends _$OtpTimerNotifier {
   void _startLockout({DateTime? lockoutUntil}) {
     _lockoutTimer?.cancel();
     final until = lockoutUntil ??
-        DateTime.now().toUtc().add(const Duration(minutes: 30));
-    final remaining = until.difference(DateTime.now().toUtc()).inSeconds;
+        clock.now().toUtc().add(const Duration(minutes: 30));
+    final remaining = until.difference(clock.now().toUtc()).inSeconds;
 
     state = state.copyWith(
       isLockedOut: true,
@@ -99,7 +100,7 @@ class OtpTimerNotifier extends _$OtpTimerNotifier {
 
     _lockoutTimer = Timer.periodic(const Duration(seconds: 1), (t) {
       final rem = state.lockoutUntil!
-          .difference(DateTime.now().toUtc())
+          .difference(clock.now().toUtc())
           .inSeconds;
       if (rem <= 0) {
         t.cancel();
