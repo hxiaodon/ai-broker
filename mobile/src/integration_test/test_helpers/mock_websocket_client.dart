@@ -23,7 +23,7 @@ class MockWebSocketClient extends QuoteWebSocketClient {
       throw Exception('Connection failed');
     }
 
-    await Future.delayed(const Duration(milliseconds: 10));
+    await Future<void>.delayed(const Duration(milliseconds: 10));
     _isConnected = true;
     _userType = (token == null || token.isEmpty) ? WsUserType.guest : WsUserType.registered;
     return _userType!;
@@ -34,7 +34,7 @@ class MockWebSocketClient extends QuoteWebSocketClient {
     if (!_isConnected) {
       throw StateError('Not connected');
     }
-    await Future.delayed(const Duration(milliseconds: 5));
+    await Future<void>.delayed(const Duration(milliseconds: 5));
     subscribedSymbols.addAll(symbols);
   }
 
@@ -45,7 +45,7 @@ class MockWebSocketClient extends QuoteWebSocketClient {
 
   @override
   Future<WsUserType> reauth(String newToken) async {
-    await Future.delayed(const Duration(milliseconds: 5));
+    await Future<void>.delayed(const Duration(milliseconds: 5));
     _userType = WsUserType.registered;
     return _userType!;
   }

@@ -41,6 +41,7 @@ class RouteNames {
   static const deposit = '/funding/deposit';
   static const withdraw = '/funding/withdraw';
   static const bankAccountBind = '/funding/bank/bind';
+  static const fundingMicroDeposit = '/funding/bank/:bankId/micro-deposit';
 
   // KYC (typically launched modally from auth or settings)
   static const kycRoot = '/kyc';

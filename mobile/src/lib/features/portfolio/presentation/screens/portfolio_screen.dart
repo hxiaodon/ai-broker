@@ -58,6 +58,15 @@ class _PortfolioScreenState extends ConsumerState<PortfolioScreen>
             fontWeight: FontWeight.w700,
           ),
         ),
+        actions: [
+          TextButton.icon(
+            onPressed: () => context.push(RouteNames.funding),
+            icon: Icon(Icons.account_balance_wallet_outlined,
+                size: 18, color: _colors.primary),
+            label: Text('出入金',
+                style: TextStyle(color: _colors.primary, fontSize: 13)),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           labelColor: _colors.primary,

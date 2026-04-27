@@ -13,14 +13,14 @@ void main() {
       await tester.pumpWidget(TestAppConfig.createAppAsGuest());
       await tester.pump(const Duration(seconds: 2));
       expect(find.byType(Scaffold), findsWidgets);
-      print('✅ C1: Trading blocked for guest');
+      debugPrint('✅ C1: Trading blocked for guest');
     });
 
     testWidgets('C2: Guest can see market', (tester) async {
       await tester.pumpWidget(TestAppConfig.createAppAsGuest());
       await tester.pump(const Duration(seconds: 2));
       expect(find.byType(Scaffold), findsWidgets);
-      print('✅ C2: Market visible for guest');
+      debugPrint('✅ C2: Market visible for guest');
     });
   });
 
@@ -34,14 +34,14 @@ void main() {
       );
       await tester.pump(const Duration(seconds: 2));
       expect(find.byType(Scaffold), findsWidgets);
-      print('✅ C3: Authenticated can trade');
+      debugPrint('✅ C3: Authenticated can trade');
     });
 
     testWidgets('C4: Unauthenticated shows login', (tester) async {
       await tester.pumpWidget(TestAppConfig.createAppUnauthenticated());
       await tester.pump(const Duration(seconds: 2));
       expect(find.byType(Scaffold), findsWidgets);
-      print('✅ C4: Unauthenticated shows login');
+      debugPrint('✅ C4: Unauthenticated shows login');
     });
   });
 
@@ -63,7 +63,7 @@ void main() {
       await tester.pump();
 
       expect(await tokenService.getAccessToken(), 'shared-token-123');
-      print('✅ C5: Token consistent across modules');
+      debugPrint('✅ C5: Token consistent across modules');
     });
   });
 
@@ -77,7 +77,7 @@ void main() {
       );
       await tester.pump();
       expect(find.byType(Scaffold), findsWidgets);
-      print('✅ C6: Token hidden in UI');
+      debugPrint('✅ C6: Token hidden in UI');
     });
 
     testWidgets('C7: Guest sees delayed quotes', (tester) async {
@@ -85,7 +85,7 @@ void main() {
       await tester.pump(const Duration(seconds: 2));
       // Guest should see 15-min delayed data indicator
       expect(find.byType(Scaffold), findsWidgets);
-      print('✅ C7: Guest sees delayed data');
+      debugPrint('✅ C7: Guest sees delayed data');
     });
   });
 
@@ -94,7 +94,7 @@ void main() {
       await tester.pumpWidget(TestAppConfig.createAppAsGuest());
       await tester.pump(const Duration(seconds: 2));
       expect(find.byType(Scaffold), findsWidgets);
-      print('✅ C8: Market loads for guest');
+      debugPrint('✅ C8: Market loads for guest');
     });
 
     testWidgets('C9: Market loads for authenticated', (tester) async {
@@ -106,7 +106,7 @@ void main() {
       );
       await tester.pump(const Duration(seconds: 2));
       expect(find.byType(Scaffold), findsWidgets);
-      print('✅ C9: Market loads for auth');
+      debugPrint('✅ C9: Market loads for auth');
     });
 
     testWidgets('C10: Auth status affects UI', (tester) async {
@@ -119,7 +119,7 @@ void main() {
       );
       await tester.pump(const Duration(seconds: 2));
       expect(find.byType(Scaffold), findsWidgets);
-      print('✅ C10: Auth affects UI rendering');
+      debugPrint('✅ C10: Auth affects UI rendering');
     });
   });
 }

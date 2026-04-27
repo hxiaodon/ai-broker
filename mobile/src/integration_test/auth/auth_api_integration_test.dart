@@ -1,8 +1,7 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/foundation.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:dio/dio.dart';
-import '../helpers/test_app.dart';
 
 /// Auth Module — API Integration Tests
 ///
@@ -41,10 +40,10 @@ void main() {
     testWidgets(
       'E1: Complete OTP login flow with Mock Server',
       (tester) async {
-        print('📱 E1: Starting complete OTP login flow');
+        debugPrint('📱 E1: Starting complete OTP login flow');
 
         // Step 1: Send OTP
-        print('  📨 Step 1: Sending OTP to +8613812345678...');
+        debugPrint('  📨 Step 1: Sending OTP to +8613812345678...');
         final sendResponse = await dio.post<Map<String, dynamic>>(
           '/v1/auth/otp/send',
           data: {'phone_number': '+8613812345678'},
@@ -53,10 +52,10 @@ void main() {
         expect(sendResponse.statusCode, 200);
         expect(sendResponse.data!['success'], true);
         expect(sendResponse.data!['message'], contains('验证码已发送'));
-        print('  ✅ OTP sent successfully');
+        debugPrint('  ✅ OTP sent successfully');
 
         // Step 2: Verify OTP (using mock code 123456)
-        print('  🔐 Step 2: Verifying OTP code 123456...');
+        debugPrint('  🔐 Step 2: Verifying OTP code 123456...');
         final verifyResponse = await dio.post<Map<String, dynamic>>(
           '/v1/auth/otp/verify',
           data: {
@@ -73,29 +72,29 @@ void main() {
         expect(verifyResponse.data!['account_id'], isNotEmpty);
 
         final accessToken = verifyResponse.data!['access_token'];
-        print('  ✅ OTP verified, access token: ${accessToken.substring(0, 16)}...');
+        debugPrint('  ✅ OTP verified, access token: ${accessToken.substring(0, 16)}...');
 
         // Step 3: App would navigate to home
-        print('  🏠 Step 3: Navigating to home screen...');
+        debugPrint('  🏠 Step 3: Navigating to home screen...');
         expect(accessToken, isNotEmpty);
-        print('  ✅ Login flow complete');
+        debugPrint('  ✅ Login flow complete');
 
-        print('✅ E1 PASSED: Complete OTP login flow');
+        debugPrint('✅ E1 PASSED: Complete OTP login flow');
       },
     );
 
     testWidgets(
       'E2: Wrong OTP attempt with error count',
       (tester) async {
-        print('\n📱 E2: Testing wrong OTP attempt');
+        debugPrint('\n📱 E2: Testing wrong OTP attempt');
 
         // Send OTP first
-        await dio.post('/v1/auth/otp/send', data: {
+        await dio.post<Map<String, dynamic>>('/v1/auth/otp/send', data: {
           'phone_number': '+8613812345678',
         });
 
         // Try wrong OTP
-        print('  ❌ Attempting wrong OTP (000000)...');
+        debugPrint('  ❌ Attempting wrong OTP (000000)...');
         final wrongResponse = await dio.post<Map<String, dynamic>>(
           '/v1/auth/otp/verify',
           data: {
@@ -108,22 +107,22 @@ void main() {
         expect(wrongResponse.statusCode, 400);
         expect(wrongResponse.data!['success'], false);
         expect(wrongResponse.data!['message'], contains('验证码错误'));
-        print('  ✅ Error message shown: ${wrongResponse.data!['message']}');
+        debugPrint('  ✅ Error message shown: ${wrongResponse.data!['message']}');
 
-        print('✅ E2 PASSED: Wrong OTP handling');
+        debugPrint('✅ E2 PASSED: Wrong OTP handling');
       },
     );
 
     testWidgets(
       'E3: Biometric registration flow',
       (tester) async {
-        print('\n📱 E3: Testing biometric registration');
+        debugPrint('\n📱 E3: Testing biometric registration');
 
         const deviceId = 'device-e3-12345';
         const biometricType = 'face_id';
 
         // Register biometric
-        print('  👆 Registering $biometricType on device $deviceId...');
+        debugPrint('  👆 Registering $biometricType on device $deviceId...');
         final registerResponse = await dio.post<Map<String, dynamic>>(
           '/v1/auth/biometric/register',
           data: {
@@ -135,10 +134,10 @@ void main() {
         expect(registerResponse.statusCode, 200);
         expect(registerResponse.data!['success'], true);
         expect(registerResponse.data!['message'], contains('注册成功'));
-        print('  ✅ Biometric registered');
+        debugPrint('  ✅ Biometric registered');
 
         // Verify biometric
-        print('  🔐 Verifying biometric...');
+        debugPrint('  🔐 Verifying biometric...');
         final verifyResponse = await dio.post<Map<String, dynamic>>(
           '/v1/auth/biometric/verify',
           data: {
@@ -150,29 +149,29 @@ void main() {
         expect(verifyResponse.statusCode, 200);
         expect(verifyResponse.data!['success'], true);
         expect(verifyResponse.data!['access_token'], isNotEmpty);
-        print('  ✅ Biometric verified, got access token');
+        debugPrint('  ✅ Biometric verified, got access token');
 
-        print('✅ E3 PASSED: Biometric registration and verification');
+        debugPrint('✅ E3 PASSED: Biometric registration and verification');
       },
     );
 
     testWidgets(
       'E4: Device management - register and list',
       (tester) async {
-        print('\n📱 E4: Testing device management');
+        debugPrint('\n📱 E4: Testing device management');
 
         const deviceId = 'device-e4-xyz789';
 
         // Register a device via biometric registration
-        print('  📱 Registering device $deviceId...');
-        await dio.post('/v1/auth/biometric/register', data: {
+        debugPrint('  📱 Registering device $deviceId...');
+        await dio.post<Map<String, dynamic>>('/v1/auth/biometric/register', data: {
           'device_id': deviceId,
           'biometric_type': 'fingerprint',
         });
-        print('  ✅ Device registered');
+        debugPrint('  ✅ Device registered');
 
         // Get devices list
-        print('  📋 Fetching devices list...');
+        debugPrint('  📋 Fetching devices list...');
         final listResponse = await dio.get<Map<String, dynamic>>(
           '/v1/auth/devices',
         );
@@ -187,21 +186,21 @@ void main() {
           true,
           reason: 'Device should be in list',
         );
-        print('  ✅ Device found in list (${devices.length} device(s) total)');
+        debugPrint('  ✅ Device found in list (${devices.length} device(s) total)');
 
-        print('✅ E4 PASSED: Device listing');
+        debugPrint('✅ E4 PASSED: Device listing');
       },
     );
 
     testWidgets(
       'E5: Device deletion',
       (tester) async {
-        print('\n📱 E5: Testing device deletion');
+        debugPrint('\n📱 E5: Testing device deletion');
 
         const deviceId = 'device-e5-delete-me';
 
         // Register device
-        await dio.post('/v1/auth/biometric/register', data: {
+        await dio.post<Map<String, dynamic>>('/v1/auth/biometric/register', data: {
           'device_id': deviceId,
           'biometric_type': 'face_id',
         });
@@ -215,17 +214,17 @@ void main() {
           devices.any((d) => d['device_id'] == deviceId),
           true,
         );
-        print('  ✅ Device registered and verified in list');
+        debugPrint('  ✅ Device registered and verified in list');
 
         // Delete device
-        print('  🗑️  Deleting device...');
+        debugPrint('  🗑️  Deleting device...');
         final deleteResponse = await dio.delete<Map<String, dynamic>>(
           '/v1/auth/devices/$deviceId',
         );
 
         expect(deleteResponse.statusCode, 200);
         expect(deleteResponse.data!['success'], true);
-        print('  ✅ Device deleted');
+        debugPrint('  ✅ Device deleted');
 
         // Verify it's removed
         listResponse = await dio.get<Map<String, dynamic>>(
@@ -237,16 +236,16 @@ void main() {
           false,
           reason: 'Device should no longer be in list',
         );
-        print('  ✅ Device confirmed removed from list');
+        debugPrint('  ✅ Device confirmed removed from list');
 
-        print('✅ E5 PASSED: Device deletion');
+        debugPrint('✅ E5 PASSED: Device deletion');
       },
     );
 
     testWidgets(
       'E6: Token refresh',
       (tester) async {
-        print('\n📱 E6: Testing token refresh');
+        debugPrint('\n📱 E6: Testing token refresh');
 
         // Get initial tokens
         final loginResponse = await dio.post<Map<String, dynamic>>(
@@ -260,7 +259,7 @@ void main() {
 
         if (loginResponse.statusCode != 200) {
           // Resend OTP first
-          await dio.post('/v1/auth/otp/send', data: {
+          await dio.post<Map<String, dynamic>>('/v1/auth/otp/send', data: {
             'phone_number': '+8613812345678',
           });
 
@@ -278,7 +277,7 @@ void main() {
             loginResponse.data!['refresh_token'] ?? 'test-refresh-token';
 
         // Refresh token
-        print('  🔄 Refreshing token...');
+        debugPrint('  🔄 Refreshing token...');
         final refreshResponse = await dio.post<Map<String, dynamic>>(
           '/v1/auth/token/refresh',
           data: {'refresh_token': refreshToken},
@@ -287,25 +286,25 @@ void main() {
         expect(refreshResponse.statusCode, 200);
         expect(refreshResponse.data!['success'], true);
         expect(refreshResponse.data!['access_token'], isNotEmpty);
-        print(
+        debugPrint(
           '  ✅ Token refreshed: ${refreshResponse.data!['access_token'].substring(0, 16)}...',
         );
 
-        print('✅ E6 PASSED: Token refresh');
+        debugPrint('✅ E6 PASSED: Token refresh');
       },
     );
 
     testWidgets(
       'E7: Account lockout after 5 failed attempts',
       (tester) async {
-        print('\n📱 E7: Testing account lockout');
+        debugPrint('\n📱 E7: Testing account lockout');
 
         // Use unique phone number to avoid lockout from previous test run
         final timestamp = DateTime.now().millisecondsSinceEpoch;
         final phoneNumber = '+861381234${timestamp.toString().substring(timestamp.toString().length - 4)}'; // +8613812345XXX
 
         // Send OTP
-        final sendResponse = await dio.post(
+        final sendResponse = await dio.post<Map<String, dynamic>>(
           '/v1/auth/otp/send',
           data: {'phone_number': phoneNumber},
           options: Options(validateStatus: (status) => status! < 500),
@@ -313,7 +312,7 @@ void main() {
         expect(sendResponse.statusCode, 200);
 
         // Try wrong OTP 5 times
-        print('  ❌ Attempting 5 wrong OTP codes...');
+        debugPrint('  ❌ Attempting 5 wrong OTP codes...');
         String lastMessage = '';
         for (int i = 1; i <= 5; i++) {
           final response = await dio.post<Map<String, dynamic>>(
@@ -326,11 +325,11 @@ void main() {
           );
 
           lastMessage = response.data!['message'] as String;
-          print('    Attempt $i: ${response.data!['message']}');
+          debugPrint('    Attempt $i: ${response.data!['message']}');
         }
 
         // After 5 attempts, account should be locked
-        print('  🔒 Verifying account is locked after 5 attempts...');
+        debugPrint('  🔒 Verifying account is locked after 5 attempts...');
         expect(lastMessage, contains('账户已锁定'));
 
         // Verify next OTP send attempt is blocked with 429
@@ -342,16 +341,16 @@ void main() {
 
         expect(nextAttempt.statusCode, 429); // OTP send returns 429 when locked
         expect(nextAttempt.data!['message'], contains('账户已锁定'));
-        print('  ✅ Account locked: ${nextAttempt.data!['message']}');
+        debugPrint('  ✅ Account locked: ${nextAttempt.data!['message']}');
 
-        print('✅ E7 PASSED: Account lockout');
+        debugPrint('✅ E7 PASSED: Account lockout');
       },
     );
 
     testWidgets(
       'E8: Logout',
       (tester) async {
-        print('\n📱 E8: Testing logout');
+        debugPrint('\n📱 E8: Testing logout');
 
         // Get a token first
         final loginResponse = await dio.post<Map<String, dynamic>>(
@@ -365,7 +364,7 @@ void main() {
 
         if (loginResponse.statusCode != 200) {
           // Resend and retry
-          await dio.post('/v1/auth/otp/send', data: {
+          await dio.post<Map<String, dynamic>>('/v1/auth/otp/send', data: {
             'phone_number': '+8613812345678',
           });
         }
@@ -374,7 +373,7 @@ void main() {
             loginResponse.data!['access_token'] ?? 'test-token';
 
         // Logout
-        print('  🚪 Logging out...');
+        debugPrint('  🚪 Logging out...');
         final logoutResponse = await dio.post<Map<String, dynamic>>(
           '/v1/auth/logout',
           data: {'access_token': accessToken},
@@ -383,9 +382,9 @@ void main() {
         expect(logoutResponse.statusCode, 200);
         expect(logoutResponse.data!['success'], true);
         expect(logoutResponse.data!['message'], equals('登出成功'));
-        print('  ✅ Logout successful');
+        debugPrint('  ✅ Logout successful');
 
-        print('✅ E8 PASSED: Logout');
+        debugPrint('✅ E8 PASSED: Logout');
       },
     );
   });

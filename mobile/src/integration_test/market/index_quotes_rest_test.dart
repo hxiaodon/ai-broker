@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:decimal/decimal.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -54,7 +55,7 @@ void main() {
       expect(state['QQQ']?.symbol, 'QQQ');
       expect(state['DIA']?.symbol, 'DIA');
 
-      print('✅ T01: REST load works');
+      debugPrint('✅ T01: REST load works');
     });
 
     test('T02: Returns empty map when no quotes available', () async {
@@ -67,7 +68,7 @@ void main() {
       // Assert
       expect(state.isEmpty, true);
 
-      print('✅ T02: Empty state works');
+      debugPrint('✅ T02: Empty state works');
     });
 
     test('T03: Handles partial quote availability', () async {
@@ -86,7 +87,7 @@ void main() {
       expect(state.containsKey('QQQ'), false);
       expect(state.containsKey('DIA'), false);
 
-      print('✅ T03: Partial availability works');
+      debugPrint('✅ T03: Partial availability works');
     });
 
     test('T04: Preserves quote metadata', () async {
@@ -128,7 +129,7 @@ void main() {
       expect(spy.marketCap, '450000000000.00');
       expect(spy.peRatio, '22.3');
 
-      print('✅ T04: Metadata preservation works');
+      debugPrint('✅ T04: Metadata preservation works');
     });
 
     test('T05: Returns empty map when repository returns empty', () async {
@@ -142,7 +143,7 @@ void main() {
       expect(state.isEmpty, true);
       expect(state.length, 0);
 
-      print('✅ T05: Empty repository result works');
+      debugPrint('✅ T05: Empty repository result works');
     });
   });
 }

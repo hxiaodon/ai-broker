@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -16,10 +17,10 @@ void main() {
 
     try {
       final result = await dataSource.getQuotes(['AAPL', 'TSLA', '0700', '9988']);
-      print('✅ API call successful');
-      print('Quotes count: ${result.quotes.length}');
-      print('as_of: ${result.asOf}');
-      print('Symbols: ${result.quotes.keys.join(", ")}');
+      debugPrint('✅ API call successful');
+      debugPrint('Quotes count: ${result.quotes.length}');
+      debugPrint('as_of: ${result.asOf}');
+      debugPrint('Symbols: ${result.quotes.keys.join(", ")}');
 
       expect(result.quotes.length, 4);
       expect(result.quotes.containsKey('AAPL'), true);
@@ -27,8 +28,8 @@ void main() {
       expect(result.quotes.containsKey('0700'), true);
       expect(result.quotes.containsKey('9988'), true);
     } catch (e, stack) {
-      print('❌ API call failed: $e');
-      print('Stack trace: $stack');
+      debugPrint('❌ API call failed: $e');
+      debugPrint('Stack trace: $stack');
       rethrow;
     }
   });

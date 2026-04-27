@@ -16,17 +16,17 @@ void main() {
     // Find and tap the guest mode button (actual text is "先逛逛 →")
     final guestButton = find.text('先逛逛 →');
     expect(guestButton, findsOneWidget);
-    print('✅ Found guest mode button: "先逛逛 →"');
+    debugPrint('✅ Found guest mode button: "先逛逛 →"');
 
     await tester.tap(guestButton);
-    print('✅ Tapped guest mode button');
+    debugPrint('✅ Tapped guest mode button');
 
     await tester.pumpAndSettle(const Duration(seconds: 5));
 
     // Verify we're on the market page
     final marketTitle = find.text('行情');
     expect(marketTitle, findsOneWidget);
-    print('✅ Navigated to market page');
+    debugPrint('✅ Navigated to market page');
 
     // Wait for data to load
     await tester.pumpAndSettle(const Duration(seconds: 3));
@@ -34,28 +34,28 @@ void main() {
     // Check for delayed quote indicator
     final delayedIndicator = find.textContaining('延迟');
     if (delayedIndicator.evaluate().isNotEmpty) {
-      print('✅ Found delayed quote indicator');
+      debugPrint('✅ Found delayed quote indicator');
     } else {
-      print('⚠️ Delayed quote indicator not found');
+      debugPrint('⚠️ Delayed quote indicator not found');
     }
 
     // Print all visible text for debugging
     final allText = find.byType(Text);
-    print('\n📋 All visible text widgets:');
+    debugPrint('\n📋 All visible text widgets:');
     for (final element in allText.evaluate()) {
       final widget = element.widget as Text;
       if (widget.data != null && widget.data!.isNotEmpty) {
-        print('  - ${widget.data}');
+        debugPrint('  - ${widget.data}');
       }
     }
 
-    print('\n✅ Guest mode test completed');
+    debugPrint('\n✅ Guest mode test completed');
   });
 }
 
 extension ScreenshotExtension on WidgetTester {
   Future<void> takeScreenshot(String name) async {
     await pumpAndSettle();
-    print('📸 Screenshot: $name');
+    debugPrint('📸 Screenshot: $name');
   }
 }

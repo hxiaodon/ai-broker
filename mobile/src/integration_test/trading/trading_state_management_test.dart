@@ -54,7 +54,7 @@ void main() {
         );
         await tester.pump(const Duration(seconds: 2));
         expect(find.byType(Scaffold), findsWidgets);
-        print('✅ T1: Authenticated state renders trading-capable app');
+        debugPrint('✅ T1: Authenticated state renders trading-capable app');
       },
     );
   });
@@ -79,10 +79,10 @@ void main() {
       final state = container.read(orderSubmitProvider);
       expect(state, isA<OrderSubmitState>());
       state.when(
-        idle: () => print('✅ T2: OrderSubmitState initial = idle'),
+        idle: () => debugPrint('✅ T2: OrderSubmitState initial = idle'),
         awaitingBiometric: () => fail('Expected idle'),
         submitting: () => fail('Expected idle'),
-        success: (_, __) => fail('Expected idle or error'),
+        success: (_, _) => fail('Expected idle or error'),
         error: (_) => fail('Expected idle'),
       );
     });
@@ -109,7 +109,7 @@ void main() {
         submitting: () => fail('Expected success'),
         success: (orderId, requestId) {
           expect(orderId, isNotEmpty);
-          print('✅ T3: idle → submitting → success (orderId: $orderId)');
+          debugPrint('✅ T3: idle → submitting → success (orderId: $orderId)');
         },
         error: (msg) => fail('Expected success, got error: $msg'),
       );
@@ -130,10 +130,10 @@ void main() {
 
       notifier.reset();
       container.read(orderSubmitProvider).when(
-        idle: () => print('✅ T4: reset() returns to idle'),
+        idle: () => debugPrint('✅ T4: reset() returns to idle'),
         awaitingBiometric: () => fail('Expected idle after reset'),
         submitting: () => fail('Expected idle after reset'),
-        success: (_, __) => fail('Expected idle after reset'),
+        success: (_, _) => fail('Expected idle after reset'),
         error: (_) => fail('Expected idle after reset'),
       );
     });
@@ -165,8 +165,8 @@ void main() {
         idle: () => fail('Expected error'),
         awaitingBiometric: () => fail('Expected error'),
         submitting: () => fail('Expected error'),
-        success: (_, __) => fail('Expected error'),
-        error: (msg) => print('✅ T5: repository error → OrderSubmitState.error: $msg'),
+        success: (_, _) => fail('Expected error'),
+        error: (msg) => debugPrint('✅ T5: repository error → OrderSubmitState.error: $msg'),
       );
     });
   });
@@ -174,7 +174,7 @@ void main() {
   // ── Biometric branch tests ────────────────────────────────────────────────────
 
   group('Trading Module - Biometric Path', () {
-    ProviderContainer _makeContainer({
+    ProviderContainer makeContainer({
       required bool biometricResult,
       bool throwOnAuth = false,
     }) {
@@ -200,7 +200,7 @@ void main() {
     }
 
     test('T9: biometric approved → idle → awaitingBiometric → submitting → success', () async {
-      final container = _makeContainer(biometricResult: true);
+      final container = makeContainer(biometricResult: true);
 
       await container.read(orderSubmitProvider.notifier).submit(
             symbol: 'AAPL',
@@ -219,7 +219,7 @@ void main() {
             awaitingBiometric: () => fail('Expected success'),
             submitting: () => fail('Expected success'),
             success: (orderId, requestId) =>
-                print('✅ T9: biometric approved → success (orderId: $orderId)'),
+                debugPrint('✅ T9: biometric approved → success (orderId: $orderId)'),
             error: (msg) => fail('Expected success, got error: $msg'),
           );
       // Drain the ordersProvider rebuild triggered by ref.invalidate before
@@ -231,7 +231,7 @@ void main() {
     });
 
     test('T10: user rejects biometric → OrderSubmitState.error (验证失败)', () async {
-      final container = _makeContainer(biometricResult: false);
+      final container = makeContainer(biometricResult: false);
       addTearDown(container.dispose);
 
       await container.read(orderSubmitProvider.notifier).submit(
@@ -249,16 +249,16 @@ void main() {
             idle: () => fail('Expected error'),
             awaitingBiometric: () => fail('Expected error'),
             submitting: () => fail('Expected error'),
-            success: (_, __) => fail('Expected error'),
+            success: (_, _) => fail('Expected error'),
             error: (msg) {
               expect(msg, contains('验证失败'));
-              print('✅ T10: rejected biometric → error: $msg');
+              debugPrint('✅ T10: rejected biometric → error: $msg');
             },
           );
     });
 
     test('T11: biometric platform exception → OrderSubmitState.error (不可用)', () async {
-      final container = _makeContainer(biometricResult: false, throwOnAuth: true);
+      final container = makeContainer(biometricResult: false, throwOnAuth: true);
       addTearDown(container.dispose);
 
       await container.read(orderSubmitProvider.notifier).submit(
@@ -276,10 +276,10 @@ void main() {
             idle: () => fail('Expected error'),
             awaitingBiometric: () => fail('Expected error'),
             submitting: () => fail('Expected error'),
-            success: (_, __) => fail('Expected error'),
+            success: (_, _) => fail('Expected error'),
             error: (msg) {
               expect(msg, contains('不可用'));
-              print('✅ T11: biometric platform exception → error: $msg');
+              debugPrint('✅ T11: biometric platform exception → error: $msg');
             },
           );
     });
@@ -306,7 +306,7 @@ void main() {
       expect(orders, isA<List<Order>>());
       expect(orders, hasLength(2));
       expect(orders.first.symbol, 'AAPL');
-      print('✅ T6: ordersProvider loaded ${orders.length} orders');
+      debugPrint('✅ T6: ordersProvider loaded ${orders.length} orders');
     });
 
     test('T7: positionsProvider loads positions list', () async {
@@ -314,14 +314,14 @@ void main() {
       expect(positions, isA<List<Position>>());
       expect(positions, hasLength(2));
       expect(positions.first.symbol, 'AAPL');
-      print('✅ T7: positionsProvider loaded ${positions.length} positions');
+      debugPrint('✅ T7: positionsProvider loaded ${positions.length} positions');
     });
 
     test('T8: portfolioSummaryProvider loads portfolio summary', () async {
       final summary = await container.read(portfolioSummaryProvider.future);
       expect(summary, isA<PortfolioSummary>());
       expect(summary.totalEquity, greaterThan(Decimal.zero));
-      print('✅ T8: portfolioSummaryProvider loaded (equity: ${summary.totalEquity})');
+      debugPrint('✅ T8: portfolioSummaryProvider loaded (equity: ${summary.totalEquity})');
     });
   });
 
@@ -363,7 +363,7 @@ void main() {
       expect(updated, isNotNull);
       expect(updated!.first.status, OrderStatus.cancelled,
           reason: 'Known orderId WS update must patch status in-place');
-      print('✅ T12: WS patch for ord-001 FILLED → CANCELLED');
+      debugPrint('✅ T12: WS patch for ord-001 FILLED → CANCELLED');
     });
 
     test('T13: WS update for unknown orderId triggers list refresh', () async {
@@ -383,7 +383,7 @@ void main() {
       // stays active when we inject the update (autoDispose would cancel it).
       final sub = patchedContainer.listen<AsyncValue<List<Order>>>(
         ordersProvider(),
-        (_, __) {},
+        (_, _) {},
       );
 
       // Wait for initial load (count = 1)
@@ -406,7 +406,7 @@ void main() {
 
       sub.close();
       patchedContainer.dispose();
-      print('✅ T13: Unknown orderId WS update → list refreshed (fetches: $getOrdersFetchCount)');
+      debugPrint('✅ T13: Unknown orderId WS update → list refreshed (fetches: $getOrdersFetchCount)');
     });
   });
 }

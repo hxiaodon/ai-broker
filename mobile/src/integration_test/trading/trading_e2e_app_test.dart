@@ -50,7 +50,7 @@ void main() {
 
       await tester.pump(const Duration(seconds: 2));
       expect(find.byType(Scaffold), findsWidgets);
-      print('✅ Journey 1: App launched with authenticated state');
+      debugPrint('✅ Journey 1: App launched with authenticated state');
     },
   );
 
@@ -74,7 +74,7 @@ void main() {
 
       expect(find.byType(OrderEntryScreen), findsOneWidget);
       expect(find.text('买入'), findsWidgets);
-      print('✅ Journey 2: OrderEntryScreen rendered for AAPL');
+      debugPrint('✅ Journey 2: OrderEntryScreen rendered for AAPL');
     },
   );
 
@@ -109,7 +109,7 @@ void main() {
 
       expect(find.text('100'), findsOneWidget);
       expect(find.text('150.25'), findsOneWidget);
-      print('✅ Journey 3: User entered qty=100 and price=150.25');
+      debugPrint('✅ Journey 3: User entered qty=100 and price=150.25');
     },
   );
 
@@ -136,7 +136,7 @@ void main() {
           reason: 'Preset order AAPL (ord-001) should be visible');
       expect(find.text('TSLA'), findsWidgets,
           reason: 'Preset order TSLA (ord-002) should be visible');
-      print('✅ Journey 4: OrderListScreen rendered with AAPL + TSLA orders');
+      debugPrint('✅ Journey 4: OrderListScreen rendered with AAPL + TSLA orders');
     },
   );
 
@@ -177,7 +177,7 @@ void main() {
       expect(find.byType(OrderListScreen), findsOneWidget);
       expect(find.text('AAPL'), findsWidgets,
           reason: 'AAPL order should still be visible after rebuild');
-      print('✅ Journey 5: OrderListScreen rebuilt without data loss');
+      debugPrint('✅ Journey 5: OrderListScreen rebuilt without data loss');
     },
   );
 }

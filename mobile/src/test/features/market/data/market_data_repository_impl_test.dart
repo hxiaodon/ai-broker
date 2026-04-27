@@ -6,7 +6,6 @@ import 'package:trading_app/features/market/data/market_data_repository_impl.dar
 import 'package:trading_app/features/market/data/remote/market_remote_data_source.dart';
 import 'package:trading_app/features/market/data/remote/market_response_models.dart';
 import 'package:trading_app/features/market/domain/entities/quote.dart';
-import 'package:trading_app/features/market/domain/entities/search_result.dart';
 
 // Mocks
 class MockMarketRemoteDataSource extends Mock implements MarketRemoteDataSource {}

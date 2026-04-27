@@ -120,6 +120,18 @@ class EnvironmentConfig {
         Environment.production => 'https://trading.trading.example.com',
       };
 
+  /// Base URL for Fund Transfer API (deposit, withdrawal, bank accounts)
+  late final String fundingBaseUrl = String.fromEnvironment(
+    'FUNDING_BASE_URL',
+    defaultValue: _fundingBaseUrlDefault,
+  );
+
+  String get _fundingBaseUrlDefault => switch (environment) {
+        Environment.development => _localhostUrl(),
+        Environment.staging => 'https://fund-staging.trading.example.com',
+        Environment.production => 'https://fund.trading.example.com',
+      };
+
   /// WebSocket base URL for real-time market data
   late final String wsBaseUrl = String.fromEnvironment(
     'WS_BASE_URL',

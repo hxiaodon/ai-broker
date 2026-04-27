@@ -1,7 +1,7 @@
-/// Widget Test Integration Helpers
-///
-/// Provides simplified test app builders that handle all Riverpod setup
-/// and allow focusing on the widget behavior being tested.
+// Widget Test Integration Helpers
+//
+// Provides simplified test app builders that handle all Riverpod setup
+// and allow focusing on the widget behavior being tested.
 
 import 'dart:async';
 
@@ -22,7 +22,7 @@ class _MockTokenService extends Mock implements TokenService {}
 
 class _MockQuoteWebSocketClient extends Mock implements QuoteWebSocketClient {}
 
-/// Simplified test app builder with sensible defaults
+// Simplified test app builder with sensible defaults
 class WidgetTestIntegrationHelper {
   /// Build authenticated test app with minimal boilerplate
   static Widget buildAuthenticatedApp({

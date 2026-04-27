@@ -9,7 +9,7 @@ void main() {
   const signer = HmacSigner();
 
   // Helper: manually compute expected HMAC for 6-segment payload
-  String _expected({
+  String expected({
     required String method,
     required String path,
     required String timestamp,
@@ -66,7 +66,7 @@ void main() {
 
       expect(
         sig,
-        _expected(
+        expected(
           method: 'POST',
           path: '/api/v1/orders',
           timestamp: ts,
@@ -119,7 +119,7 @@ void main() {
 
       expect(
         sig,
-        _expected(
+        expected(
           method: 'DELETE',
           path: '/api/v1/orders/ord-001',
           timestamp: ts,

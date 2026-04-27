@@ -1,7 +1,7 @@
-/// Widget Test Helpers
-///
-/// Utilities for testing Riverpod-based Flutter widgets with proper
-/// provider overrides and mock setup.
+// Widget Test Helpers
+//
+// Utilities for testing Riverpod-based Flutter widgets with proper
+// provider overrides and mock setup.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,12 +10,11 @@ import 'package:mocktail/mocktail.dart';
 import 'package:trading_app/core/auth/token_service.dart';
 import 'package:trading_app/features/auth/application/auth_notifier.dart';
 import 'package:trading_app/features/market/application/quote_websocket_notifier.dart';
-import 'package:trading_app/features/market/application/watchlist_notifier.dart';
 import 'package:trading_app/features/market/data/watchlist_repository_impl.dart';
 import 'package:trading_app/features/market/data/websocket/quote_websocket_client.dart';
 import 'package:trading_app/features/market/domain/repositories/watchlist_repository.dart';
 
-/// Test app builder for widget tests with Riverpod provider overrides
+// Test app builder for widget tests with Riverpod provider overrides
 class TestWidgetBuilder {
   /// Build a test app with authenticated user and mocked services
   static Widget buildAuthenticatedApp({
@@ -90,7 +89,7 @@ class TestWidgetBuilder {
   }
 }
 
-/// Common mock implementations for widget tests
+// Common mock implementations for widget tests
 class MockTokenServiceForWidget extends Mock implements TokenService {
   late String? _accessToken;
 

@@ -64,7 +64,7 @@ Map<String, dynamic> _positionResponseJson() => {
       'unrealized_pnl_pct': '3.16',
       'today_pnl': '200.0000',
       'today_pnl_pct': '1.31',
-      'pending_settlements': [],
+      'pending_settlements': <Map<String, dynamic>>[],
     };
 
 Map<String, dynamic> _portfolioSummaryResponseJson() => {

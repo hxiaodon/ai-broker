@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/foundation.dart';
 import 'package:integration_test/integration_test.dart';
 
 /// Trading Module — API Integration Tests
@@ -41,7 +42,7 @@ void main() {
       expect(resp.data!['key_id'], isNotEmpty);
       expect(resp.data!['hmac_secret'], isNotEmpty);
       expect(resp.data!['expires_at'], isNotEmpty);
-      print('✅ TA1: session-key issued: ${resp.data!['key_id']}');
+      debugPrint('✅ TA1: session-key issued: ${resp.data!['key_id']}');
     });
 
     testWidgets('TA2: GET /api/v1/trading/nonce returns one-time nonce',
@@ -53,7 +54,7 @@ void main() {
       expect(resp.statusCode, 200);
       expect(resp.data!['nonce'], isNotEmpty);
       expect(resp.data!['expires_at'], isNotEmpty);
-      print('✅ TA2: nonce issued: ${resp.data!['nonce']}');
+      debugPrint('✅ TA2: nonce issued: ${resp.data!['nonce']}');
     });
 
     testWidgets('TA3: GET /api/v1/trading/bio-challenge returns challenge',
@@ -65,7 +66,7 @@ void main() {
       expect(resp.statusCode, 200);
       expect(resp.data!['challenge'], isNotEmpty);
       expect(resp.data!['expires_at'], isNotEmpty);
-      print('✅ TA3: bio-challenge issued');
+      debugPrint('✅ TA3: bio-challenge issued');
     });
 
     testWidgets('TA4: Same nonce rejected on second use', (tester) async {
@@ -137,7 +138,7 @@ void main() {
       } on DioException catch (e) {
         expect(e.response?.statusCode, 400);
         expect(e.response?.data['error_code'], 'NONCE_ALREADY_USED');
-        print('✅ TA4: reused nonce correctly rejected with 400');
+        debugPrint('✅ TA4: reused nonce correctly rejected with 400');
       }
     });
   });
@@ -145,7 +146,7 @@ void main() {
   // ── Order Submission ───────────────────────────────────────────────────────
 
   group('Order Submission', () {
-    Future<Map<String, String>> _getSecurityHeaders() async {
+    Future<Map<String, String>> getSecurityHeaders() async {
       final skResp = await dio.post<Map<String, dynamic>>(
         '/api/v1/auth/session-key',
       );
@@ -171,7 +172,7 @@ void main() {
 
     testWidgets('TA5: Complete order submission with all security headers returns 201',
         (tester) async {
-      final headers = await _getSecurityHeaders();
+      final headers = await getSecurityHeaders();
 
       final resp = await dio.post<Map<String, dynamic>>(
         '/api/v1/orders',
@@ -192,11 +193,11 @@ void main() {
       expect(resp.data!['order_id'], isNotEmpty);
       expect(resp.data!['symbol'], 'AAPL');
       expect(resp.data!['status'], 'PENDING');
-      print('✅ TA5: Order submitted: ${resp.data!['order_id']}');
+      debugPrint('✅ TA5: Order submitted: ${resp.data!['order_id']}');
     });
 
     testWidgets('TA6: Missing X-Nonce header returns 400', (tester) async {
-      final headers = await _getSecurityHeaders();
+      final headers = await getSecurityHeaders();
       headers.remove('X-Nonce');
 
       try {
@@ -217,12 +218,12 @@ void main() {
       } on DioException catch (e) {
         expect(e.response?.statusCode, 400);
         expect(e.response?.data['error_code'], 'MISSING_HEADER');
-        print('✅ TA6: Missing X-Nonce → 400 MISSING_HEADER');
+        debugPrint('✅ TA6: Missing X-Nonce → 400 MISSING_HEADER');
       }
     });
 
     testWidgets('TA7: Order without biometric headers succeeds (biometric optional)', (tester) async {
-      final headers = await _getSecurityHeaders();
+      final headers = await getSecurityHeaders();
       // Remove all biometric headers - should still succeed
       headers.remove('X-Biometric-Token');
       headers.remove('X-Bio-Challenge');
@@ -243,11 +244,11 @@ void main() {
       );
       expect(resp.statusCode, 201);
       expect(resp.data?['order_id'], isNotNull);
-      print('✅ TA7: Order without biometric headers → 201 (biometric optional)');
+      debugPrint('✅ TA7: Order without biometric headers → 201 (biometric optional)');
     });
 
     testWidgets('TA8: Market order (no limit_price) returns 201', (tester) async {
-      final headers = await _getSecurityHeaders();
+      final headers = await getSecurityHeaders();
 
       final resp = await dio.post<Map<String, dynamic>>(
         '/api/v1/orders',
@@ -266,12 +267,12 @@ void main() {
       expect(resp.statusCode, 201);
       expect(resp.data!['order_type'], 'market');
       expect(resp.data!['limit_price'], isNull);
-      print('✅ TA8: Market order submitted: ${resp.data!['order_id']}');
+      debugPrint('✅ TA8: Market order submitted: ${resp.data!['order_id']}');
     });
 
     testWidgets('TA8b: Market order auto-transitions PENDING → FILLED', (tester) async {
       // Submit a market order and verify Mock Server auto-fills it after ~2s.
-      final headers = await _getSecurityHeaders();
+      final headers = await getSecurityHeaders();
 
       final submit = await dio.post<Map<String, dynamic>>(
         '/api/v1/orders',
@@ -306,12 +307,12 @@ void main() {
           reason: 'Market order should auto-transition to FILLED within 5s');
       expect(order['filled_qty'], 7);
       expect(order['avg_fill_price'], isNotNull);
-      print('✅ TA8b: Market order $orderId auto-filled @ ${order['avg_fill_price']}');
+      debugPrint('✅ TA8b: Market order $orderId auto-filled @ ${order['avg_fill_price']}');
     });
 
     testWidgets('TA8c: Limit order does NOT auto-fill', (tester) async {
       // Limit orders must stay PENDING; only market orders auto-fill.
-      final headers = await _getSecurityHeaders();
+      final headers = await getSecurityHeaders();
 
       final submit = await dio.post<Map<String, dynamic>>(
         '/api/v1/orders',
@@ -338,7 +339,7 @@ void main() {
       final order = resp.data!['order'] as Map<String, dynamic>;
       expect(order['status'], 'PENDING',
           reason: 'Limit order should remain PENDING after 2.1s');
-      print('✅ TA8c: Limit order $orderId stayed PENDING');
+      debugPrint('✅ TA8c: Limit order $orderId stayed PENDING');
     });
   });
 
@@ -393,7 +394,7 @@ void main() {
       );
 
       expect(cancelResp.statusCode, 202);
-      print('✅ TA9: Order $orderId cancelled → 202');
+      debugPrint('✅ TA9: Order $orderId cancelled → 202');
     });
 
     testWidgets('TA10: Cancel requires X-Nonce — missing returns 400', (tester) async {
@@ -412,7 +413,7 @@ void main() {
         fail('Expected 400');
       } on DioException catch (e) {
         expect(e.response?.statusCode, 400);
-        print('✅ TA10: Cancel without nonce → 400');
+        debugPrint('✅ TA10: Cancel without nonce → 400');
       }
     });
 
@@ -491,7 +492,7 @@ void main() {
       if (finalStatus == 'CANCELLED') expect(filledQty, 0);
       if (finalStatus == 'FILLED') expect(filledQty, 5);
 
-      print('✅ TA10b: cancel-while-fill race → $finalStatus (filled_qty=$filledQty)');
+      debugPrint('✅ TA10b: cancel-while-fill race → $finalStatus (filled_qty=$filledQty)');
     });
   });
 
@@ -504,10 +505,10 @@ void main() {
         options: Options(headers: {'Authorization': 'Bearer test-token'}),
       );
       expect(resp.statusCode, 200);
-      expect(resp.data!['orders'], isA<List>());
+      expect(resp.data!['orders'], isA<List<dynamic>>());
       final orders = resp.data!['orders'] as List;
       expect(orders, isNotEmpty);
-      print('✅ TA11: GET /orders returned ${orders.length} orders');
+      debugPrint('✅ TA11: GET /orders returned ${orders.length} orders');
     });
 
     testWidgets('TA12: GET /api/v1/orders/:id returns order + fills', (tester) async {
@@ -516,11 +517,11 @@ void main() {
         options: Options(headers: {'Authorization': 'Bearer test-token'}),
       );
       expect(resp.statusCode, 200);
-      expect(resp.data!['order'], isA<Map>());
-      expect(resp.data!['fills'], isA<List>());
+      expect(resp.data!['order'], isA<Map<String, dynamic>>());
+      expect(resp.data!['fills'], isA<List<dynamic>>());
       final order = resp.data!['order'] as Map;
       expect(order['order_id'], 'ord-001');
-      print('✅ TA12: GET /orders/ord-001 returned order + ${(resp.data!['fills'] as List).length} fills');
+      debugPrint('✅ TA12: GET /orders/ord-001 returned order + ${(resp.data!['fills'] as List).length} fills');
     });
 
     testWidgets('TA13: GET /api/v1/positions returns positions list', (tester) async {
@@ -532,7 +533,7 @@ void main() {
       final positions = resp.data!['positions'] as List;
       expect(positions, hasLength(2));
       expect((positions.first as Map)['symbol'], 'AAPL');
-      print('✅ TA13: GET /positions returned ${positions.length} positions');
+      debugPrint('✅ TA13: GET /positions returned ${positions.length} positions');
     });
 
     testWidgets('TA14: GET /api/v1/portfolio/summary returns portfolio data',
@@ -546,7 +547,7 @@ void main() {
       expect(resp.data!['cash_balance'], isNotEmpty);
       expect(resp.data!['buying_power'], isNotEmpty);
       expect(resp.data!['cumulative_pnl'], isNotEmpty);
-      print('✅ TA14: GET /portfolio/summary returned equity: ${resp.data!['total_equity']}');
+      debugPrint('✅ TA14: GET /portfolio/summary returned equity: ${resp.data!['total_equity']}');
     });
 
     testWidgets('TA15: GET /api/v1/orders with status filter', (tester) async {
@@ -560,7 +561,7 @@ void main() {
       for (final o in orders) {
         expect((o as Map)['status'], 'PENDING');
       }
-      print('✅ TA15: Status filter PENDING returned ${orders.length} orders');
+      debugPrint('✅ TA15: Status filter PENDING returned ${orders.length} orders');
     });
 
     testWidgets('TA16: GET /api/v1/positions/:symbol returns single position',
@@ -572,7 +573,7 @@ void main() {
       expect(resp.statusCode, 200);
       expect(resp.data!['symbol'], 'AAPL');
       expect(resp.data!['market'], 'US');
-      print('✅ TA16: GET /positions/AAPL returned qty: ${resp.data!['quantity']}');
+      debugPrint('✅ TA16: GET /positions/AAPL returned qty: ${resp.data!['quantity']}');
     });
   });
 }

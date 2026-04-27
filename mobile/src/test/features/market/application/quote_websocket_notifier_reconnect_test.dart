@@ -1,15 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
-import 'package:trading_app/core/auth/token_service.dart';
-import 'package:trading_app/core/errors/app_exception.dart';
 import 'package:trading_app/core/logging/app_logger.dart';
 import 'package:trading_app/features/market/application/quote_websocket_notifier.dart';
-import 'package:trading_app/features/market/data/websocket/quote_websocket_client.dart';
 import 'dart:math' show pow, Random;
-
-class _MockTokenService extends Mock implements TokenService {}
-
-class _MockQuoteWebSocketClient extends Mock implements QuoteWebSocketClient {}
 
 void main() {
   setUpAll(() {

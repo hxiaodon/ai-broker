@@ -1,9 +1,7 @@
-import 'dart:async';
 
 import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
 
 import 'package:trading_app/core/config/environment_config.dart';
 import 'package:trading_app/core/logging/app_logger.dart';
@@ -49,7 +47,7 @@ void main() {
       final app = WidgetTestIntegrationHelper.buildAuthenticatedApp(
         child: WatchlistTab(onStockTap: (_) {}),
         watchlistItems: () async {
-          await Future.delayed(const Duration(milliseconds: 100));
+          await Future<void>.delayed(const Duration(milliseconds: 100));
           return [];
         },
       );

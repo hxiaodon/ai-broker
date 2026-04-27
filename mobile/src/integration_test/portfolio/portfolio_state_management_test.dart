@@ -59,7 +59,7 @@ void main() {
         );
         await tester.pump(const Duration(seconds: 2));
         expect(find.byType(Scaffold), findsWidgets);
-        print('✅ TP1: Authenticated state renders portfolio-capable app');
+        debugPrint('✅ TP1: Authenticated state renders portfolio-capable app');
       },
     );
   });
@@ -93,7 +93,7 @@ void main() {
       expect(positions.first.qty, 100);
       expect(positions.last.symbol, '0700');
       expect(positions.last.qty, 200);
-      print('✅ TP2: positionsProvider loaded ${positions.length} positions');
+      debugPrint('✅ TP2: positionsProvider loaded ${positions.length} positions');
     });
 
     test(
@@ -103,7 +103,7 @@ void main() {
         expect(summary, isA<PortfolioSummary>());
         expect(summary.totalEquity, Decimal.parse('96282.20'));
         expect(summary.cashBalance, greaterThan(Decimal.zero));
-        print(
+        debugPrint(
           '✅ TP3: portfolioSummaryProvider totalEquity = ${summary.totalEquity}',
         );
       },
@@ -122,7 +122,7 @@ void main() {
         expect(detail.recentTrades, hasLength(1));
         expect(detail.recentTrades.first.side, TradeSide.buy);
         expect(detail.unrealizedPnl, greaterThan(Decimal.zero));
-        print(
+        debugPrint(
           '✅ TP4: positionDetailProvider(AAPL) returned PositionDetail '
           'companyName="${detail.companyName}" sector="${detail.sector}"',
         );
@@ -152,7 +152,7 @@ void main() {
         expect(detail.currentPrice, newPrice,
             reason:
                 'positionDetailProvider must overlay WS currentPrice on top of REST data');
-        print(
+        debugPrint(
           '✅ TP5: positionDetailProvider overlaid WS currentPrice = $newPrice',
         );
       },
@@ -190,7 +190,7 @@ void main() {
         expect(ranked.first.unrealizedPnl,
             greaterThanOrEqualTo(ranked.last.unrealizedPnl),
             reason: 'Positions must be sorted by unrealizedPnl descending');
-        print(
+        debugPrint(
           '✅ TP6: pnlRanking[0]=${ranked.first.symbol} '
           'pnl=${ranked.first.unrealizedPnl}',
         );
@@ -219,7 +219,7 @@ void main() {
         expect(tech, isNotNull, reason: 'Technology sector must be present');
         // AAPL marketValue=17550 / total(17550+73700) = 0.192
         expect(tech!.weight.toDouble(), closeTo(0.192, 0.01));
-        print(
+        debugPrint(
           '✅ TP7: sectorAllocation weights sum = $totalWeight '
           '(Technology = ${tech.weight})',
         );
@@ -251,7 +251,7 @@ void main() {
         expect(allocations, hasLength(1));
         expect(allocations.first.weight.toDouble(), closeTo(1.0, 0.001),
             reason: 'Single sector must have weight = 1.0');
-        print(
+        debugPrint(
           '✅ TP8: Single-sector weight = ${allocations.first.weight}',
         );
       },
@@ -304,7 +304,7 @@ void main() {
         expect(patchedAapl, isNotNull);
         expect(patchedAapl!.currentPrice, updatedPrice,
             reason: 'WS update must patch AAPL currentPrice in-place');
-        print(
+        debugPrint(
           '✅ TP9: WS patch AAPL currentPrice ${initialAapl.currentPrice} → $updatedPrice',
         );
       },
@@ -331,7 +331,7 @@ void main() {
             reason:
                 'Unknown symbol WS update must append a new position entry');
         expect(updated.any((p) => p.symbol == 'NVDA'), isTrue);
-        print(
+        debugPrint(
           '✅ TP10: NVDA appended, positions count $initialCount → ${updated.length}',
         );
       },
@@ -367,7 +367,7 @@ void main() {
             reason: 'No positions state must yield empty list');
         expect(summary.cashBalance, Decimal.zero,
             reason: 'No-cash state must yield zero cashBalance');
-        print('✅ TP11: Empty portfolio state verified');
+        debugPrint('✅ TP11: Empty portfolio state verified');
       },
     );
 
@@ -397,7 +397,7 @@ void main() {
         expect(summary.cashBalance, greaterThan(Decimal.zero),
             reason:
                 'Cash-only state must have non-zero cashBalance for UI branch');
-        print(
+        debugPrint(
           '✅ TP12: Cash-only state: positions empty, cash = ${summary.cashBalance}',
         );
       },
@@ -431,7 +431,7 @@ void main() {
             reason: 'Partial failure must not empty the analysis tab');
         expect(allocations.any((a) => a.sector == 'Technology'), isTrue,
             reason: 'AAPL Technology sector must survive 0700 failure');
-        print(
+        debugPrint(
             '✅ TP13: Partial failure — ${allocations.length} sector(s) returned');
       },
     );
@@ -461,7 +461,7 @@ void main() {
             reason:
                 'Provider must pass through server data unchanged; '
                 'UI layer (position_detail_screen) clamps availableQty.clamp(0, qty)');
-        print(
+        debugPrint(
             '✅ TP14: availableQty=${detail.availableQty} > qty=${detail.qty} — '
             'UI clamp is the safety net');
       },
@@ -491,7 +491,7 @@ void main() {
         final symbols = ranked.map((p) => p.symbol).toList();
         expect(symbols, equals(['AAPL', 'GOOG', 'TSLA']),
             reason: 'Equal P&L → stable sort by symbol alphabetically');
-        print('✅ TP15: Equal P&L stable sort: $symbols');
+        debugPrint('✅ TP15: Equal P&L stable sort: $symbols');
       },
     );
 
@@ -519,7 +519,7 @@ void main() {
             reason:
                 'Non-positive total market value must return empty to avoid '
                 'invalid weight calculations');
-        print('✅ TP16: All-negative market values → empty allocation list');
+        debugPrint('✅ TP16: All-negative market values → empty allocation list');
       },
     );
 
@@ -553,7 +553,7 @@ void main() {
             reason:
                 'invalidate() on a factory override must create a new instance; '
                 'stale repo with old tokens must not be reused after logout');
-        print('✅ TP17: portfolioRepositoryProvider rebuilt after invalidation');
+        debugPrint('✅ TP17: portfolioRepositoryProvider rebuilt after invalidation');
       },
     );
   });

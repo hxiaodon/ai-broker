@@ -31,20 +31,20 @@ void main() {
     testWidgets(
       'M1: Guest user sees market home (no auth required)',
       (tester) async {
-        print('\n📱 M1: Guest market home');
+        debugPrint('\n📱 M1: Guest market home');
         await tester.pumpWidget(TestAppConfig.createAppAsGuest());
         await tester.pump(const Duration(seconds: 2));
 
         // Guest should see market content
         expect(find.byType(Scaffold), findsWidgets);
-        print('    ✅ Guest sees market home');
+        debugPrint('    ✅ Guest sees market home');
       },
     );
 
     testWidgets(
       'M2: Authenticated user sees full market features',
       (tester) async {
-        print('\n📱 M2: Authenticated market home');
+        debugPrint('\n📱 M2: Authenticated market home');
         await tester.pumpWidget(
           TestAppConfig.createAppWithAuth(
             accessToken: 'token-market-123',
@@ -55,7 +55,7 @@ void main() {
 
         // Authenticated user should see full market UI
         expect(find.byType(Scaffold), findsWidgets);
-        print('    ✅ Authenticated user sees market features');
+        debugPrint('    ✅ Authenticated user sees market features');
       },
     );
   });
@@ -64,7 +64,7 @@ void main() {
     testWidgets(
       'M3: Watchlist screen loads for authenticated user',
       (tester) async {
-        print('\n📱 M3: Watchlist screen loads');
+        debugPrint('\n📱 M3: Watchlist screen loads');
         await tester.pumpWidget(
           TestAppConfig.createAppWithAuth(
             accessToken: 'token-123',
@@ -75,46 +75,46 @@ void main() {
 
         // Look for watchlist indicators
         expect(find.byType(Scaffold), findsWidgets);
-        print('    ✅ Watchlist screen rendered');
+        debugPrint('    ✅ Watchlist screen rendered');
       },
     );
 
     testWidgets(
       'M4: Search results screen loads',
       (tester) async {
-        print('\n📱 M4: Search screen');
+        debugPrint('\n📱 M4: Search screen');
         await tester.pumpWidget(TestAppConfig.createAppAsGuest());
         await tester.pump(const Duration(seconds: 2));
 
         // Search functionality available
         expect(find.byType(Scaffold), findsWidgets);
-        print('    ✅ Search screen available');
+        debugPrint('    ✅ Search screen available');
       },
     );
 
     testWidgets(
       'M5: Stock detail screen renders',
       (tester) async {
-        print('\n📱 M5: Stock detail screen');
+        debugPrint('\n📱 M5: Stock detail screen');
         await tester.pumpWidget(TestAppConfig.createAppAsGuest());
         await tester.pump(const Duration(seconds: 2));
 
         // Stock detail should render
         expect(find.byType(Scaffold), findsWidgets);
-        print('    ✅ Stock detail screen renders');
+        debugPrint('    ✅ Stock detail screen renders');
       },
     );
 
     testWidgets(
       'M6: Guest sees delayed data indicator',
       (tester) async {
-        print('\n📱 M6: Guest delayed data indicator');
+        debugPrint('\n📱 M6: Guest delayed data indicator');
         await tester.pumpWidget(TestAppConfig.createAppAsGuest());
         await tester.pump(const Duration(seconds: 2));
 
         // Guest mode should show some indication of delay
         expect(find.byType(Scaffold), findsWidgets);
-        print('    ✅ Guest mode indicators displayed');
+        debugPrint('    ✅ Guest mode indicators displayed');
       },
     );
   });
@@ -123,7 +123,7 @@ void main() {
     testWidgets(
       'M7: Market home loads in < 3 seconds',
       (tester) async {
-        print('\n📱 M7: Market load performance');
+        debugPrint('\n📱 M7: Market load performance');
         final sw = Stopwatch()..start();
 
         await tester.pumpWidget(TestAppConfig.createAppAsGuest());
@@ -131,14 +131,14 @@ void main() {
 
         sw.stop();
         expect(sw.elapsedMilliseconds, lessThan(3000));
-        print('    ✅ Market loaded in ${sw.elapsedMilliseconds}ms');
+        debugPrint('    ✅ Market loaded in ${sw.elapsedMilliseconds}ms');
       },
     );
 
     testWidgets(
       'M8: Search screen loads quickly',
       (tester) async {
-        print('\n📱 M8: Search load performance');
+        debugPrint('\n📱 M8: Search load performance');
         final sw = Stopwatch()..start();
 
         await tester.pumpWidget(TestAppConfig.createAppAsGuest());
@@ -146,14 +146,14 @@ void main() {
 
         sw.stop();
         expect(sw.elapsedMilliseconds, lessThan(2500));
-        print('    ✅ Search loaded in ${sw.elapsedMilliseconds}ms');
+        debugPrint('    ✅ Search loaded in ${sw.elapsedMilliseconds}ms');
       },
     );
 
     testWidgets(
       'M9: Stock detail loads without lag',
       (tester) async {
-        print('\n📱 M9: Stock detail performance');
+        debugPrint('\n📱 M9: Stock detail performance');
         final sw = Stopwatch()..start();
 
         await tester.pumpWidget(TestAppConfig.createAppAsGuest());
@@ -161,7 +161,7 @@ void main() {
 
         sw.stop();
         expect(sw.elapsedMilliseconds, lessThan(2500));
-        print('    ✅ Stock detail loaded in ${sw.elapsedMilliseconds}ms');
+        debugPrint('    ✅ Stock detail loaded in ${sw.elapsedMilliseconds}ms');
       },
     );
   });
@@ -170,7 +170,7 @@ void main() {
     testWidgets(
       'M10: Market UI stable during scrolling',
       (tester) async {
-        print('\n📱 M10: UI stability during scroll');
+        debugPrint('\n📱 M10: UI stability during scroll');
         await tester.pumpWidget(TestAppConfig.createAppAsGuest());
         await tester.pump(const Duration(seconds: 2));
 
@@ -179,18 +179,18 @@ void main() {
         if (scaffolds.evaluate().isNotEmpty) {
           await tester.drag(scaffolds.first, const Offset(0, -300));
           await tester.pump();
-          print('    ✅ Scroll handled smoothly');
+          debugPrint('    ✅ Scroll handled smoothly');
         }
 
         expect(find.byType(Scaffold), findsWidgets);
-        print('    ✅ UI remains stable');
+        debugPrint('    ✅ UI remains stable');
       },
     );
 
     testWidgets(
       'M11: App state consistent across navigation',
       (tester) async {
-        print('\n📱 M11: Navigation state consistency');
+        debugPrint('\n📱 M11: Navigation state consistency');
         await tester.pumpWidget(
           TestAppConfig.createAppWithAuth(
             accessToken: 'token',
@@ -207,14 +207,14 @@ void main() {
 
         // App state should remain consistent
         expect(find.byType(Scaffold), findsWidgets);
-        print('    ✅ State consistent across navigation');
+        debugPrint('    ✅ State consistent across navigation');
       },
     );
 
     testWidgets(
       'M12: No memory leaks during repeated render cycles',
       (tester) async {
-        print('\n📱 M12: Memory stability');
+        debugPrint('\n📱 M12: Memory stability');
         await tester.pumpWidget(TestAppConfig.createAppAsGuest());
 
         for (int i = 0; i < 10; i++) {
@@ -222,7 +222,7 @@ void main() {
         }
 
         expect(find.byType(Scaffold), findsWidgets);
-        print('    ✅ No stability issues during repeated cycles');
+        debugPrint('    ✅ No stability issues during repeated cycles');
       },
     );
   });

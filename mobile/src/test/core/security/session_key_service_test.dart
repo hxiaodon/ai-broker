@@ -28,7 +28,7 @@ void main() {
     service = SessionKeyService(dio: mockDio, storage: mockStorage);
   });
 
-  Map<String, dynamic> _serverResponse({
+  Map<String, dynamic> serverResponse({
     String keyId = 'sk-001',
     String secret = 'dynamic-secret',
     String? expiresAt,
@@ -48,7 +48,7 @@ void main() {
       when(() => mockStorage.read(any())).thenAnswer((_) async => null);
       when(() => mockDio.post<Map<String, dynamic>>(any()))
           .thenAnswer((_) async => Response(
-                data: _serverResponse(keyId: 'sk-001', secret: 'sec-abc'),
+                data: serverResponse(keyId: 'sk-001', secret: 'sec-abc'),
                 statusCode: 200,
                 requestOptions: RequestOptions(path: '/api/v1/auth/session-key'),
               ));
@@ -66,7 +66,7 @@ void main() {
       when(() => mockStorage.read(any())).thenAnswer((_) async => null);
       when(() => mockDio.post<Map<String, dynamic>>(any()))
           .thenAnswer((_) async => Response(
-                data: _serverResponse(),
+                data: serverResponse(),
                 statusCode: 200,
                 requestOptions: RequestOptions(path: '/api/v1/auth/session-key'),
               ));
@@ -105,7 +105,7 @@ void main() {
       when(() => mockStorage.read(any())).thenAnswer((_) async => null);
       when(() => mockDio.post<Map<String, dynamic>>(any()))
           .thenAnswer((_) async => Response(
-                data: _serverResponse(keyId: 'sk-cached', secret: 'sec-cached'),
+                data: serverResponse(keyId: 'sk-cached', secret: 'sec-cached'),
                 statusCode: 200,
                 requestOptions: RequestOptions(path: '/api/v1/auth/session-key'),
               ));
@@ -158,7 +158,7 @@ void main() {
           .thenAnswer((_) async => nearExpiry);
       when(() => mockDio.post<Map<String, dynamic>>(any()))
           .thenAnswer((_) async => Response(
-                data: _serverResponse(keyId: 'sk-new', secret: 'sec-new'),
+                data: serverResponse(keyId: 'sk-new', secret: 'sec-new'),
                 statusCode: 200,
                 requestOptions: RequestOptions(path: '/api/v1/auth/session-key'),
               ));
@@ -196,7 +196,7 @@ void main() {
       when(() => mockStorage.read(any())).thenAnswer((_) async => null);
       when(() => mockDio.post<Map<String, dynamic>>(any()))
           .thenAnswer((_) async => Response(
-                data: _serverResponse(keyId: 'sk-v1'),
+                data: serverResponse(keyId: 'sk-v1'),
                 statusCode: 200,
                 requestOptions: RequestOptions(path: '/api/v1/auth/session-key'),
               ));
@@ -206,7 +206,7 @@ void main() {
       // Now rotate — should call server again
       when(() => mockDio.post<Map<String, dynamic>>(any()))
           .thenAnswer((_) async => Response(
-                data: _serverResponse(keyId: 'sk-v2', secret: 'sec-v2'),
+                data: serverResponse(keyId: 'sk-v2', secret: 'sec-v2'),
                 statusCode: 200,
                 requestOptions: RequestOptions(path: '/api/v1/auth/session-key'),
               ));
@@ -234,7 +234,7 @@ void main() {
       when(() => mockStorage.read(any())).thenAnswer((_) async => null);
       when(() => mockDio.post<Map<String, dynamic>>(any()))
           .thenAnswer((_) async => Response(
-                data: _serverResponse(keyId: 'sk-before'),
+                data: serverResponse(keyId: 'sk-before'),
                 statusCode: 200,
                 requestOptions: RequestOptions(path: '/api/v1/auth/session-key'),
               ));
@@ -248,7 +248,7 @@ void main() {
       when(() => mockStorage.read(any())).thenAnswer((_) async => null);
       when(() => mockDio.post<Map<String, dynamic>>(any()))
           .thenAnswer((_) async => Response(
-                data: _serverResponse(keyId: 'sk-after'),
+                data: serverResponse(keyId: 'sk-after'),
                 statusCode: 200,
                 requestOptions: RequestOptions(path: '/api/v1/auth/session-key'),
               ));

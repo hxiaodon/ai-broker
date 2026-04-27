@@ -11,6 +11,11 @@ import '../../features/auth/presentation/screens/device_management_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/otp_input_screen.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
+import '../../features/funding/presentation/screens/bank_account_bind_screen.dart';
+import '../../features/funding/presentation/screens/deposit_screen.dart';
+import '../../features/funding/presentation/screens/funding_screen.dart';
+import '../../features/funding/presentation/screens/micro_deposit_verify_screen.dart';
+import '../../features/funding/presentation/screens/withdraw_screen.dart';
 import '../../features/market/presentation/screens/market_home_screen.dart';
 import '../../features/market/presentation/screens/search_screen.dart';
 import '../../features/market/presentation/screens/stock_detail_screen.dart';
@@ -84,6 +89,32 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: RouteNames.kycRoot,
         builder: (_, _) => const _Placeholder('KYC — Personal Info'),
+      ),
+
+      // ── Funding flow ──────────────────────────────────────────────────────
+      GoRoute(
+        path: RouteNames.funding,
+        builder: (_, _) => const FundingScreen(),
+        routes: [
+          GoRoute(
+            path: 'deposit',
+            builder: (_, _) => const DepositScreen(),
+          ),
+          GoRoute(
+            path: 'withdraw',
+            builder: (_, _) => const WithdrawScreen(),
+          ),
+          GoRoute(
+            path: 'bank/bind',
+            builder: (_, _) => const BankAccountBindScreen(),
+          ),
+          GoRoute(
+            path: 'bank/:bankId/micro-deposit',
+            builder: (_, state) => MicroDepositVerifyScreen(
+              bankAccountId: state.pathParameters['bankId']!,
+            ),
+          ),
+        ],
       ),
 
       // ── Main tab shell ────────────────────────────────────────────────────

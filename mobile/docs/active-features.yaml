@@ -12,8 +12,8 @@
 #   shipped     — 审核通过，合并至 main
 
 domain: mobile
-last_updated: 2026-04-24
-current_focus: portfolio
+last_updated: 2026-04-27
+current_focus: funding
 
 development_order:
   - auth
@@ -83,10 +83,10 @@ modules:
 
   - id: funding
     name: 资金模块
-    status: pending
-    phase1_tasks: "0/?"
+    status: review
+    phase1_tasks: "30/30"
     prd: mobile/docs/prd/05-funding.md
-    tracker: mobile/docs/specs/funding.tracker.md  # JIT
+    tracker: mobile/docs/specs/funding.tracker.md
     hifi: mobile/prototypes/05-funding/
     contracts:
       - docs/contracts/fund-to-mobile.md

@@ -6,6 +6,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/foundation.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:trading_app/core/auth/device_info_service.dart';
@@ -56,7 +57,7 @@ void main() {
         final positions = resp.data!['positions'] as List;
         expect(positions.length, greaterThanOrEqualTo(2));
         expect((positions.first as Map).containsKey('symbol'), isTrue);
-        print(
+        debugPrint(
           '✅ TPA1: GET /positions returned ${positions.length} positions',
         );
       },
@@ -82,7 +83,7 @@ void main() {
             reason: 'avg_cost must be a valid decimal string');
         expect(Decimal.tryParse(data['cost_basis'] as String), isNotNull,
             reason: 'cost_basis must be a valid decimal string');
-        print(
+        debugPrint(
           '✅ TPA2: GET /positions/AAPL company_name="${data['company_name']}" '
           'sector="${data['sector']}"',
         );
@@ -111,7 +112,7 @@ void main() {
             reason: 'side must be BUY or SELL',
           );
         }
-        print(
+        debugPrint(
           '✅ TPA3: GET /positions/AAPL recent_trades has ${trades.length} records',
         );
       },
@@ -131,7 +132,7 @@ void main() {
           isTrue,
           reason: 'wash_sale_status must be "clean" or "flagged"',
         );
-        print('✅ TPA4: wash_sale_status = "$washSaleStatus"');
+        debugPrint('✅ TPA4: wash_sale_status = "$washSaleStatus"');
       },
     );
 
@@ -142,7 +143,7 @@ void main() {
             .get<Map<String, dynamic>>('/api/v1/positions/NONEXIST_SYMBOL');
         expect(resp.statusCode, 404);
         expect(resp.data!['error_code'], 'POSITION_NOT_FOUND');
-        print('✅ TPA5: NONEXIST → 404 POSITION_NOT_FOUND');
+        debugPrint('✅ TPA5: NONEXIST → 404 POSITION_NOT_FOUND');
       },
     );
 
@@ -168,7 +169,7 @@ void main() {
             reason: '$field must be a valid decimal string, got "$val"',
           );
         }
-        print(
+        debugPrint(
           '✅ TPA6: portfolio/summary total_equity=${data['total_equity']} '
           'cash_balance=${data['cash_balance']}',
         );
@@ -211,7 +212,7 @@ void main() {
         expect(detail.avgCost.scale, greaterThanOrEqualTo(2),
             reason:
                 'avgCost must retain at least 2 decimal places (financial precision)');
-        print(
+        debugPrint(
           '✅ TPA7: getPositionDetail(AAPL) returned domain object '
           'unrealizedPnl=${detail.unrealizedPnl} costBasis=${detail.costBasis}',
         );
@@ -227,7 +228,7 @@ void main() {
           fail('Expected ServerException to be thrown');
         } on ServerException catch (e) {
           expect(e.statusCode, 404);
-          print('✅ TPA8: ZZZZ throws ServerException(404): ${e.message}');
+          debugPrint('✅ TPA8: ZZZZ throws ServerException(404): ${e.message}');
         } on Exception catch (e) {
           fail('Expected ServerException but got: ${e.runtimeType}');
         }
@@ -274,7 +275,7 @@ void main() {
         expect(received, isTrue,
             reason:
                 'Mock Server must push portfolio.summary within 5s (check mock-server is running)');
-        print('✅ TPA9: Received WS portfolio update from trading channel');
+        debugPrint('✅ TPA9: Received WS portfolio update from trading channel');
       },
     );
   });
@@ -313,7 +314,7 @@ void main() {
             reason: '"$field" must be a valid decimal string, got "$val"',
           );
         }
-        print('✅ TPA10: All 9 required summary fields present and parseable');
+        debugPrint('✅ TPA10: All 9 required summary fields present and parseable');
       },
     );
   });
@@ -347,7 +348,7 @@ void main() {
               'unrealizedPnl=$unrealizedPnl should ≈ (currentPrice=$currentPrice '
               '− avgCost=$avgCost) × qty=$qty = $expected (diff=$diff)',
         );
-        print(
+        debugPrint(
             '✅ TPA11: unrealizedPnl formula verified (diff=$diff ≤ 0.01)');
       },
     );
@@ -383,7 +384,7 @@ void main() {
           fail('Expected ServerException to be thrown');
         } on ServerException catch (e) {
           expect(e.statusCode, greaterThanOrEqualTo(500));
-          print(
+          debugPrint(
               '✅ TPA12: 5xx → ServerException(${e.statusCode}) thrown correctly');
         } on Exception catch (e) {
           fail('Expected ServerException but got: ${e.runtimeType}');
@@ -414,10 +415,10 @@ void main() {
         try {
           final detail = await retryRepo.getPositionDetail('AAPL');
           expect(detail, isA<PositionDetail>());
-          print('✅ TPA13: Retry succeeded — detail.symbol=${detail.symbol}');
+          debugPrint('✅ TPA13: Retry succeeded — detail.symbol=${detail.symbol}');
         } on ServerException catch (e) {
           // Acceptable if retry interceptor is not yet configured (documents the gap)
-          print(
+          debugPrint(
               'ℹ️  TPA13: Retry not configured yet — ServerException(${e.statusCode}) '
               'thrown on first error. Add RetryInterceptor to productionDio to fix.');
         }
@@ -465,10 +466,6 @@ class _StubDeviceInfoService extends DeviceInfoService {
 
   @override
   Future<String> getDeviceId() async => 'test-device-id';
-}
-
-class _NoopSecureStorage extends SecureStorageService {
-  _NoopSecureStorage() : super(MockFlutterSecureStorage());
 }
 
 /// Interceptor that always responds with HTTP 500.

@@ -1,8 +1,7 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/foundation.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:dio/dio.dart';
-import '../helpers/test_app.dart';
 
 /// Market Module — API Integration Tests
 ///
@@ -47,7 +46,7 @@ void main() {
     testWidgets(
       'MA1: Fetch single stock quote',
       (tester) async {
-        print('📊 MA1: Fetch single quote for AAPL');
+        debugPrint('📊 MA1: Fetch single quote for AAPL');
 
         final response = await dio.get<Map<String, dynamic>>(
           '/v1/market/stocks/AAPL',
@@ -59,14 +58,14 @@ void main() {
         expect(response.data!['price'], isNotNull);
         expect(response.data!['timestamp'], isNotNull);
 
-        print('    ✅ Quote received: ${response.data!['price']}');
+        debugPrint('    ✅ Quote received: ${response.data!['price']}');
       },
     );
 
     testWidgets(
       'MA2: Fetch batch quotes',
       (tester) async {
-        print('📊 MA2: Fetch batch quotes for AAPL, TSLA, 0700');
+        debugPrint('📊 MA2: Fetch batch quotes for AAPL, TSLA, 0700');
 
         final response = await dio.get<Map<String, dynamic>>(
           '/v1/market/quotes',
@@ -81,14 +80,14 @@ void main() {
         expect(response.data!['quotes']['TSLA'], isNotNull);
         expect(response.data!['quotes']['0700'], isNotNull);
 
-        print('    ✅ Batch quotes received: ${response.data!['quotes'].keys.length} symbols');
+        debugPrint('    ✅ Batch quotes received: ${response.data!['quotes'].keys.length} symbols');
       },
     );
 
     testWidgets(
       'MA3: Quote contains required fields',
       (tester) async {
-        print('📊 MA3: Verify quote data structure');
+        debugPrint('📊 MA3: Verify quote data structure');
 
         final response = await dio.get<Map<String, dynamic>>(
           '/v1/market/stocks/AAPL',
@@ -104,14 +103,14 @@ void main() {
         expect(quote['market_status'], isNotEmpty);
         expect(quote['timestamp'], isNotNull);
 
-        print('    ✅ All required fields present');
+        debugPrint('    ✅ All required fields present');
       },
     );
 
     testWidgets(
       'MA4: HK stock quote data',
       (tester) async {
-        print('📊 MA4: Fetch HK stock quote (0700)');
+        debugPrint('📊 MA4: Fetch HK stock quote (0700)');
 
         final response = await dio.get<Map<String, dynamic>>(
           '/v1/market/stocks/0700',
@@ -121,14 +120,14 @@ void main() {
         expect(response.data!['symbol'], '0700');
         expect(response.data!['market'], 'HK');
 
-        print('    ✅ HK stock quote received');
+        debugPrint('    ✅ HK stock quote received');
       },
     );
 
     testWidgets(
       'MA5: US stock quote data',
       (tester) async {
-        print('📊 MA5: Fetch US stock quote (TSLA)');
+        debugPrint('📊 MA5: Fetch US stock quote (TSLA)');
 
         final response = await dio.get<Map<String, dynamic>>(
           '/v1/market/stocks/TSLA',
@@ -138,7 +137,7 @@ void main() {
         expect(response.data!['symbol'], 'TSLA');
         expect(response.data!['market'], 'US');
 
-        print('    ✅ US stock quote received');
+        debugPrint('    ✅ US stock quote received');
       },
     );
   });
@@ -147,7 +146,7 @@ void main() {
     testWidgets(
       'MA6: Search by symbol',
       (tester) async {
-        print('🔍 MA6: Search by symbol "AAPL"');
+        debugPrint('🔍 MA6: Search by symbol "AAPL"');
 
         final response = await dio.get<Map<String, dynamic>>(
           '/v1/market/search',
@@ -160,14 +159,14 @@ void main() {
         expect(response.data!['results'], isList);
         expect(response.data!['results'].length, greaterThan(0));
 
-        print('    ✅ Search results: ${response.data!['results'].length} matches');
+        debugPrint('    ✅ Search results: ${response.data!['results'].length} matches');
       },
     );
 
     testWidgets(
       'MA7: Search by company name',
       (tester) async {
-        print('🔍 MA7: Search by name "Apple"');
+        debugPrint('🔍 MA7: Search by name "Apple"');
 
         final response = await dio.get<Map<String, dynamic>>(
           '/v1/market/search',
@@ -179,14 +178,14 @@ void main() {
         expect(response.statusCode, 200);
         expect(response.data!['results'], isList);
 
-        print('    ✅ Name search successful: ${response.data!['results'].length} results');
+        debugPrint('    ✅ Name search successful: ${response.data!['results'].length} results');
       },
     );
 
     testWidgets(
       'MA8: Search returns required fields',
       (tester) async {
-        print('🔍 MA8: Verify search result structure');
+        debugPrint('🔍 MA8: Verify search result structure');
 
         final response = await dio.get<Map<String, dynamic>>(
           '/v1/market/search',
@@ -202,7 +201,7 @@ void main() {
           expect(first['name'], isNotEmpty);
           expect(first['market'], isNotEmpty);
 
-          print('    ✅ Search result has required fields');
+          debugPrint('    ✅ Search result has required fields');
         }
       },
     );
@@ -210,7 +209,7 @@ void main() {
     testWidgets(
       'MA9: Empty search returns empty results',
       (tester) async {
-        print('🔍 MA9: Empty search query');
+        debugPrint('🔍 MA9: Empty search query');
 
         final response = await dio.get<Map<String, dynamic>>(
           '/v1/market/search',
@@ -222,7 +221,7 @@ void main() {
         expect(response.statusCode, 200);
         expect(response.data!['results'], isList);
 
-        print('    ✅ Empty search handled correctly');
+        debugPrint('    ✅ Empty search handled correctly');
       },
     );
   });
@@ -231,7 +230,7 @@ void main() {
     testWidgets(
       'MA10: Fetch market movers (gainers)',
       (tester) async {
-        print('📈 MA10: Fetch gainers');
+        debugPrint('📈 MA10: Fetch gainers');
 
         final response = await dio.get<Map<String, dynamic>>(
           '/v1/market/movers',
@@ -241,14 +240,14 @@ void main() {
         expect(response.data!['gainers'], isList);
         expect(response.data!['gainers'].length, greaterThan(0));
 
-        print('    ✅ Gainers: ${response.data!['gainers'].length} stocks');
+        debugPrint('    ✅ Gainers: ${response.data!['gainers'].length} stocks');
       },
     );
 
     testWidgets(
       'MA11: Fetch market movers (losers)',
       (tester) async {
-        print('📉 MA11: Fetch losers');
+        debugPrint('📉 MA11: Fetch losers');
 
         final response = await dio.get<Map<String, dynamic>>(
           '/v1/market/movers',
@@ -258,14 +257,14 @@ void main() {
         expect(response.data!['losers'], isList);
         expect(response.data!['losers'].length, greaterThan(0));
 
-        print('    ✅ Losers: ${response.data!['losers'].length} stocks');
+        debugPrint('    ✅ Losers: ${response.data!['losers'].length} stocks');
       },
     );
 
     testWidgets(
       'MA12: Movers have required fields',
       (tester) async {
-        print('📈 MA12: Verify movers data structure');
+        debugPrint('📈 MA12: Verify movers data structure');
 
         final response = await dio.get<Map<String, dynamic>>(
           '/v1/market/movers',
@@ -278,7 +277,7 @@ void main() {
           expect(first['name'], isNotEmpty);
           expect(first['change_pct'], isNotNull);
 
-          print('    ✅ Movers have symbol, name, and change_pct');
+          debugPrint('    ✅ Movers have symbol, name, and change_pct');
         }
       },
     );
@@ -288,7 +287,7 @@ void main() {
     testWidgets(
       'MA13: Stock detail endpoint',
       (tester) async {
-        print('📄 MA13: Stock detail for AAPL');
+        debugPrint('📄 MA13: Stock detail for AAPL');
 
         final response = await dio.get<Map<String, dynamic>>(
           '/v1/market/detail/AAPL',
@@ -298,14 +297,14 @@ void main() {
         expect(response.data!['symbol'], 'AAPL');
         expect(response.data!['price'], isNotNull);
 
-        print('    ✅ Stock detail loaded');
+        debugPrint('    ✅ Stock detail loaded');
       },
     );
 
     testWidgets(
       'MA14: Stock detail for HK stock',
       (tester) async {
-        print('📄 MA14: Stock detail for HK stock (0700)');
+        debugPrint('📄 MA14: Stock detail for HK stock (0700)');
 
         final response = await dio.get<Map<String, dynamic>>(
           '/v1/market/detail/0700',
@@ -314,7 +313,7 @@ void main() {
         expect(response.statusCode, 200);
         expect(response.data!['symbol'], '0700');
 
-        print('    ✅ HK stock detail loaded');
+        debugPrint('    ✅ HK stock detail loaded');
       },
     );
   });
@@ -323,7 +322,7 @@ void main() {
     testWidgets(
       'MA15: Missing symbols parameter returns error',
       (tester) async {
-        print('❌ MA15: Missing symbols in batch quote');
+        debugPrint('❌ MA15: Missing symbols in batch quote');
 
         try {
           await dio.get<Map<String, dynamic>>(
@@ -333,7 +332,7 @@ void main() {
           fail('Expected error for missing symbols');
         } catch (e) {
           expect(e, isA<DioException>());
-          print('    ✅ Error handled correctly');
+          debugPrint('    ✅ Error handled correctly');
         }
       },
     );
@@ -341,13 +340,13 @@ void main() {
     testWidgets(
       'MA16: API resilience under normal conditions',
       (tester) async {
-        print('🛡️ MA16: API resilience');
+        debugPrint('🛡️ MA16: API resilience');
 
         // Make multiple rapid requests
-        final futures = <Future>[];
+        final futures = <Future<dynamic>>[];
         for (int i = 0; i < 5; i++) {
           futures.add(
-            dio.get('/v1/market/stocks/AAPL'),
+            dio.get<Map<String, dynamic>>('/v1/market/stocks/AAPL'),
           );
         }
 
@@ -357,7 +356,7 @@ void main() {
           expect(result.statusCode, 200);
         }
 
-        print('    ✅ API handled ${results.length} concurrent requests');
+        debugPrint('    ✅ API handled ${results.length} concurrent requests');
       },
     );
   });
@@ -366,7 +365,7 @@ void main() {
     testWidgets(
       'MA17: Quote timestamp is valid',
       (tester) async {
-        print('🕐 MA17: Timestamp validation');
+        debugPrint('🕐 MA17: Timestamp validation');
 
         final response = await dio.get<Map<String, dynamic>>(
           '/v1/market/stocks/AAPL',
@@ -379,7 +378,7 @@ void main() {
         // Should be valid ISO 8601 format
         try {
           DateTime.parse(timestamp as String);
-          print('    ✅ Timestamp is valid ISO 8601');
+          debugPrint('    ✅ Timestamp is valid ISO 8601');
         } catch (e) {
           fail('Invalid timestamp format: $timestamp');
         }
@@ -389,7 +388,7 @@ void main() {
     testWidgets(
       'MA18: Price values are positive',
       (tester) async {
-        print('💰 MA18: Price validation');
+        debugPrint('💰 MA18: Price validation');
 
         final response = await dio.get<Map<String, dynamic>>(
           '/v1/market/stocks/AAPL',
@@ -402,7 +401,7 @@ void main() {
         final priceValue = price is String ? double.parse(price) : price as double;
         expect(priceValue, greaterThan(0));
 
-        print('    ✅ Price is positive: $price');
+        debugPrint('    ✅ Price is positive: $price');
       },
     );
   });
@@ -411,7 +410,7 @@ void main() {
     testWidgets(
       'MA19: Fetch SPY (S&P 500 ETF)',
       (tester) async {
-        print('📈 MA19: Fetch SPY ETF');
+        debugPrint('📈 MA19: Fetch SPY ETF');
 
         final response = await dio.get<Map<String, dynamic>>(
           '/v1/market/stocks/SPY',
@@ -423,14 +422,14 @@ void main() {
         expect(response.data!['is_etf'], true);
         expect(response.data!['tracking_name'], contains('S&P 500'));
 
-        print('    ✅ SPY loaded: \$${response.data!['price']} (${response.data!['change_pct']}%)');
+        debugPrint('    ✅ SPY loaded: \$${response.data!['price']} (${response.data!['change_pct']}%)');
       },
     );
 
     testWidgets(
       'MA20: Fetch QQQ (Nasdaq-100 ETF)',
       (tester) async {
-        print('📈 MA20: Fetch QQQ ETF');
+        debugPrint('📈 MA20: Fetch QQQ ETF');
 
         final response = await dio.get<Map<String, dynamic>>(
           '/v1/market/stocks/QQQ',
@@ -441,14 +440,14 @@ void main() {
         expect(response.data!['is_etf'], true);
         expect(response.data!['tracking_name'], contains('Nasdaq'));
 
-        print('    ✅ QQQ loaded: \$${response.data!['price']} (${response.data!['change_pct']}%)');
+        debugPrint('    ✅ QQQ loaded: \$${response.data!['price']} (${response.data!['change_pct']}%)');
       },
     );
 
     testWidgets(
       'MA21: Fetch DIA (DJIA ETF)',
       (tester) async {
-        print('📈 MA21: Fetch DIA ETF');
+        debugPrint('📈 MA21: Fetch DIA ETF');
 
         final response = await dio.get<Map<String, dynamic>>(
           '/v1/market/stocks/DIA',
@@ -459,14 +458,14 @@ void main() {
         expect(response.data!['is_etf'], true);
         expect(response.data!['tracking_name'], contains('DJIA'));
 
-        print('    ✅ DIA loaded: \$${response.data!['price']} (${response.data!['change_pct']}%)');
+        debugPrint('    ✅ DIA loaded: \$${response.data!['price']} (${response.data!['change_pct']}%)');
       },
     );
 
     testWidgets(
       'MA22: Fetch batch ETF quotes',
       (tester) async {
-        print('📊 MA22: Batch ETF quotes');
+        debugPrint('📊 MA22: Batch ETF quotes');
 
         final response = await dio.get<Map<String, dynamic>>(
           '/v1/market/quotes',
@@ -480,14 +479,14 @@ void main() {
         expect(response.data!['quotes']['QQQ'], isNotNull);
         expect(response.data!['quotes']['DIA'], isNotNull);
 
-        print('    ✅ All 3 ETFs loaded');
+        debugPrint('    ✅ All 3 ETFs loaded');
       },
     );
 
     testWidgets(
       'MA23: ETF data completeness',
       (tester) async {
-        print('✓ MA23: ETF data structure');
+        debugPrint('✓ MA23: ETF data structure');
 
         final response = await dio.get<Map<String, dynamic>>(
           '/v1/market/stocks/SPY',
@@ -500,14 +499,14 @@ void main() {
         expect(etf['tracking_name'], isNotEmpty);
         expect(etf['is_etf'], true);
 
-        print('    ✅ ETF has all required fields');
+        debugPrint('    ✅ ETF has all required fields');
       },
     );
 
     testWidgets(
       'MA24: ETF price format (large number for DIA)',
       (tester) async {
-        print('💰 MA24: ETF price format validation');
+        debugPrint('💰 MA24: ETF price format validation');
 
         final response = await dio.get<Map<String, dynamic>>(
           '/v1/market/stocks/DIA',
@@ -517,7 +516,7 @@ void main() {
         final priceValue = price is String ? double.parse(price) : price as double;
         expect(priceValue, greaterThan(30000)); // DIA price ~ 38,000
 
-        print('    ✅ DIA price format correct: \$${response.data!['price']}');
+        debugPrint('    ✅ DIA price format correct: \$${response.data!['price']}');
       },
     );
   });

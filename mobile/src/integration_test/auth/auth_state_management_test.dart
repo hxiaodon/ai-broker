@@ -34,7 +34,7 @@ void main() {
         await tester.pump(const Duration(seconds: 2));
 
         expect(find.byType(Scaffold), findsWidgets);
-        print('✅ T1: Unauthenticated state renders');
+        debugPrint('✅ T1: Unauthenticated state renders');
       },
     );
 
@@ -50,7 +50,7 @@ void main() {
         await tester.pump(const Duration(seconds: 2));
 
         expect(find.byType(Scaffold), findsWidgets);
-        print('✅ T2: Authenticated state renders');
+        debugPrint('✅ T2: Authenticated state renders');
       },
     );
 
@@ -61,7 +61,7 @@ void main() {
         await tester.pump(const Duration(seconds: 2));
 
         expect(find.byType(Scaffold), findsWidgets);
-        print('✅ T3: Guest state renders');
+        debugPrint('✅ T3: Guest state renders');
       },
     );
   });
@@ -86,7 +86,7 @@ void main() {
         await tester.pump();
 
         expect(await tokenService.getAccessToken(), equals('valid-token-xyz'));
-        print('✅ T4: Access token stored');
+        debugPrint('✅ T4: Access token stored');
       },
     );
 
@@ -111,7 +111,7 @@ void main() {
 
         final isValid = await tokenService.isAccessTokenValid();
         expect(isValid, isTrue);
-        print('✅ T5: Token valid check works');
+        debugPrint('✅ T5: Token valid check works');
       },
     );
 
@@ -132,7 +132,7 @@ void main() {
 
         // Verify cleared
         expect(await tokenService.getAccessToken(), isNull);
-        print('✅ T6: Logout clears all tokens');
+        debugPrint('✅ T6: Logout clears all tokens');
       },
     );
   });
@@ -158,7 +158,7 @@ void main() {
 
         // Token should be in secure storage, not visible in widgets
         expect(find.byType(Scaffold), findsWidgets);
-        print('✅ T7: Tokens in secure storage');
+        debugPrint('✅ T7: Tokens in secure storage');
       },
     );
 
@@ -189,7 +189,7 @@ void main() {
         );
 
         expect(await tokenService.getRefreshToken(), 'stable-refresh');
-        print('✅ T8: Refresh token stable');
+        debugPrint('✅ T8: Refresh token stable');
       },
     );
   });
@@ -207,7 +207,7 @@ void main() {
         await tester.pump();
 
         expect(find.byType(Scaffold), findsWidgets);
-        print('✅ T9: Missing token handled');
+        debugPrint('✅ T9: Missing token handled');
       },
     );
 
@@ -221,11 +221,11 @@ void main() {
           expiresIn: const Duration(milliseconds: 50),
         );
 
-        await Future.delayed(const Duration(milliseconds: 100));
+        await Future<void>.delayed(const Duration(milliseconds: 100));
 
         final isValid = await tokenService.isAccessTokenValid();
         expect(isValid, isFalse);
-        print('✅ T10: Expired token detected');
+        debugPrint('✅ T10: Expired token detected');
       },
     );
   });
@@ -249,7 +249,7 @@ void main() {
 
         expect(await device1.getAccessToken(), 'device-1-token');
         expect(await device2.getAccessToken(), 'device-2-token');
-        print('✅ T11: Independent token storage');
+        debugPrint('✅ T11: Independent token storage');
       },
     );
 
@@ -265,7 +265,7 @@ void main() {
         );
 
         expect(await tokenService.getAccessToken(), 'saved-token');
-        print('✅ T12: Token persistence works');
+        debugPrint('✅ T12: Token persistence works');
       },
     );
   });
@@ -279,7 +279,7 @@ void main() {
 
         // No exceptions thrown, app renders
         expect(find.byType(Scaffold), findsWidgets);
-        print('✅ T13: Unauthenticated app stable');
+        debugPrint('✅ T13: Unauthenticated app stable');
       },
     );
 
@@ -295,7 +295,7 @@ void main() {
         await tester.pump(const Duration(seconds: 2));
 
         expect(find.byType(Scaffold), findsWidgets);
-        print('✅ T14: Authenticated app stable');
+        debugPrint('✅ T14: Authenticated app stable');
       },
     );
 
@@ -306,7 +306,7 @@ void main() {
         await tester.pump(const Duration(seconds: 2));
 
         expect(find.byType(Scaffold), findsWidgets);
-        print('✅ T15: Guest app stable');
+        debugPrint('✅ T15: Guest app stable');
       },
     );
   });

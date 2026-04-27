@@ -1,18 +1,13 @@
-import 'dart:async';
 
 import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
 
 import 'package:trading_app/core/config/environment_config.dart';
 import 'package:trading_app/core/logging/app_logger.dart';
 import 'package:trading_app/features/market/domain/entities/market_status.dart';
 import 'package:trading_app/features/market/domain/entities/quote.dart';
 import 'package:trading_app/features/market/presentation/screens/market_home_screen.dart';
-import 'package:trading_app/features/market/presentation/widgets/delayed_quote_banner.dart';
-import 'package:trading_app/features/market/presentation/widgets/movers_tab.dart';
-import 'package:trading_app/features/market/presentation/widgets/watchlist_tab.dart';
 import '../../../../helpers/widget_test_integration_helpers.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────

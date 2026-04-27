@@ -74,6 +74,15 @@ func main() {
 	http.HandleFunc("/api/market/detail/", handleStockDetail)
 	http.HandleFunc("/health", handleHealth)
 
+	// Funding endpoints
+	http.HandleFunc("/api/v1/balance", handleFundingBalance)
+	http.HandleFunc("/api/v1/deposit", handleFundingDeposit)
+	http.HandleFunc("/api/v1/withdrawal", handleFundingWithdrawal)
+	http.HandleFunc("/api/v1/fund/history", handleFundingHistory)
+	http.HandleFunc("/api/v1/bank-accounts", handleFundingBankAccounts)
+	http.HandleFunc("/api/v1/bank-accounts/", handleFundingBankAccountByID)
+	http.HandleFunc("/api/v1/funding/bio-challenge", handleFundingBioChallenge)
+
 	addr := fmt.Sprintf(":%d", *port)
 	log.Printf("🚀 Mock server started on %s (strategy: %s)", addr, *strategy)
 	log.Printf("📡 WebSocket endpoint: ws://localhost%s/v1/market/quotes", addr)

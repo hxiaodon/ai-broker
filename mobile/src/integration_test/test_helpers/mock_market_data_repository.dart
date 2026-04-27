@@ -22,7 +22,6 @@ class MockMarketDataRepository implements MarketDataRepository {
     return result;
   }
 
-  @override
   Future<Quote> getQuote(String symbol) async {
     if (_mockQuotes.containsKey(symbol)) {
       return _mockQuotes[symbol]!;
