@@ -14,7 +14,7 @@ Decimal _parseDecimal(String? raw, String field) {
     throw FormatException('Missing required field: $field');
   }
   return Decimal.tryParse(raw) ??
-      (throw FormatException('Invalid decimal for $field: "$raw"'));
+      (throw FormatException('Invalid decimal for field: $field'));
 }
 
 DateTime _parseUtcDateTime(String? raw, String field) {
@@ -24,14 +24,14 @@ DateTime _parseUtcDateTime(String? raw, String field) {
   try {
     return DateTime.parse(raw).toUtc();
   } catch (_) {
-    throw FormatException('Invalid datetime for $field: "$raw"');
+    throw FormatException('Invalid datetime for field: $field');
   }
 }
 
 TransferType _parseTransferType(String raw) => switch (raw.toUpperCase()) {
       'DEPOSIT' => TransferType.deposit,
       'WITHDRAWAL' => TransferType.withdrawal,
-      _ => throw FormatException('Unknown transfer type: "$raw"'),
+      _ => throw FormatException('Unknown transfer type'),
     };
 
 TransferStatus _parseTransferStatus(String raw) =>
@@ -57,13 +57,13 @@ TransferStatus _parseTransferStatus(String raw) =>
       'TRANSFER_STATUS_COMPLETED' || 'COMPLETED' => TransferStatus.completed,
       'TRANSFER_STATUS_FAILED' || 'FAILED' => TransferStatus.failed,
       'TRANSFER_STATUS_REJECTED' || 'REJECTED' => TransferStatus.rejected,
-      _ => TransferStatus.pending,
+      _ => throw FormatException('Unknown transfer status'),
     };
 
 BankChannel _parseBankChannel(String raw) => switch (raw.toUpperCase()) {
       'ACH' => BankChannel.ach,
       'WIRE' => BankChannel.wire,
-      _ => BankChannel.ach,
+      _ => throw FormatException('Unknown bank channel'),
     };
 
 MicroDepositStatus _parseMicroDepositStatus(String raw) =>
@@ -90,7 +90,13 @@ extension AccountBalanceModelMapper on AccountBalanceModel {
 }
 
 extension BankAccountModelMapper on BankAccountModel {
-  BankAccount toDomain() => BankAccount(
+  BankAccount toDomain() {
+    assert(
+      accountNumberMasked.startsWith('****') ||
+          accountNumberMasked.length <= 4,
+      'Server returned unmasked account number — check Fund Transfer API masking config',
+    );
+    return BankAccount(
         id: id,
         accountName: accountName,
         accountNumberMasked: accountNumberMasked,
@@ -105,6 +111,7 @@ extension BankAccountModelMapper on BankAccountModel {
         remainingVerifyAttempts: remainingVerifyAttempts,
         createdAt: _parseUtcDateTime(createdAt, 'created_at'),
       );
+  }
 }
 
 extension FundTransferModelMapper on FundTransferModel {

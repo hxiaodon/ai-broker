@@ -49,15 +49,22 @@ class FundWithdrawalBioService {
   }
 
   /// SHA256(WITHDRAWAL|AMOUNT|BANK_ACCOUNT_ID|ACCOUNT_ID)
-  ///
-  /// Binds the challenge to a specific withdrawal, preventing cross-account
-  /// replay attacks.
   static String computeActionHash({
     required String amount,
     required String bankAccountId,
     required String accountId,
   }) {
     final normalized = 'WITHDRAWAL|$amount|$bankAccountId|$accountId';
+    return sha256.convert(utf8.encode(normalized)).toString();
+  }
+
+  /// SHA256(DEPOSIT|AMOUNT|BANK_ACCOUNT_ID|ACCOUNT_ID)
+  static String computeDepositActionHash({
+    required String amount,
+    required String bankAccountId,
+    required String accountId,
+  }) {
+    final normalized = 'DEPOSIT|$amount|$bankAccountId|$accountId';
     return sha256.convert(utf8.encode(normalized)).toString();
   }
 }

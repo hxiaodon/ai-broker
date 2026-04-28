@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/errors/app_exception.dart';
+import '../../../../core/security/screen_protection_service.dart';
 import '../../../../shared/theme/color_tokens.dart';
 import '../../../../shared/widgets/buttons/primary_button.dart';
 import '../../../../shared/widgets/inputs/decimal_input_field.dart';
@@ -28,7 +30,8 @@ class MicroDepositVerifyScreen extends ConsumerStatefulWidget {
 }
 
 class _MicroDepositVerifyScreenState
-    extends ConsumerState<MicroDepositVerifyScreen> {
+    extends ConsumerState<MicroDepositVerifyScreen>
+    with ScreenProtectionMixin {
   static const _colors = ColorTokens.greenUp;
 
   Decimal? _amount1;
@@ -107,7 +110,12 @@ class _MicroDepositVerifyScreenState
         context.pop();
       }
     } on Object catch (e) {
-      setState(() => _errorMessage = e.toString());
+      final msg = e is ValidationException
+          ? e.message
+          : e is BusinessException
+              ? e.message
+              : '验证失败，请稍后重试';
+      setState(() => _errorMessage = msg);
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }

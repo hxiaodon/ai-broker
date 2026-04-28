@@ -55,7 +55,7 @@ final class BankAccountsNotifierProvider
 }
 
 String _$bankAccountsNotifierHash() =>
-    r'5c751cb0da6c8f371906b2a21f147443d56df78f';
+    r'591cff084ce63e02f1c17fa7d66ecd38bfb748ea';
 
 /// Manages the list of the user's linked bank accounts.
 ///

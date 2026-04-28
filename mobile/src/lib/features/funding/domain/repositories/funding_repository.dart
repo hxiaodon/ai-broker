@@ -12,6 +12,9 @@ abstract interface class FundingRepository {
     required String bankAccountId,
     required BankChannel channel,
     required String idempotencyKey,
+    required String bioToken,
+    required String bioChallenge,
+    required String bioTimestamp,
   });
 
   Future<FundTransfer> initiateWithdrawal({

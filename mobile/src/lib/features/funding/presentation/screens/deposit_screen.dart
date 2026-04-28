@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/security/screen_protection_service.dart';
 import '../../../../shared/extensions/decimal_extensions.dart';
 import '../../../../shared/theme/color_tokens.dart';
 import '../../../../shared/widgets/buttons/primary_button.dart';
@@ -19,7 +20,8 @@ class DepositScreen extends ConsumerStatefulWidget {
   ConsumerState<DepositScreen> createState() => _DepositScreenState();
 }
 
-class _DepositScreenState extends ConsumerState<DepositScreen> {
+class _DepositScreenState extends ConsumerState<DepositScreen>
+    with ScreenProtectionMixin {
   static const _colors = ColorTokens.greenUp;
   Decimal? _amount;
   String _channel = 'ACH';
@@ -68,21 +70,24 @@ class _DepositScreenState extends ConsumerState<DepositScreen> {
                 );
           },
         ),
-        confirming: (amount, bankAccountId, channel) => _ConfirmStep(
+        confirming: (amount, bankAccountId, channel) => _BiometricStep(
           colors: _colors,
           amount: amount,
           channel: channel,
           bank: usableBanks.firstWhere((b) => b.id == bankAccountId,
               orElse: () => usableBanks.first),
-          onBack: () =>
-              ref.read(depositFormProvider.notifier).backToIdle(),
-          onSubmit: () =>
-              ref.read(depositFormProvider.notifier).submit(),
+          onBack: () => ref.read(depositFormProvider.notifier).backToIdle(),
+          onConfirm: () => ref
+              .read(depositFormProvider.notifier)
+              .authenticateAndSubmit(),
         ),
+        awaitingBiometric: () =>
+            const _LoadingStep(label: '等待生物识别验证...'),
         submitting: () => const _LoadingStep(label: '提交入金申请中...'),
         success: (transferId) => _SuccessStep(
           colors: _colors,
           transferId: transferId,
+          channel: _channel,
           onDone: () {
             ref.read(depositFormProvider.notifier).reset();
             context.pop();
@@ -91,8 +96,9 @@ class _DepositScreenState extends ConsumerState<DepositScreen> {
         error: (message) => _ErrorStep(
           colors: _colors,
           message: message,
-          onRetry: () =>
-              ref.read(depositFormProvider.notifier).submit(),
+          onRetry: () => ref
+              .read(depositFormProvider.notifier)
+              .authenticateAndSubmit(),
           onCancel: () {
             ref.read(depositFormProvider.notifier).reset();
             context.pop();
@@ -128,8 +134,15 @@ class _AmountStep extends StatelessWidget {
   final ValueChanged<String?> onBankChanged;
   final VoidCallback onNext;
 
-  bool get _canProceed =>
-      amount != null && amount! > Decimal.zero && selectedBankAccountId != null;
+  static final _minDepositAch = Decimal.parse('1.00');
+  static final _minDepositWire = Decimal.parse('100.00');
+
+  bool get _canProceed {
+    final a = amount;
+    if (a == null || selectedBankAccountId == null) return false;
+    final min = channel == 'WIRE' ? _minDepositWire : _minDepositAch;
+    return a >= min;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -279,14 +292,16 @@ class _FeeRow extends StatelessWidget {
   }
 }
 
-class _ConfirmStep extends StatelessWidget {
-  const _ConfirmStep({
+// ─── Biometric step (mirrors WithdrawScreen._BiometricStep) ──────────────────
+
+class _BiometricStep extends StatefulWidget {
+  const _BiometricStep({
     required this.colors,
     required this.amount,
     required this.channel,
     required this.bank,
     required this.onBack,
-    required this.onSubmit,
+    required this.onConfirm,
   });
 
   final ColorTokens colors;
@@ -294,46 +309,58 @@ class _ConfirmStep extends StatelessWidget {
   final String channel;
   final BankAccount bank;
   final VoidCallback onBack;
-  final VoidCallback onSubmit;
+  final VoidCallback onConfirm;
+
+  @override
+  State<_BiometricStep> createState() => _BiometricStepState();
+}
+
+class _BiometricStepState extends State<_BiometricStep> {
+  bool _isSubmitting = false;
 
   @override
   Widget build(BuildContext context) {
-    final fee = channel == 'WIRE' ? Decimal.parse('25') : Decimal.zero;
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Center(
-            child: Text(
-              amount.toAmount(),
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 36,
-                  fontWeight: FontWeight.bold),
-            ),
+          Text(
+            widget.amount.toAmount(),
+            style: const TextStyle(
+                color: Colors.white,
+                fontSize: 36,
+                fontWeight: FontWeight.bold),
           ),
-          const SizedBox(height: 24),
-          _InfoRow(label: '出账银行',
-              value: '${bank.bankName} ${bank.accountNumberMasked}'),
-          _InfoRow(label: '入金方式', value: channel == 'WIRE' ? 'Wire 电汇' : 'ACH 转账'),
-          _InfoRow(
-              label: '手续费',
-              value: fee == Decimal.zero ? '免费' : fee.toAmount()),
-          _InfoRow(
-              label: '预计到账',
-              value: channel == 'WIRE' ? '当日（工作日 14:00 ET 前）' : '3-5 个工作日'),
-          const SizedBox(height: 16),
+          const SizedBox(height: 8),
+          Text(
+            '入金至 ${widget.bank.bankName} ${widget.bank.accountNumberMasked}',
+            style: const TextStyle(color: Colors.white60, fontSize: 13),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            widget.channel == 'WIRE' ? '预计当日到账' : '预计 3-5 个工作日到账',
+            style: const TextStyle(color: Colors.white38, fontSize: 12),
+          ),
+          const SizedBox(height: 32),
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.amber.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
+              color: const Color(0xFF242638),
+              borderRadius: BorderRadius.circular(16),
             ),
-            child: const Text(
-              '⚠️ 请确保银行卡账户名与 KYC 认证姓名一致，否则转账将被退回。',
-              style: TextStyle(color: Colors.amber, fontSize: 12),
+            child: Column(
+              children: [
+                Icon(Icons.fingerprint, size: 56, color: widget.colors.primary),
+                const SizedBox(height: 12),
+                const Text('请进行生物识别验证',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600)),
+                const SizedBox(height: 6),
+                const Text('使用 Face ID 或 Touch ID 确认入金',
+                    style: TextStyle(color: Colors.white60, fontSize: 13)),
+              ],
             ),
           ),
           const Spacer(),
@@ -341,38 +368,24 @@ class _ConfirmStep extends StatelessWidget {
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: onBack,
+                  onPressed: _isSubmitting ? null : widget.onBack,
                   child: const Text('返回'),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: PrimaryButton(label: '确认入金', onPressed: onSubmit),
+                child: PrimaryButton(
+                  label: '开始验证',
+                  onPressed: _isSubmitting
+                      ? null
+                      : () {
+                          setState(() => _isSubmitting = true);
+                          widget.onConfirm();
+                        },
+                ),
               ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  const _InfoRow({required this.label, required this.value});
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label,
-              style: const TextStyle(color: Colors.white60, fontSize: 13)),
-          Text(value,
-              style: const TextStyle(color: Colors.white, fontSize: 13)),
         ],
       ),
     );
@@ -402,15 +415,18 @@ class _SuccessStep extends StatelessWidget {
   const _SuccessStep({
     required this.colors,
     required this.transferId,
+    required this.channel,
     required this.onDone,
   });
 
   final ColorTokens colors;
   final String transferId;
+  final String channel;
   final VoidCallback onDone;
 
   @override
   Widget build(BuildContext context) {
+    final arrivalText = channel == 'WIRE' ? '资金预计当日到账' : '资金将在 3-5 个工作日内到账';
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -426,8 +442,8 @@ class _SuccessStep extends StatelessWidget {
                     fontSize: 20,
                     fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            const Text('资金将在 3-5 个工作日内到账',
-                style: TextStyle(color: Colors.white60, fontSize: 13)),
+            Text(arrivalText,
+                style: const TextStyle(color: Colors.white60, fontSize: 13)),
             const SizedBox(height: 8),
             Text('订单号：$transferId',
                 style: const TextStyle(color: Colors.white38, fontSize: 11)),

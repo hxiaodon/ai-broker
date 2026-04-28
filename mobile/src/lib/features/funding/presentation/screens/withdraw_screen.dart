@@ -290,7 +290,7 @@ class _AmountStep extends StatelessWidget {
   }
 }
 
-class _BiometricStep extends StatelessWidget {
+class _BiometricStep extends StatefulWidget {
   const _BiometricStep({
     required this.colors,
     required this.amount,
@@ -308,13 +308,20 @@ class _BiometricStep extends StatelessWidget {
   final VoidCallback onConfirm;
 
   @override
+  State<_BiometricStep> createState() => _BiometricStepState();
+}
+
+class _BiometricStepState extends State<_BiometricStep> {
+  bool _isSubmitting = false;
+
+  @override
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Column(
         children: [
           Text(
-            amount.toAmount(),
+            widget.amount.toAmount(),
             style: const TextStyle(
                 color: Colors.white,
                 fontSize: 36,
@@ -322,10 +329,10 @@ class _BiometricStep extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           _InfoRow(label: '收款银行',
-              value: '${bank.bankName} ${bank.accountNumberMasked}'),
+              value: '${widget.bank.bankName} ${widget.bank.accountNumberMasked}'),
           _InfoRow(
               label: '预计到账',
-              value: channel == 'WIRE' ? '当日' : '1-3 个工作日'),
+              value: widget.channel == 'WIRE' ? '当日' : '1-3 个工作日'),
           const SizedBox(height: 32),
           Container(
             padding: const EdgeInsets.all(24),
@@ -336,7 +343,7 @@ class _BiometricStep extends StatelessWidget {
             child: Column(
               children: [
                 Icon(Icons.fingerprint,
-                    size: 56, color: colors.primary),
+                    size: 56, color: widget.colors.primary),
                 const SizedBox(height: 12),
                 const Text('请进行生物识别验证',
                     style: TextStyle(
@@ -354,7 +361,7 @@ class _BiometricStep extends StatelessWidget {
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: onBack,
+                  onPressed: _isSubmitting ? null : widget.onBack,
                   child: const Text('返回'),
                 ),
               ),
@@ -362,7 +369,12 @@ class _BiometricStep extends StatelessWidget {
               Expanded(
                 child: PrimaryButton(
                   label: '开始验证',
-                  onPressed: onConfirm,
+                  onPressed: _isSubmitting
+                      ? null
+                      : () {
+                          setState(() => _isSubmitting = true);
+                          widget.onConfirm();
+                        },
                 ),
               ),
             ],

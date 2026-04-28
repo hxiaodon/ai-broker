@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../shared/extensions/decimal_extensions.dart';
 import '../../../../shared/widgets/loading/skeleton_loader.dart';
+import '../../application/account_balance_notifier.dart';
 import '../../domain/entities/account_balance.dart';
 
 /// Displays the user's USD account balance with 4 breakdown fields.
@@ -27,7 +28,9 @@ class BalanceCard extends ConsumerWidget {
       ),
       child: balanceAsync.when(
         loading: () => const _BalanceCardSkeleton(),
-        error: (e, _) => _BalanceCardError(onRetry: () {}),
+        error: (e, _) => _BalanceCardError(
+          onRetry: () => ref.invalidate(accountBalanceProvider),
+        ),
         data: (balance) => _BalanceCardContent(balance: balance),
       ),
     );

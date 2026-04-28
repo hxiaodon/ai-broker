@@ -22,6 +22,7 @@ class DioLogInterceptor extends Interceptor {
     'ssn',
     'hkid',
     'bank_account_number',
+    'routing_number',
     'access_token',
     'refresh_token',
     'id_number',

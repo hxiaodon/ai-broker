@@ -41,7 +41,7 @@ final class BankBindNotifierProvider
   }
 }
 
-String _$bankBindNotifierHash() => r'8b50420901f9fe14f9010ddd7ed09ae8c53317f3';
+String _$bankBindNotifierHash() => r'f1b8c41498f66f33e7adfb7b0beb54c9cdab205e';
 
 abstract class _$BankBindNotifier extends $Notifier<BankBindState> {
   BankBindState build();

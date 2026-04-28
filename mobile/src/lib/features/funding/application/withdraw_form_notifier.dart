@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/auth/device_info_service.dart';
 import '../../../core/auth/local_auth_service.dart';
+import '../../../core/errors/app_exception.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/security/fund_withdrawal_bio_service.dart';
 import '../../../core/security/session_key_service.dart';
@@ -61,6 +62,12 @@ class WithdrawFormNotifier extends _$WithdrawFormNotifier {
 
     final keepAlive = ref.keepAlive();
     state = const WithdrawFormState.awaitingBiometric();
+
+    // Clear pending key before fetching a new challenge so that the
+    // idempotency key and bio-token are always computed against the same
+    // challenge. Reusing an old key with a new challenge would cause the
+    // server to replay the cached (failed) response from the first attempt.
+    _pendingIdempotencyKey = null;
 
     String bioToken = '';
     String bioChallenge = '';
@@ -129,7 +136,8 @@ class WithdrawFormNotifier extends _$WithdrawFormNotifier {
       state = WithdrawFormState.success(transferId: transfer.transferId);
     } on Object catch (e) {
       AppLogger.warning('Withdrawal submit failed: $e');
-      state = WithdrawFormState.error(message: e.toString());
+      final msg = e is BusinessException ? e.message : '出金失败，请稍后重试';
+      state = WithdrawFormState.error(message: msg);
     } finally {
       keepAlive.close();
     }

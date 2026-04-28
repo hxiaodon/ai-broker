@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/security/screen_protection_service.dart';
 import '../../../../shared/theme/color_tokens.dart';
 import '../../../../shared/widgets/buttons/primary_button.dart';
+import '../../../kyc/application/kyc_session_notifier.dart';
 import '../../application/bank_bind_notifier.dart';
 
 /// 绑定银行卡 — US ACH bank account binding flow.
@@ -24,7 +26,8 @@ class BankAccountBindScreen extends ConsumerStatefulWidget {
 }
 
 class _BankAccountBindScreenState
-    extends ConsumerState<BankAccountBindScreen> {
+    extends ConsumerState<BankAccountBindScreen>
+    with ScreenProtectionMixin {
   static const _colors = ColorTokens.greenUp;
   final _formKey = GlobalKey<FormState>();
   final _routingNumberCtrl = TextEditingController();
@@ -42,6 +45,11 @@ class _BankAccountBindScreenState
   @override
   Widget build(BuildContext context) {
     final bindState = ref.watch(bankBindProvider);
+    // KYC-verified legal name — same-name account principle (同名账户原则)
+    final kycName = ref.watch(kycSessionProvider).maybeWhen(
+          active: (s) => s.accountHolderName ?? '',
+          orElse: () => '',
+        );
 
     return Scaffold(
       backgroundColor: _colors.background,
@@ -66,10 +74,11 @@ class _BankAccountBindScreenState
           accountCtrl: _accountNumberCtrl,
           bankNameCtrl: _bankNameCtrl,
           colors: _colors,
+          kycName: kycName,
           onSubmit: () {
             if (_formKey.currentState?.validate() ?? false) {
               ref.read(bankBindProvider.notifier).submit(
-                    accountName: '张三', // TODO: get from auth/KYC provider
+                    accountName: kycName,
                     accountNumber: _accountNumberCtrl.text.trim(),
                     routingNumber: _routingNumberCtrl.text.trim(),
                     bankName: _bankNameCtrl.text.trim(),
@@ -111,6 +120,7 @@ class _FormStep extends StatelessWidget {
     required this.accountCtrl,
     required this.bankNameCtrl,
     required this.colors,
+    required this.kycName,
     required this.onSubmit,
   });
 
@@ -119,6 +129,7 @@ class _FormStep extends StatelessWidget {
   final TextEditingController accountCtrl;
   final TextEditingController bankNameCtrl;
   final ColorTokens colors;
+  final String kycName;
   final VoidCallback onSubmit;
 
   @override
@@ -143,9 +154,9 @@ class _FormStep extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 24),
-            // Account name — read-only, from KYC
+            // Account name — read-only, from KYC verified name
             TextFormField(
-              initialValue: '张三', // TODO: from KYC provider
+              initialValue: kycName,
               enabled: false,
               decoration: const InputDecoration(
                 labelText: '账户持有人姓名',

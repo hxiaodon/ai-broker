@@ -55,12 +55,13 @@ extension DepositFormStatePatterns on DepositFormState {
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( _Idle value)?  idle,TResult Function( _Confirming value)?  confirming,TResult Function( _Submitting value)?  submitting,TResult Function( _Success value)?  success,TResult Function( _Error value)?  error,required TResult orElse(),}){
+@optionalTypeArgs TResult maybeMap<TResult extends Object?>({TResult Function( _Idle value)?  idle,TResult Function( _Confirming value)?  confirming,TResult Function( _AwaitingBiometric value)?  awaitingBiometric,TResult Function( _Submitting value)?  submitting,TResult Function( _Success value)?  success,TResult Function( _Error value)?  error,required TResult orElse(),}){
 final _that = this;
 switch (_that) {
 case _Idle() when idle != null:
 return idle(_that);case _Confirming() when confirming != null:
-return confirming(_that);case _Submitting() when submitting != null:
+return confirming(_that);case _AwaitingBiometric() when awaitingBiometric != null:
+return awaitingBiometric(_that);case _Submitting() when submitting != null:
 return submitting(_that);case _Success() when success != null:
 return success(_that);case _Error() when error != null:
 return error(_that);case _:
@@ -81,12 +82,13 @@ return error(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( _Idle value)  idle,required TResult Function( _Confirming value)  confirming,required TResult Function( _Submitting value)  submitting,required TResult Function( _Success value)  success,required TResult Function( _Error value)  error,}){
+@optionalTypeArgs TResult map<TResult extends Object?>({required TResult Function( _Idle value)  idle,required TResult Function( _Confirming value)  confirming,required TResult Function( _AwaitingBiometric value)  awaitingBiometric,required TResult Function( _Submitting value)  submitting,required TResult Function( _Success value)  success,required TResult Function( _Error value)  error,}){
 final _that = this;
 switch (_that) {
 case _Idle():
 return idle(_that);case _Confirming():
-return confirming(_that);case _Submitting():
+return confirming(_that);case _AwaitingBiometric():
+return awaitingBiometric(_that);case _Submitting():
 return submitting(_that);case _Success():
 return success(_that);case _Error():
 return error(_that);}
@@ -103,12 +105,13 @@ return error(_that);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( _Idle value)?  idle,TResult? Function( _Confirming value)?  confirming,TResult? Function( _Submitting value)?  submitting,TResult? Function( _Success value)?  success,TResult? Function( _Error value)?  error,}){
+@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>({TResult? Function( _Idle value)?  idle,TResult? Function( _Confirming value)?  confirming,TResult? Function( _AwaitingBiometric value)?  awaitingBiometric,TResult? Function( _Submitting value)?  submitting,TResult? Function( _Success value)?  success,TResult? Function( _Error value)?  error,}){
 final _that = this;
 switch (_that) {
 case _Idle() when idle != null:
 return idle(_that);case _Confirming() when confirming != null:
-return confirming(_that);case _Submitting() when submitting != null:
+return confirming(_that);case _AwaitingBiometric() when awaitingBiometric != null:
+return awaitingBiometric(_that);case _Submitting() when submitting != null:
 return submitting(_that);case _Success() when success != null:
 return success(_that);case _Error() when error != null:
 return error(_that);case _:
@@ -128,11 +131,12 @@ return error(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  idle,TResult Function( Decimal amount,  String bankAccountId,  String channel)?  confirming,TResult Function()?  submitting,TResult Function( String transferId)?  success,TResult Function( String message)?  error,required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>({TResult Function()?  idle,TResult Function( Decimal amount,  String bankAccountId,  String channel)?  confirming,TResult Function()?  awaitingBiometric,TResult Function()?  submitting,TResult Function( String transferId)?  success,TResult Function( String message)?  error,required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Idle() when idle != null:
 return idle();case _Confirming() when confirming != null:
-return confirming(_that.amount,_that.bankAccountId,_that.channel);case _Submitting() when submitting != null:
+return confirming(_that.amount,_that.bankAccountId,_that.channel);case _AwaitingBiometric() when awaitingBiometric != null:
+return awaitingBiometric();case _Submitting() when submitting != null:
 return submitting();case _Success() when success != null:
 return success(_that.transferId);case _Error() when error != null:
 return error(_that.message);case _:
@@ -153,11 +157,12 @@ return error(_that.message);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  idle,required TResult Function( Decimal amount,  String bankAccountId,  String channel)  confirming,required TResult Function()  submitting,required TResult Function( String transferId)  success,required TResult Function( String message)  error,}) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>({required TResult Function()  idle,required TResult Function( Decimal amount,  String bankAccountId,  String channel)  confirming,required TResult Function()  awaitingBiometric,required TResult Function()  submitting,required TResult Function( String transferId)  success,required TResult Function( String message)  error,}) {final _that = this;
 switch (_that) {
 case _Idle():
 return idle();case _Confirming():
-return confirming(_that.amount,_that.bankAccountId,_that.channel);case _Submitting():
+return confirming(_that.amount,_that.bankAccountId,_that.channel);case _AwaitingBiometric():
+return awaitingBiometric();case _Submitting():
 return submitting();case _Success():
 return success(_that.transferId);case _Error():
 return error(_that.message);}
@@ -174,11 +179,12 @@ return error(_that.message);}
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  idle,TResult? Function( Decimal amount,  String bankAccountId,  String channel)?  confirming,TResult? Function()?  submitting,TResult? Function( String transferId)?  success,TResult? Function( String message)?  error,}) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>({TResult? Function()?  idle,TResult? Function( Decimal amount,  String bankAccountId,  String channel)?  confirming,TResult? Function()?  awaitingBiometric,TResult? Function()?  submitting,TResult? Function( String transferId)?  success,TResult? Function( String message)?  error,}) {final _that = this;
 switch (_that) {
 case _Idle() when idle != null:
 return idle();case _Confirming() when confirming != null:
-return confirming(_that.amount,_that.bankAccountId,_that.channel);case _Submitting() when submitting != null:
+return confirming(_that.amount,_that.bankAccountId,_that.channel);case _AwaitingBiometric() when awaitingBiometric != null:
+return awaitingBiometric();case _Submitting() when submitting != null:
 return submitting();case _Success() when success != null:
 return success(_that.transferId);case _Error() when error != null:
 return error(_that.message);case _:
@@ -290,6 +296,30 @@ as String,
 
 
 }
+
+/// @nodoc
+
+
+class _AwaitingBiometric implements DepositFormState {
+  const _AwaitingBiometric();
+
+@override
+bool operator ==(Object other) {
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _AwaitingBiometric);
+}
+
+@override
+int get hashCode => runtimeType.hashCode;
+
+@override
+String toString() {
+  return 'DepositFormState.awaitingBiometric()';
+}
+
+}
+
+
+
 
 /// @nodoc
 

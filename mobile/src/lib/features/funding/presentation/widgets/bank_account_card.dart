@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/auth/local_auth_service.dart';
 import '../../../../core/routing/route_names.dart';
 import '../../domain/entities/bank_account.dart';
 
@@ -8,8 +10,8 @@ import '../../domain/entities/bank_account.dart';
 ///
 /// Interactions:
 ///  - Tap on PENDING_MICRO_DEPOSIT card → navigate to micro-deposit verify screen
-///  - Long press (or swipe) → delete confirmation dialog
-class BankAccountCard extends StatelessWidget {
+///  - Long press (or swipe) → biometric confirm → delete
+class BankAccountCard extends ConsumerWidget {
   const BankAccountCard({
     super.key,
     required this.account,
@@ -20,11 +22,11 @@ class BankAccountCard extends StatelessWidget {
   final VoidCallback onDelete;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Dismissible(
       key: Key(account.id),
       direction: DismissDirection.endToStart,
-      confirmDismiss: (_) => _confirmDelete(context),
+      confirmDismiss: (_) => _confirmDelete(context, ref),
       onDismissed: (_) => onDelete(),
       background: Container(
         alignment: Alignment.centerRight,
@@ -87,8 +89,8 @@ class BankAccountCard extends StatelessWidget {
     }
   }
 
-  Future<bool?> _confirmDelete(BuildContext context) {
-    return showDialog<bool>(
+  Future<bool?> _confirmDelete(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1A1C2A),
@@ -110,6 +112,11 @@ class BankAccountCard extends StatelessWidget {
         ],
       ),
     );
+    if (confirmed != true) return false;
+    // Require biometric re-verification before removing a withdrawal channel.
+    return ref.read(localAuthServiceProvider).authenticate(
+          localizedReason: '删除银行卡需要身份验证',
+        );
   }
 }
 

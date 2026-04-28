@@ -32,12 +32,18 @@ class FundingRepositoryImpl implements FundingRepository {
     required String bankAccountId,
     required BankChannel channel,
     required String idempotencyKey,
+    required String bioToken,
+    required String bioChallenge,
+    required String bioTimestamp,
   }) =>
       _remote.initiateDeposit(
         amount: amount,
         bankAccountId: bankAccountId,
         channel: channel.name.toUpperCase(),
         idempotencyKey: idempotencyKey,
+        bioToken: bioToken,
+        bioChallenge: bioChallenge,
+        bioTimestamp: bioTimestamp,
       );
 
   @override

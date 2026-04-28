@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:decimal/decimal.dart';
 import 'package:dio/dio.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../../core/auth/device_info_service.dart';
 import '../../../../core/errors/app_exception.dart';
@@ -82,6 +83,9 @@ class FundingRemoteDataSource {
     required String bankAccountId,
     required String channel,
     required String idempotencyKey,
+    required String bioToken,
+    required String bioChallenge,
+    required String bioTimestamp,
   }) async {
     await _checkConnectivity();
     const path = '/api/v1/deposit';
@@ -97,6 +101,9 @@ class FundingRemoteDataSource {
       bodyJson: bodyJson,
       idempotencyKey: idempotencyKey,
     );
+    headers['X-Biometric-Token'] = bioToken;
+    headers['X-Bio-Challenge'] = bioChallenge;
+    headers['X-Bio-Timestamp'] = bioTimestamp;
     try {
       final resp = await _dio.post<Map<String, dynamic>>(
         path,
@@ -233,9 +240,14 @@ class FundingRemoteDataSource {
   Future<void> removeBankAccount(String bankAccountId) async {
     await _checkConnectivity();
     final path = '/api/v1/bank-accounts/$bankAccountId';
-    final sigHeaders = await _buildGetHeaders(path);
+    final headers = await _buildMutatingHeaders(
+      method: 'DELETE',
+      path: path,
+      bodyJson: '',
+      idempotencyKey: 'delete-$bankAccountId',
+    );
     try {
-      await _dio.delete<void>(path, options: Options(headers: sigHeaders));
+      await _dio.delete<void>(path, options: Options(headers: headers));
     } on DioException catch (e) {
       throw _mapDioError(e, 'removeBankAccount');
     }
@@ -257,7 +269,7 @@ class FundingRemoteDataSource {
       method: 'POST',
       path: path,
       bodyJson: bodyJson,
-      idempotencyKey: '${bankAccountId}_verify',
+      idempotencyKey: const Uuid().v4(),
     );
     try {
       final resp = await _dio.post<Map<String, dynamic>>(

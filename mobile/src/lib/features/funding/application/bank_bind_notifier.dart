@@ -2,6 +2,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../core/errors/app_exception.dart';
 import '../../../core/logging/app_logger.dart';
 import 'bank_accounts_notifier.dart';
 
@@ -62,7 +63,8 @@ class BankBindNotifier extends _$BankBindNotifier {
       );
     } on Object catch (e) {
       AppLogger.warning('Bank bind failed: $e');
-      state = BankBindState.error(message: e.toString());
+      final msg = e is ValidationException ? e.message : '绑卡失败，请稍后重试';
+      state = BankBindState.error(message: msg);
     } finally {
       keepAlive.close();
     }
