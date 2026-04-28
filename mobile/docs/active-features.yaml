@@ -12,8 +12,8 @@
 #   shipped     — 审核通过，合并至 main
 
 domain: mobile
-last_updated: 2026-04-27
-current_focus: funding
+last_updated: 2026-04-28
+current_focus: kyc
 
 development_order:
   - auth
@@ -94,16 +94,19 @@ modules:
 
   - id: kyc
     name: KYC 模块
-    status: pending
-    phase1_tasks: "0/?"
+    status: review
+    phase1_tasks: "36/36"
     prd: mobile/docs/prd/02-kyc.md
-    tracker: mobile/docs/specs/kyc.tracker.md  # JIT
-    hifi: mobile/prototypes/02-kyc/
+    tracker: mobile/docs/specs/kyc.tracker.md
+    hifi: mobile/prototypes/02-kyc/hifi/
     contracts:
       - docs/contracts/ams-to-mobile.md   # § KYC
     notes: >
-      Steps 1-6 Flutter Native；Steps 7-8 H5 WebView
-      （详见 mobile/docs/specs/h5-vs-native-decision.md）
+      Phase 1 实现完成（T01-T36），flutter analyze 0 errors。
+      8步开户流程（Step 1-6 Native + Step 7-8 H5 WebView），
+      Sumsub SDK 集成，KycSessionNotifier 断点续传 + 状态轮询，
+      W-8BEN/W-9 税务申报，审核状态页（5节点时间轴），三层测试套件（12+13+12 cases）。
+      待 security-engineer + code-reviewer 审核。
 
   - id: settings
     name: 设置模块

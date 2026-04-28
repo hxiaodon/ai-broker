@@ -83,6 +83,19 @@ func main() {
 	http.HandleFunc("/api/v1/bank-accounts/", handleFundingBankAccountByID)
 	http.HandleFunc("/api/v1/funding/bio-challenge", handleFundingBioChallenge)
 
+	// KYC endpoints
+	http.HandleFunc("/v1/kyc/start", handleKycStart)
+	http.HandleFunc("/v1/kyc/sumsub-token", handleKycSumsubToken)
+	http.HandleFunc("/v1/kyc/upload-url", handleKycUploadURL)
+	http.HandleFunc("/v1/kyc/documents/confirm-upload", handleKycConfirmUpload)
+	http.HandleFunc("/v1/kyc/address-proof", handleKycAddressProof)
+	http.HandleFunc("/v1/kyc/financial-profile", handleKycFinancialProfile)
+	http.HandleFunc("/v1/kyc/investment-assessment", handleKycInvestmentAssessment)
+	http.HandleFunc("/v1/kyc/tax-forms", handleKycTaxForms)
+	http.HandleFunc("/v1/kyc/agreements", handleKycAgreements)
+	http.HandleFunc("/v1/kyc/submit", handleKycSubmit)
+	http.HandleFunc("/v1/kyc/status", handleKycStatus)
+
 	addr := fmt.Sprintf(":%d", *port)
 	log.Printf("🚀 Mock server started on %s (strategy: %s)", addr, *strategy)
 	log.Printf("📡 WebSocket endpoint: ws://localhost%s/v1/market/quotes", addr)

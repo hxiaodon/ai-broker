@@ -68,6 +68,13 @@ const Map<String, List<String>> _spkiPins = {
     'PLACEHOLDER_WS_CERT_PIN_BASE64==',
     'PLACEHOLDER_WS_BACKUP_CERT_PIN_BASE64==',
   ],
+  // S3 document upload (KYC identity documents / address proof).
+  // Pin your CloudFront distribution domain if presigned URLs route through CDN.
+  // TODO Phase 2: Replace with actual fingerprints before production.
+  's3.amazonaws.com': [
+    'PLACEHOLDER_S3_CERT_PIN_BASE64==',
+    'PLACEHOLDER_S3_BACKUP_CERT_PIN_BASE64==',
+  ],
 };
 
 /// Creates an [HttpClient] that enforces certificate pinning for all connections.

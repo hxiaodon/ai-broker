@@ -43,15 +43,18 @@ class RouteNames {
   static const bankAccountBind = '/funding/bank/bind';
   static const fundingMicroDeposit = '/funding/bank/:bankId/micro-deposit';
 
-  // KYC (typically launched modally from auth or settings)
+  // KYC (typically launched modally from auth or home banner)
   static const kycRoot = '/kyc';
+  static const kycSteps = '/kyc/steps';
   static const kycStep1 = '/kyc/personal-info';
   static const kycStep2 = '/kyc/documents';
   static const kycStep3 = '/kyc/address';
-  static const kycStep4 = '/kyc/employment';
-  static const kycStep5 = '/kyc/investment-profile';
-  static const kycStep6 = '/kyc/risk-disclosure';
-  static const kycStep7 = '/kyc/agreement';
+  static const kycStep4 = '/kyc/finance';
+  static const kycStep5 = '/kyc/investment';
+  static const kycStep6 = '/kyc/tax';
+  static const kycStep7 = '/kyc/disclosure';
+  static const kycStep8 = '/kyc/agreement';
+  static const kycStatus = '/kyc/status';
 
   // Settings sub-routes
   static const securitySettings = '/settings/security';
