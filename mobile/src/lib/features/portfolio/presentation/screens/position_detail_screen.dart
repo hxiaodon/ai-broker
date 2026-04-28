@@ -1,3 +1,4 @@
+import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -93,6 +94,13 @@ class _DetailBody extends StatelessWidget {
   final PositionDetail detail;
   final ColorTokens colors;
 
+  String _formatPrice(Decimal v) =>
+      detail.market == 'HK' ? v.toHkPrice() : v.toUsPrice();
+
+  String _formatAmount(Decimal v) => detail.market == 'HK'
+      ? v.toAmount(currencySymbol: 'HK\$')
+      : v.toAmount();
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -117,14 +125,14 @@ class _DetailBody extends StatelessWidget {
               children: [
                 _MetricRow(
                   label: '当前市值',
-                  value: detail.marketValue.toAmount(),
+                  value: _formatAmount(detail.marketValue),
                   valueColor: colors.onSurface,
                   colors: colors,
                 ),
                 _MetricRow(
                   label: '浮动盈亏',
                   value:
-                      '${detail.unrealizedPnl.isPositive ? '+' : ''}${detail.unrealizedPnl.toAmount()} '
+                      '${detail.unrealizedPnl.isPositive ? '+' : ''}${_formatAmount(detail.unrealizedPnl)} '
                       '(${detail.unrealizedPnlPct.toPercentChange()})',
                   valueColor: detail.unrealizedPnl.isPositive
                       ? colors.priceUp
@@ -136,7 +144,7 @@ class _DetailBody extends StatelessWidget {
                 _MetricRow(
                   label: '今日盈亏',
                   value:
-                      '${detail.todayPnl.isPositive ? '+' : ''}${detail.todayPnl.toAmount()} '
+                      '${detail.todayPnl.isPositive ? '+' : ''}${_formatAmount(detail.todayPnl)} '
                       '(${detail.todayPnlPct.toPercentChange()})',
                   valueColor: detail.todayPnl.isPositive
                       ? colors.priceUp
@@ -163,26 +171,26 @@ class _DetailBody extends StatelessWidget {
                 ),
                 _MetricRow(
                   label: '持仓均价',
-                  value: detail.avgCost.toUsPrice(),
+                  value: _formatPrice(detail.avgCost),
                   valueColor: colors.onSurface,
                   colors: colors,
                 ),
                 _MetricRow(
                   label: '当前价格',
-                  value: detail.currentPrice.toUsPrice(),
+                  value: _formatPrice(detail.currentPrice),
                   valueColor: colors.onSurface,
                   colors: colors,
                 ),
                 _MetricRow(
                   label: '成本基础',
-                  value: detail.costBasis.toAmount(),
+                  value: _formatAmount(detail.costBasis),
                   valueColor: colors.onSurface,
                   colors: colors,
                 ),
                 _MetricRow(
                   label: '已实现盈亏',
                   value:
-                      '${detail.realizedPnl.isPositive ? '+' : ''}${detail.realizedPnl.toAmount()}',
+                      '${detail.realizedPnl.isPositive ? '+' : ''}${_formatAmount(detail.realizedPnl)}',
                   valueColor: detail.realizedPnl.isPositive
                       ? colors.priceUp
                       : detail.realizedPnl.isNegative
@@ -229,7 +237,7 @@ class _DetailBody extends StatelessWidget {
               colors: colors,
               child: Column(
                 children: detail.recentTrades
-                    .map((t) => _TradeRow(trade: t, colors: colors))
+                    .map((t) => _TradeRow(trade: t, colors: colors, market: detail.market))
                     .toList(),
               ),
             ),
@@ -483,10 +491,17 @@ class _SettlementCard extends StatelessWidget {
 }
 
 class _TradeRow extends StatelessWidget {
-  const _TradeRow({required this.trade, required this.colors});
+  const _TradeRow({required this.trade, required this.colors, required this.market});
 
   final TradeRecord trade;
   final ColorTokens colors;
+  final String market;
+
+  String _formatPrice(Decimal v) =>
+      market == 'HK' ? v.toHkPrice() : v.toUsPrice();
+
+  String _formatAmount(Decimal v) =>
+      market == 'HK' ? v.toAmount(currencySymbol: 'HK\$') : v.toAmount();
 
   @override
   Widget build(BuildContext context) {
@@ -521,7 +536,7 @@ class _TradeRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '${trade.qty} 股 @ ${trade.price.toUsPrice()}',
+                '${trade.qty} 股 @ ${_formatPrice(trade.price)}',
                 style: TextStyle(
                   color: colors.onSurface,
                   fontSize: 13,
@@ -542,7 +557,7 @@ class _TradeRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                trade.amount.toAmount(),
+                _formatAmount(trade.amount),
                 style: TextStyle(
                   color: colors.onSurface,
                   fontSize: 13,
@@ -550,7 +565,7 @@ class _TradeRow extends StatelessWidget {
                 ),
               ),
               Text(
-                '手续费 ${trade.fee.toAmount()}',
+                '手续费 ${_formatAmount(trade.fee)}',
                 style: TextStyle(
                   color: colors.onSurfaceVariant,
                   fontSize: 11,

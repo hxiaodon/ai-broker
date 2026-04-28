@@ -67,7 +67,7 @@ void main() {
       await tester.pump(const Duration(seconds: 2));
       expect(find.byType(Scaffold), findsWidgets,
           reason: 'App scaffold must be rendered for authenticated user');
-      debugPrint('✅ Journey 1: Authenticated app launched successfully');
+      printOnFailure('✅ Journey 1: Authenticated app launched successfully');
     },
   );
 
@@ -93,7 +93,7 @@ void main() {
       // AssetSummaryCard shows "账户总资产（USD）" label
       expect(find.text('账户总资产（USD）'), findsWidgets,
           reason: 'AssetSummaryCard must be visible with total equity label');
-      debugPrint('✅ Journey 2: PortfolioScreen rendered with AssetSummaryCard');
+      printOnFailure('✅ Journey 2: PortfolioScreen rendered with AssetSummaryCard');
     },
   );
 
@@ -118,7 +118,7 @@ void main() {
           reason: 'AAPL position from Mock Server must appear in list');
       expect(find.text('0700'), findsWidgets,
           reason: '0700 position from Mock Server must appear in list');
-      debugPrint('✅ Journey 3: AAPL and 0700 positions visible in portfolio list');
+      printOnFailure('✅ Journey 3: AAPL and 0700 positions visible in portfolio list');
     },
   );
 
@@ -148,7 +148,7 @@ void main() {
       );
       // Verify trade history section is present
       expect(find.text('交易记录'), findsOneWidget);
-      debugPrint('✅ Journey 4: PositionDetailScreen(AAPL) shows "Apple Inc."');
+      printOnFailure('✅ Journey 4: PositionDetailScreen(AAPL) shows "Apple Inc."');
     },
   );
 
@@ -179,7 +179,7 @@ void main() {
         reason:
             'AAPL sector "Technology" from Mock Server must appear in analysis tab',
       );
-      debugPrint('✅ Journey 5: PortfolioAnalysisScreen shows "Technology" sector bar');
+      printOnFailure('✅ Journey 5: PortfolioAnalysisScreen shows "Technology" sector bar');
     },
   );
 
@@ -206,7 +206,7 @@ void main() {
       expect(find.byType(EmptyPortfolioWidget), findsOneWidget,
           reason: 'Empty positions + zero cash must render EmptyPortfolioWidget');
       expect(find.text('账户还没有资产'), findsOneWidget);
-      debugPrint('✅ Journey 6: EmptyPortfolioWidget rendered correctly');
+      printOnFailure('✅ Journey 6: EmptyPortfolioWidget rendered correctly');
     },
   );
 
@@ -234,7 +234,7 @@ void main() {
           reason:
               'Empty positions + non-zero cash must render CashOnlyPortfolioWidget');
       expect(find.text('可用现金'), findsOneWidget);
-      debugPrint('✅ Journey 7: CashOnlyPortfolioWidget with cash balance rendered');
+      printOnFailure('✅ Journey 7: CashOnlyPortfolioWidget with cash balance rendered');
     },
   );
 
@@ -266,7 +266,7 @@ void main() {
         isTrue,
         reason: 'Error state must show recoverable error message',
       );
-      debugPrint('✅ Journey 8: Error state with error message rendered');
+      printOnFailure('✅ Journey 8: Error state with error message rendered');
     },
   );
 
@@ -293,7 +293,7 @@ void main() {
       // Positions tab must be visible with both symbols
       expect(find.text('AAPL'), findsWidgets);
       expect(find.text('0700'), findsWidgets);
-      debugPrint('✅ Journey 9: Position list with 2 symbols rendered for sort test');
+      printOnFailure('✅ Journey 9: Position list with 2 symbols rendered for sort test');
     },
   );
 
@@ -323,7 +323,7 @@ void main() {
       expect(find.textContaining('集中度'), findsWidgets,
           reason:
               'Position with weight > 30% of totalEquity must show concentration warning');
-      debugPrint('✅ Journey 10: Concentration warning banner rendered');
+      printOnFailure('✅ Journey 10: Concentration warning banner rendered');
     },
   );
 
@@ -352,7 +352,7 @@ void main() {
       expect(find.textContaining('Wash Sale'), findsWidgets,
           reason:
               'washSaleFlagged=true must render _WashSaleWarning with "Wash Sale" text');
-      debugPrint('✅ Journey 11: Wash sale warning card rendered');
+      printOnFailure('✅ Journey 11: Wash sale warning card rendered');
     },
   );
 
@@ -381,7 +381,7 @@ void main() {
       // Pending settlement section must be visible
       expect(find.text('待结算'), findsWidgets,
           reason: 'Pending settlement row must appear when qty > 0');
-      debugPrint('✅ Journey 12: Pending settlement date rendered');
+      printOnFailure('✅ Journey 12: Pending settlement date rendered');
     },
   );
 }

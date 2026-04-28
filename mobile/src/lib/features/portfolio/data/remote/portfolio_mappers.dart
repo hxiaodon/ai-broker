@@ -13,7 +13,7 @@ Decimal _parseDecimal(String? raw, String field) {
     throw FormatException('Missing required field: $field');
   }
   return Decimal.tryParse(raw) ??
-      (throw FormatException('Invalid decimal for $field: "$raw"'));
+      (throw FormatException('Invalid decimal for field: $field'));
 }
 
 DateTime _parseUtcDateTime(String? raw, String field) {
@@ -23,7 +23,7 @@ DateTime _parseUtcDateTime(String? raw, String field) {
   try {
     return DateTime.parse(raw).toUtc();
   } catch (_) {
-    throw FormatException('Invalid datetime for $field: "$raw"');
+    throw FormatException('Invalid datetime for field: $field');
   }
 }
 
@@ -31,7 +31,7 @@ TradeSide _parseTradeSide(String raw) {
   return switch (raw.toUpperCase()) {
     'BUY' => TradeSide.buy,
     'SELL' => TradeSide.sell,
-    _ => throw FormatException('Unknown trade side: "$raw"'),
+    _ => throw FormatException('Unknown trade side value'),
   };
 }
 

@@ -2,6 +2,14 @@ import 'package:decimal/decimal.dart';
 import 'package:intl/intl.dart';
 import '../constants/app_constants.dart';
 
+// Formats a non-negative fixed-decimal string with thousand separators.
+// Operates entirely on string/integer arithmetic — no floating-point involved.
+String _formatFixed(String fixedAbs) {
+  final parts = fixedAbs.split('.');
+  final intFormatted = NumberFormat('#,##0').format(int.parse(parts[0]));
+  return parts.length == 2 ? '$intFormatted.${parts[1]}' : intFormatted;
+}
+
 /// Extension methods on [Decimal] for financial price formatting.
 ///
 /// All formatted strings include the correct decimal precision per
@@ -10,31 +18,28 @@ extension DecimalFinancialExtensions on Decimal {
   /// Format as US stock price (4 decimal places).
   /// Example: Decimal('150.25') → '$150.2500'
   String toUsPrice({String currencySymbol = r'$'}) {
-    final formatter = NumberFormat.currency(
-      symbol: currencySymbol,
-      decimalDigits: AppConstants.usPriceDecimalPlaces,
-    );
-    return formatter.format(toDouble());
+    final sign = isNegative ? '-' : '';
+    final formatted = _formatFixed(
+        abs().toStringAsFixed(AppConstants.usPriceDecimalPlaces));
+    return '$sign$currencySymbol$formatted';
   }
 
   /// Format as HK stock price (3 decimal places).
   /// Example: Decimal('25.6') → 'HK$25.600'
   String toHkPrice({String currencySymbol = 'HK\$'}) {
-    final formatter = NumberFormat.currency(
-      symbol: currencySymbol,
-      decimalDigits: AppConstants.hkPriceDecimalPlaces,
-    );
-    return formatter.format(toDouble());
+    final sign = isNegative ? '-' : '';
+    final formatted = _formatFixed(
+        abs().toStringAsFixed(AppConstants.hkPriceDecimalPlaces));
+    return '$sign$currencySymbol$formatted';
   }
 
   /// Format as currency amount (2 decimal places).
   /// Example: Decimal('1234.5') → '$1,234.50'
   String toAmount({String currencySymbol = r'$'}) {
-    final formatter = NumberFormat.currency(
-      symbol: currencySymbol,
-      decimalDigits: AppConstants.amountDecimalPlaces,
-    );
-    return formatter.format(toDouble());
+    final sign = isNegative ? '-' : '';
+    final formatted = _formatFixed(
+        abs().toStringAsFixed(AppConstants.amountDecimalPlaces));
+    return '$sign$currencySymbol$formatted';
   }
 
   /// Format as percentage change.

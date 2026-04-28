@@ -1,6 +1,8 @@
 import 'package:decimal/decimal.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../../core/errors/app_exception.dart';
+
 import '../../trading/application/positions_provider.dart';
 import '../domain/entities/position_detail.dart';
 import '../domain/entities/sector_allocation.dart';
@@ -21,7 +23,10 @@ Future<List<SectorAllocation>> sectorAllocation(Ref ref) async {
   final futures = positions
       .map((p) => ref.watch(positionDetailProvider(p.symbol).future)
           .then<PositionDetail?>((d) => d)
-          .catchError((Object _) => null))
+          .catchError((Object e) {
+            if (e is AuthException) throw e;
+            return null as PositionDetail?;
+          }))
       .toList();
 
   final results = await Future.wait(futures);
@@ -43,8 +48,9 @@ Future<List<SectorAllocation>> sectorAllocation(Ref ref) async {
       .map((e) => SectorAllocation(
             sector: e.key,
             marketValue: e.value,
-            weight: Decimal.parse(
-                (e.value / total).toDecimal(scaleOnInfinitePrecision: 6).toString()),
+            weight: (e.value / total)
+                .toDecimal(scaleOnInfinitePrecision: 7)
+                .round(scale: 6),
           ))
       .toList()
     ..sort((a, b) => b.marketValue.compareTo(a.marketValue));

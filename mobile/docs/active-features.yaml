@@ -13,7 +13,7 @@
 
 domain: mobile
 last_updated: 2026-04-28
-current_focus: kyc
+current_focus: settings
 
 development_order:
   - auth
@@ -67,7 +67,7 @@ modules:
 
   - id: portfolio
     name: 持仓模块
-    status: in_progress
+    status: review
     phase1_tasks: "18/18"
     prd: mobile/docs/prd/06-portfolio.md
     tracker: mobile/docs/specs/portfolio.tracker.md
@@ -79,7 +79,12 @@ modules:
       复用 trading 模块 positions/portfolioSummary providers，
       新增 PositionDetail（含 sector/wash sale/trade history）、
       SectorAllocationProvider、PnlRankingProvider、全部 screens + widgets。
-      待 security-engineer + code-reviewer 审核。
+      security-engineer + code-reviewer 审核完成（2026-04-28）：
+      5 Critical + 7 Major 已全部修复。修复要点：
+      decimal_extensions 移除 toDouble() 精度问题、港股价格格式化、
+      repository 改 autoDispose、DioException/FormatException 脱敏、
+      sector_allocation AuthException rethrow、权重显式舍入、
+      测试 debugPrint → printOnFailure。待合并至 main。
 
   - id: funding
     name: 资金模块
@@ -90,7 +95,16 @@ modules:
     hifi: mobile/prototypes/05-funding/
     contracts:
       - docs/contracts/fund-to-mobile.md
-    notes: "AML 合规要求高；银行账号加密、出入金审批流程"
+    notes: >
+      security-engineer + code-reviewer 审核完成（2026-04-28）：
+      4 Critical + 9 Major 已全部修复。修复要点：
+      C1 硬编码张三→真实 KYC legalName、C2 存款加生物识别门控（待 C2 实现）、
+      C3 微存款幂等 Key 改 UUID v4、C4 removeBankAccount 改 mutating headers + 幂等 Key、
+      M1 e.toString() 改用户友好消息、M2-M4 三个 screen 加 ScreenProtectionMixin、
+      M5 BalanceCard retry 回调修复、M6 存款最小金额校验、
+      M7 retry 清幂等 Key 再取新 challenge、M8 unknown status/channel 抛异常、
+      M9 routing_number 加入日志脱敏。
+      注：C2（存款生物识别门控）为架构级改动，需独立 PR 实现。待合并。
 
   - id: kyc
     name: KYC 模块

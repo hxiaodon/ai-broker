@@ -25,7 +25,7 @@ class PortfolioRepositoryImpl implements PortfolioRepository {
       _remote.getPositionDetail(symbol);
 }
 
-@Riverpod(keepAlive: true)
+@riverpod
 PortfolioRepository portfolioRepository(Ref ref) {
   final tokenSvc = ref.read(tokenServiceProvider);
   final baseUrl = EnvironmentConfig.instance.tradingBaseUrl;
@@ -33,7 +33,7 @@ PortfolioRepository portfolioRepository(Ref ref) {
   return PortfolioRepositoryImpl(
     remote: PortfolioRemoteDataSource(
       dio: dio,
-      connectivity: ref.watch(connectivityServiceProvider),
+      connectivity: ref.read(connectivityServiceProvider),
       signer: const HmacSigner(),
       sessionKeyService: ref.read(sessionKeyServiceProvider),
       nonceService: ref.read(nonceServiceProvider),

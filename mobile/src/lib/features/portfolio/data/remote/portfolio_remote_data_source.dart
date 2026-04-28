@@ -62,9 +62,9 @@ class PortfolioRemoteDataSource {
       return PositionDetailModel.fromJson(resp.data!).toDomain();
     } on DioException catch (e) {
       throw _mapDioError(e, 'getPositionDetail');
-    } on FormatException catch (e) {
-      AppLogger.warning('getPositionDetail: invalid response format: ${e.message}');
-      throw ServerException(statusCode: 0, message: 'Invalid response format: ${e.message}');
+    } on FormatException catch (_) {
+      AppLogger.warning('getPositionDetail: invalid response format');
+      throw const ServerException(statusCode: 0, message: 'Invalid response format');
     }
   }
 
@@ -75,7 +75,7 @@ class PortfolioRemoteDataSource {
   }
 
   AppException _mapDioError(DioException e, String op) {
-    AppLogger.warning('$op failed: ${e.message}');
+    AppLogger.warning('$op failed: type=${e.type.name}');
     if (e.type == DioExceptionType.connectionTimeout ||
         e.type == DioExceptionType.receiveTimeout) {
       return NetworkException(message: '$op timed out', cause: e);
@@ -90,10 +90,12 @@ class PortfolioRemoteDataSource {
     }
     if (statusCode != null && statusCode >= 400) {
       final body = e.response?.data;
-      final msg = body is Map ? body['message'] as String? : null;
+      final raw = body is Map ? body['message'] as String? : null;
+      // Truncate server message to prevent internal detail leakage.
+      final msg = raw != null && raw.length <= 200 ? raw : null;
       return ServerException(
           statusCode: statusCode, message: msg ?? 'Client error');
     }
-    return NetworkException(message: '$op failed: ${e.message}', cause: e);
+    return NetworkException(message: '$op failed', cause: e);
   }
 }

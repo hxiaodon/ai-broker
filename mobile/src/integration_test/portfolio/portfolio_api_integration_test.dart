@@ -6,7 +6,6 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter/foundation.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:trading_app/core/auth/device_info_service.dart';
@@ -57,7 +56,7 @@ void main() {
         final positions = resp.data!['positions'] as List;
         expect(positions.length, greaterThanOrEqualTo(2));
         expect((positions.first as Map).containsKey('symbol'), isTrue);
-        debugPrint(
+        printOnFailure(
           '✅ TPA1: GET /positions returned ${positions.length} positions',
         );
       },
@@ -83,7 +82,7 @@ void main() {
             reason: 'avg_cost must be a valid decimal string');
         expect(Decimal.tryParse(data['cost_basis'] as String), isNotNull,
             reason: 'cost_basis must be a valid decimal string');
-        debugPrint(
+        printOnFailure(
           '✅ TPA2: GET /positions/AAPL company_name="${data['company_name']}" '
           'sector="${data['sector']}"',
         );
@@ -112,7 +111,7 @@ void main() {
             reason: 'side must be BUY or SELL',
           );
         }
-        debugPrint(
+        printOnFailure(
           '✅ TPA3: GET /positions/AAPL recent_trades has ${trades.length} records',
         );
       },
@@ -132,7 +131,7 @@ void main() {
           isTrue,
           reason: 'wash_sale_status must be "clean" or "flagged"',
         );
-        debugPrint('✅ TPA4: wash_sale_status = "$washSaleStatus"');
+        printOnFailure('✅ TPA4: wash_sale_status = "$washSaleStatus"');
       },
     );
 
@@ -143,7 +142,7 @@ void main() {
             .get<Map<String, dynamic>>('/api/v1/positions/NONEXIST_SYMBOL');
         expect(resp.statusCode, 404);
         expect(resp.data!['error_code'], 'POSITION_NOT_FOUND');
-        debugPrint('✅ TPA5: NONEXIST → 404 POSITION_NOT_FOUND');
+        printOnFailure('✅ TPA5: NONEXIST → 404 POSITION_NOT_FOUND');
       },
     );
 
@@ -169,7 +168,7 @@ void main() {
             reason: '$field must be a valid decimal string, got "$val"',
           );
         }
-        debugPrint(
+        printOnFailure(
           '✅ TPA6: portfolio/summary total_equity=${data['total_equity']} '
           'cash_balance=${data['cash_balance']}',
         );
@@ -212,7 +211,7 @@ void main() {
         expect(detail.avgCost.scale, greaterThanOrEqualTo(2),
             reason:
                 'avgCost must retain at least 2 decimal places (financial precision)');
-        debugPrint(
+        printOnFailure(
           '✅ TPA7: getPositionDetail(AAPL) returned domain object '
           'unrealizedPnl=${detail.unrealizedPnl} costBasis=${detail.costBasis}',
         );
@@ -228,7 +227,7 @@ void main() {
           fail('Expected ServerException to be thrown');
         } on ServerException catch (e) {
           expect(e.statusCode, 404);
-          debugPrint('✅ TPA8: ZZZZ throws ServerException(404): ${e.message}');
+          printOnFailure('✅ TPA8: ZZZZ throws ServerException(404): ${e.message}');
         } on Exception catch (e) {
           fail('Expected ServerException but got: ${e.runtimeType}');
         }
@@ -275,7 +274,7 @@ void main() {
         expect(received, isTrue,
             reason:
                 'Mock Server must push portfolio.summary within 5s (check mock-server is running)');
-        debugPrint('✅ TPA9: Received WS portfolio update from trading channel');
+        printOnFailure('✅ TPA9: Received WS portfolio update from trading channel');
       },
     );
   });
@@ -314,7 +313,7 @@ void main() {
             reason: '"$field" must be a valid decimal string, got "$val"',
           );
         }
-        debugPrint('✅ TPA10: All 9 required summary fields present and parseable');
+        printOnFailure('✅ TPA10: All 9 required summary fields present and parseable');
       },
     );
   });
@@ -334,7 +333,7 @@ void main() {
         final currentPrice =
             Decimal.parse(data['current_price'] as String);
         final avgCost = Decimal.parse(data['avg_cost'] as String);
-        final qty = (data['qty'] as int).toDecimal();
+        final qty = (data['quantity'] as int).toDecimal();
         final unrealizedPnl =
             Decimal.parse(data['unrealized_pnl'] as String);
 
@@ -348,7 +347,7 @@ void main() {
               'unrealizedPnl=$unrealizedPnl should ≈ (currentPrice=$currentPrice '
               '− avgCost=$avgCost) × qty=$qty = $expected (diff=$diff)',
         );
-        debugPrint(
+        printOnFailure(
             '✅ TPA11: unrealizedPnl formula verified (diff=$diff ≤ 0.01)');
       },
     );
@@ -362,7 +361,6 @@ void main() {
     setUpAll(() {
       // Dio that always returns 500 via an interceptor
       final errorDio = Dio(BaseOptions(baseUrl: baseUrl));
-      errorDio.options.validateStatus = (_) => true;
       errorDio.interceptors.add(_AlwaysServerErrorInterceptor());
       errorRepo = PortfolioRepositoryImpl(
         remote: PortfolioRemoteDataSource(
@@ -384,7 +382,7 @@ void main() {
           fail('Expected ServerException to be thrown');
         } on ServerException catch (e) {
           expect(e.statusCode, greaterThanOrEqualTo(500));
-          debugPrint(
+          printOnFailure(
               '✅ TPA12: 5xx → ServerException(${e.statusCode}) thrown correctly');
         } on Exception catch (e) {
           fail('Expected ServerException but got: ${e.runtimeType}');
@@ -396,7 +394,6 @@ void main() {
       'TPA13: getPositionDetail retries on transient 5xx and succeeds on second attempt',
       (tester) async {
         final retryDio = Dio(BaseOptions(baseUrl: baseUrl));
-        retryDio.options.validateStatus = (_) => true;
         retryDio.interceptors.add(_TransientErrorInterceptor());
         final retryRepo = PortfolioRepositoryImpl(
           remote: PortfolioRemoteDataSource(
@@ -415,10 +412,10 @@ void main() {
         try {
           final detail = await retryRepo.getPositionDetail('AAPL');
           expect(detail, isA<PositionDetail>());
-          debugPrint('✅ TPA13: Retry succeeded — detail.symbol=${detail.symbol}');
+          printOnFailure('✅ TPA13: Retry succeeded — detail.symbol=${detail.symbol}');
         } on ServerException catch (e) {
           // Acceptable if retry interceptor is not yet configured (documents the gap)
-          debugPrint(
+          printOnFailure(
               'ℹ️  TPA13: Retry not configured yet — ServerException(${e.statusCode}) '
               'thrown on first error. Add RetryInterceptor to productionDio to fix.');
         }
@@ -472,11 +469,16 @@ class _StubDeviceInfoService extends DeviceInfoService {
 class _AlwaysServerErrorInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    handler.resolve(
-      Response<Map<String, dynamic>>(
+    final response = Response<Map<String, dynamic>>(
+      requestOptions: options,
+      statusCode: 500,
+      data: {'message': 'Simulated server error'},
+    );
+    handler.reject(
+      DioException(
         requestOptions: options,
-        statusCode: 500,
-        data: {'message': 'Simulated server error'},
+        response: response,
+        type: DioExceptionType.badResponse,
       ),
     );
   }
@@ -490,11 +492,16 @@ class _TransientErrorInterceptor extends Interceptor {
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     _callCount++;
     if (_callCount == 1) {
-      handler.resolve(
-        Response<Map<String, dynamic>>(
+      final response = Response<Map<String, dynamic>>(
+        requestOptions: options,
+        statusCode: 500,
+        data: {'message': 'Transient error — first attempt'},
+      );
+      handler.reject(
+        DioException(
           requestOptions: options,
-          statusCode: 500,
-          data: {'message': 'Transient error — first attempt'},
+          response: response,
+          type: DioExceptionType.badResponse,
         ),
       );
     } else {
