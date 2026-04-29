@@ -12,7 +12,7 @@
 #   shipped     — 审核通过，合并至 main
 
 domain: mobile
-last_updated: 2026-04-28
+last_updated: 2026-04-29
 current_focus: settings
 
 development_order:
@@ -28,13 +28,26 @@ modules:
   - id: auth
     name: 认证模块
     status: review
-    phase1_tasks: "17/17"   # completed/total — 更新自 auth.tracker.md
+    phase1_tasks: "17/17"
     prd: mobile/docs/prd/01-auth.md
     tracker: mobile/docs/specs/auth.tracker.md
     hifi: mobile/prototypes/01-auth/
     contracts:
       - docs/contracts/ams-to-mobile.md  # § Auth
-    notes: "Phase 1 实现完成，flutter analyze 0 issues，等待 security-engineer + code-reviewer 审核"
+    notes: >
+      security-engineer + code-reviewer 审核完成（2026-04-29）：
+      5 Critical + 7 Major 已全部修复。修复要点：
+      C1 SSL pin placeholder 加 assert 阻断 release 构建、
+      C2 biometric_login/setup/device 三个 screen 替换 raw LocalAuthentication → localAuthServiceProvider（强制 biometricOnly:true）、
+      C3 设备注销 stub 签名加 kReleaseMode guard、
+      C4 AuthInterceptor Completer 竞态修复（null 移至 complete 前）、
+      C5 refresh token JWT 格式校验移除（opaque token 合约）、
+      M1 accountStatus 从 JWT claims 提取（不再硬编码 ACTIVE）、
+      M2 OTP lockout 持久化到 secure storage（重启不可绕过）、
+      M3 refresh 请求加 X-Device-ID、M4 confirmRevokeAll 合并单次生物识别、
+      M5 日志手机号脱敏、M6 screen 改用 use-case provider。
+      API 集成测试修复：otp→otp_code 字段名、400→401 状态码、移除不存在的 success 字段断言。
+      待合并至 main。
 
   - id: market
     name: 行情模块
@@ -61,9 +74,18 @@ modules:
     contracts:
       - docs/contracts/trading-to-mobile.md
     notes: >
-      Phase 1 实现完成（T01-T20），完整三层测试套件通过（state/api/e2e）。
-      HMAC 签名、nonce 防重放、生物识别、WS token_expiring 全部覆盖。
-      待 security-engineer + code-reviewer 审核。
+      security-engineer + code-reviewer 审核完成（2026-04-29）：
+      4 Critical + 6 Major 已全部修复。修复要点：
+      C1 e.toString() 改类型化异常映射（BusinessException/Network/Auth/Server 各有本地化提示）、
+      C2 submit() 加 idle 守卫 + 幂等 Key 移至首个 await 前（消除双击竞态）、
+      C3 三个交易页面加 ScreenProtectionMixin（OrderConfirmScreen 转 ConsumerStatefulWidget）、
+      C4 撤单加生物识别门控（_OrderTab 转 ConsumerStatefulWidget）、
+      M1 WS _onDone/_onError 重置 _reconnectAttempts（二次断连不会耗尽配额）、
+      M2 撤单幂等 Key 按订单持久化 + try/catch + SnackBar、
+      M3+M4 Decimal.parse 全改安全 _d() helper + 枚举解析抛异常 + WS 数据边界校验、
+      M5 _BalanceCard 类型化 AsyncValue 替换 dynamic cast、
+      M6 _canSubmit 加数量上限（100000）和价格精度校验（HK≤3dp/US≤4dp）。
+      待合并至 main。
 
   - id: portfolio
     name: 持仓模块
