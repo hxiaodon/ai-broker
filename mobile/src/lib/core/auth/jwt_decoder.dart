@@ -42,6 +42,17 @@ class JwtDecoder {
         extractClaim(jwt, 'user_id');
   }
 
+  /// Extracts the account status from a JWT token.
+  ///
+  /// Tries claim names 'account_status' and 'status'.
+  /// Falls back to 'ACTIVE' if not present (backwards-compatible with tokens
+  /// issued before AMS added the claim).
+  static String extractAccountStatus(String jwt) {
+    return extractClaim(jwt, 'account_status') ??
+        extractClaim(jwt, 'status') ??
+        'ACTIVE';
+  }
+
   /// Decodes a base64url-encoded string (JWT payload).
   ///
   /// Handles padding normalization required by JWT spec.

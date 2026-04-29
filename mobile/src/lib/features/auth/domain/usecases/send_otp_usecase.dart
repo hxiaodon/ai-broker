@@ -35,7 +35,7 @@ class SendOtpUseCase {
     // Generate UUID v4 for network retry idempotency.
     // Same key + same request = server returns cached response.
     final idempotencyKey = _uuidGenerator.v4();
-    AppLogger.debug('SendOtpUseCase: phone=$phoneNumber, idempotency=$idempotencyKey');
+    AppLogger.debug('SendOtpUseCase: sending OTP, idempotency=$idempotencyKey');
 
     try {
       // ─── Repository Call ────────────────────────────────────────────
@@ -46,7 +46,7 @@ class SendOtpUseCase {
 
       AppLogger.info(
         'OTP sent successfully: '
-        'phone=$phoneNumber (masked=${result.maskedPhoneNumber}), '
+        'phone=${result.maskedPhoneNumber}, '
         'expiresIn=${result.expiresInSeconds}s',
       );
 

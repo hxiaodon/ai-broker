@@ -4,6 +4,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import '../../../core/logging/app_logger.dart';
+import '../../../core/storage/secure_storage_service.dart';
 
 part 'otp_timer_notifier.freezed.dart';
 part 'otp_timer_notifier.g.dart';
@@ -40,10 +41,26 @@ class OtpTimerNotifier extends _$OtpTimerNotifier {
   Timer? _expiryTimer;
   Timer? _lockoutTimer;
 
+  static const _lockoutStorageKey = 'auth.otp_lockout_until';
+
   @override
   OtpTimerState build() {
     ref.onDispose(_cancelAll);
+    _restoreLockoutIfActive();
     return const OtpTimerState();
+  }
+
+  Future<void> _restoreLockoutIfActive() async {
+    final storage = ref.read(secureStorageServiceProvider);
+    final stored = await storage.read(_lockoutStorageKey);
+    if (stored == null) return;
+    final lockoutUntil = DateTime.tryParse(stored)?.toUtc();
+    if (lockoutUntil == null ||
+        lockoutUntil.isBefore(clock.now().toUtc())) {
+      await storage.delete(_lockoutStorageKey);
+      return;
+    }
+    _startLockout(lockoutUntil: lockoutUntil);
   }
 
   // ─── OTP Sent ────────────────────────────────────────────────────────────
@@ -98,12 +115,19 @@ class OtpTimerNotifier extends _$OtpTimerNotifier {
 
     AppLogger.warning('Account locked out until $until');
 
+    // Persist so lockout survives app restart.
+    ref.read(secureStorageServiceProvider).write(
+          _lockoutStorageKey,
+          until.toIso8601String(),
+        );
+
     _lockoutTimer = Timer.periodic(const Duration(seconds: 1), (t) {
       final rem = state.lockoutUntil!
           .difference(clock.now().toUtc())
           .inSeconds;
       if (rem <= 0) {
         t.cancel();
+        ref.read(secureStorageServiceProvider).delete(_lockoutStorageKey);
         state = state.copyWith(
           isLockedOut: false,
           lockoutRemainingSeconds: 0,

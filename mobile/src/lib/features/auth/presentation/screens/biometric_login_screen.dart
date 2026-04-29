@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:local_auth/local_auth.dart';
 
+import '../../../../core/auth/local_auth_service.dart';
 import '../../../../core/auth/token_service.dart';
 import '../../../../core/logging/app_logger.dart';
 import '../../../../core/routing/route_names.dart';
@@ -27,7 +27,6 @@ class BiometricLoginScreen extends ConsumerStatefulWidget {
 }
 
 class _BiometricLoginScreenState extends ConsumerState<BiometricLoginScreen> {
-  final _localAuth = LocalAuthentication();
   bool _isVerifying = false;
   int _failureCount = 0; // max 3 before auto-switch
   String? _errorMessage;
@@ -64,13 +63,14 @@ class _BiometricLoginScreenState extends ConsumerState<BiometricLoginScreen> {
     });
 
     try {
-      final canCheck = await _localAuth.canCheckBiometrics;
+      final localAuth = ref.read(localAuthServiceProvider);
+      final canCheck = await localAuth.isAvailable();
       if (!canCheck) {
         _switchToOtp();
         return;
       }
 
-      final authenticated = await _localAuth.authenticate(
+      final authenticated = await localAuth.authenticate(
         localizedReason: '使用 Face ID 登录 MetaStock',
       );
 

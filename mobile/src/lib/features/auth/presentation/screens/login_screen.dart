@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../../../core/errors/app_exception.dart';
 import '../../../../core/logging/app_logger.dart';
@@ -9,7 +8,7 @@ import '../../../../core/routing/route_names.dart';
 import '../../../../shared/theme/color_tokens.dart';
 import '../../application/auth_notifier.dart';
 import '../../application/otp_timer_notifier.dart';
-import '../../data/auth_repository_impl.dart';
+import '../../data/auth_usecase_providers.dart';
 import '../widgets/country_code_picker.dart';
 import '../widgets/phone_input_widget.dart';
 
@@ -62,14 +61,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       _errorMessage = null;
     });
 
-    final idempotencyKey = const Uuid().v4();
-    final repo = ref.read(authRepositoryProvider);
-
     try {
-      final result = await repo.sendOtp(
-        phoneNumber: _e164Phone,
-        idempotencyKey: idempotencyKey,
-      );
+      final result = await ref
+          .read(sendOtpUseCaseProvider)
+          .call(phoneNumber: _e164Phone);
 
       // Start OTP countdown timers
       ref.read(otpTimerProvider.notifier).onOtpSent(
@@ -84,7 +79,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           requestId: result.requestId,
           phoneNumber: _e164Phone,
           maskedPhone: result.maskedPhoneNumber,
-          idempotencyKey: idempotencyKey,
+          idempotencyKey: result.requestId, // use-case owns idempotency
         ),
       );
     } on BusinessException catch (e) {

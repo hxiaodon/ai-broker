@@ -72,29 +72,15 @@ class RefreshTokenUseCase {
   }
 
   /// Validate refresh token format.
+  /// Validates the refresh token.
   ///
-  /// Throws [ValidationException] if token is invalid.
+  /// Refresh tokens are opaque (AMS contract: auth_token.dart §7) — no
+  /// structural assumptions beyond non-empty. JWT format validation is
+  /// intentionally omitted; AMS may change the format without a client break.
   void _validateRefreshToken(String token) {
     if (token.isEmpty) {
       throw ValidationException(
         message: 'Refresh token cannot be empty',
-        field: 'refreshToken',
-      );
-    }
-
-    // Validate JWT format: header.payload.signature (3 parts separated by dots)
-    final parts = token.split('.');
-    if (parts.length != 3) {
-      throw ValidationException(
-        message: 'Invalid refresh token format: expected JWT with 3 parts, got ${parts.length}',
-        field: 'refreshToken',
-      );
-    }
-
-    // Check that each part is non-empty
-    if (parts.any((p) => p.isEmpty)) {
-      throw ValidationException(
-        message: 'Invalid refresh token: empty parts',
         field: 'refreshToken',
       );
     }

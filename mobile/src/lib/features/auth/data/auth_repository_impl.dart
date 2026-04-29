@@ -145,13 +145,16 @@ class AuthRepositoryImpl implements AuthRepository {
     final accountId = existingAccess != null
         ? JwtDecoder.extractAccountId(existingAccess) ?? 'unknown'
         : 'unknown';
+    // Extract account_status from the new access token JWT claims.
+    // Falls back to 'ACTIVE' for tokens issued before AMS added the claim.
+    final accountStatus = JwtDecoder.extractAccountStatus(response.accessToken);
 
     final token = AuthToken(
       accessToken: response.accessToken,
       refreshToken: response.refreshToken,
       accessTokenExpiresAt: expiresAt,
       accountId: accountId,
-      accountStatus: 'ACTIVE',
+      accountStatus: accountStatus,
     );
 
     await _tokenService.saveTokens(

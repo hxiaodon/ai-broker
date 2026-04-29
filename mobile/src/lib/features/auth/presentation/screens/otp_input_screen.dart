@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../../../core/errors/app_exception.dart';
 import '../../../../core/logging/app_logger.dart';
@@ -10,7 +9,7 @@ import '../../../../core/routing/route_names.dart';
 import '../../../../shared/theme/color_tokens.dart';
 import '../../application/auth_notifier.dart';
 import '../../application/otp_timer_notifier.dart';
-import '../../data/auth_repository_impl.dart';
+import '../../data/auth_usecase_providers.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../widgets/otp_input_widget.dart';
 import 'login_screen.dart';
@@ -74,16 +73,12 @@ class _OtpInputScreenState extends ConsumerState<OtpInputScreen> {
       _errorMessage = null;
     });
 
-    final idempotencyKey = const Uuid().v4();
-    final repo = ref.read(authRepositoryProvider);
-
     try {
-      final result = await repo.verifyOtp(
-        requestId: widget.args.requestId,
-        otpCode: code,
-        phoneNumber: widget.args.phoneNumber,
-        idempotencyKey: idempotencyKey,
-      );
+      final result = await ref.read(verifyOtpUseCaseProvider).call(
+            requestId: widget.args.requestId,
+            otpCode: code,
+            phoneNumber: widget.args.phoneNumber,
+          );
 
       if (!mounted) return;
 
@@ -145,14 +140,10 @@ class _OtpInputScreenState extends ConsumerState<OtpInputScreen> {
     final timerState = ref.read(otpTimerProvider);
     if (timerState.resendCountdownSeconds > 0) return;
 
-    final idempotencyKey = const Uuid().v4();
-    final repo = ref.read(authRepositoryProvider);
-
     try {
-      final result = await repo.sendOtp(
-        phoneNumber: widget.args.phoneNumber,
-        idempotencyKey: idempotencyKey,
-      );
+      final result = await ref
+          .read(sendOtpUseCaseProvider)
+          .call(phoneNumber: widget.args.phoneNumber);
       ref.read(otpTimerProvider.notifier).onOtpSent(
             resendAfterSeconds: result.retryAfterSeconds,
             expiresInSeconds: result.expiresInSeconds,

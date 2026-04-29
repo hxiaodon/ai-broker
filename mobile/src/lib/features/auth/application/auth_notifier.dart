@@ -66,10 +66,11 @@ class AuthNotifier extends _$AuthNotifier {
       final isValid = await tokenService.isAccessTokenValid();
       if (isValid) {
         final accountId = JwtDecoder.extractAccountId(accessToken) ?? 'unknown';
+        final accountStatus = JwtDecoder.extractAccountStatus(accessToken);
         final biometricEnabled = await _isBiometricRegistered();
         state = AuthState.authenticated(
           accountId: accountId,
-          accountStatus: 'ACTIVE',
+          accountStatus: accountStatus,
           biometricEnabled: biometricEnabled,
         );
         AppLogger.info('Session restored from storage');

@@ -1,9 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:local_auth/local_auth.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
 import '../../../../core/auth/device_info_service.dart';
+import '../../../../core/auth/local_auth_service.dart';
 import '../../../../core/logging/app_logger.dart';
 import '../../../../shared/theme/color_tokens.dart';
 import '../../data/auth_repository_impl.dart';
@@ -28,7 +29,6 @@ class DeviceManagementScreen extends ConsumerStatefulWidget {
 
 class _DeviceManagementScreenState
     extends ConsumerState<DeviceManagementScreen> {
-  final _localAuth = LocalAuthentication();
   List<DeviceInfoEntity>? _devices;
   bool _isLoading = true;
   String? _errorMessage;
@@ -61,7 +61,8 @@ class _DeviceManagementScreenState
     if (!confirmed) return;
 
     // Biometric confirmation required per PRD §6.3
-    final canCheck = await _localAuth.canCheckBiometrics;
+    final localAuth = ref.read(localAuthServiceProvider);
+    final canCheck = await localAuth.isAvailable();
     if (!canCheck) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -71,23 +72,30 @@ class _DeviceManagementScreenState
       return;
     }
 
-    final authenticated = await _localAuth.authenticate(
+    final authenticated = await localAuth.authenticate(
       localizedReason: '验证身份以注销设备 ${device.deviceName}',
     );
 
     if (!authenticated) return;
 
     try {
+      // C3 guard: stub biometric signature must not reach production.
+      // Phase 2 will implement real Secure Enclave / Keystore signing.
+      if (kReleaseMode) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('远程注销功能正在建设中，如需帮助请联系客服')),
+          );
+        }
+        return;
+      }
       final repo = ref.read(authRepositoryProvider);
       // Build biometric signature header value
       final deviceInfoService = ref.read(deviceInfoServiceProvider);
       final currentDeviceId = await deviceInfoService.getDeviceId();
       final timestamp =
           DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
-      // Phase 1 stub: real biometric signing via Secure Enclave / Keystore
-      // will be implemented in Phase 2 (see BiometricKeyManager).
-      // Phase 1 stub: real biometric signing via Secure Enclave / Keystore
-      // will be implemented in Phase 2 (see BiometricKeyManager).
+      // TODO(phase2): replace with BiometricKeyManager Secure Enclave/Keystore signature.
       final biometricSignature =
           '$timestamp|$currentDeviceId|revoke|stub_signature';
 
@@ -569,8 +577,60 @@ class _DeviceManagementScreenState
 
     if (!(confirmed ?? false)) return;
 
+    // Single biometric prompt for batch revoke (not per-device).
+    final localAuth = ref.read(localAuthServiceProvider);
+    final canCheck = await localAuth.isAvailable();
+    if (!canCheck) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('需要生物识别验证才能注销设备')),
+        );
+      }
+      return;
+    }
+    final authenticated = await localAuth.authenticate(
+      localizedReason: '验证身份以注销所有其他设备',
+    );
+    if (!authenticated) return;
+
+    // C3 guard: stub biometric signature must not reach production.
+    if (kReleaseMode) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('远程注销功能正在建设中，如需帮助请联系客服')),
+        );
+      }
+      return;
+    }
+
     for (final device in devices) {
-      await _confirmAndRevokeDevice(device);
+      await _revokeDeviceDirectly(device);
+    }
+  }
+
+  // Revokes a device without showing confirmation dialog or biometric prompt.
+  // Callers must have already confirmed intent and authenticated the user.
+  Future<void> _revokeDeviceDirectly(DeviceInfoEntity device) async {
+    try {
+      final repo = ref.read(authRepositoryProvider);
+      final deviceInfoService = ref.read(deviceInfoServiceProvider);
+      final currentDeviceId = await deviceInfoService.getDeviceId();
+      final timestamp =
+          DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000;
+      // TODO(phase2): replace with BiometricKeyManager Secure Enclave/Keystore signature.
+      final biometricSignature =
+          '$timestamp|$currentDeviceId|revoke|stub_signature';
+      await repo.revokeDevice(
+        targetDeviceId: device.deviceId,
+        biometricSignature: biometricSignature,
+      );
+    } on Object catch (e, st) {
+      AppLogger.error('Revoke device failed', error: e, stackTrace: st);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('注销 ${device.deviceName} 失败，请重试')),
+        );
+      }
     }
   }
 }

@@ -85,8 +85,13 @@ const Map<String, List<String>> _spkiPins = {
 /// CA-signed certificate. This defeats MitM proxies that rely on a
 /// user-installed root CA to produce apparently-valid certificates.
 HttpClient createPinnedHttpClient() {
-  // withTrustedRoots: false → no system CAs are trusted → all certificates
-  // are "bad" from Dart's perspective → badCertificateCallback fires for
+  // Fail fast in any build if placeholder pins are still present.
+  // In release builds this will throw at startup; catch it in integration tests.
+  assert(
+    _spkiPins.values.every((pins) => pins.every((p) => !p.startsWith('PLACEHOLDER_'))),
+    'SSL pins contain placeholder values. Replace with real certificate '
+    'fingerprints before releasing. See ssl_pinning_config.dart for instructions.',
+  );
   // every connection, not just self-signed or expired certs.
   final context = SecurityContext(withTrustedRoots: false);
   final client = HttpClient(context: context);

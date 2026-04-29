@@ -20,6 +20,9 @@ class LocalAuthService {
       );
 
   Future<bool> isAvailable() => _auth.canCheckBiometrics;
+
+  Future<List<BiometricType>> getAvailableBiometrics() =>
+      _auth.getAvailableBiometrics();
 }
 
 @Riverpod(keepAlive: true)

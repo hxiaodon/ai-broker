@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../auth/device_info_service.dart';
 import '../auth/token_service.dart';
 import '../logging/app_logger.dart';
 import 'auth_interceptor.dart';
@@ -13,6 +14,7 @@ import 'dio_client.dart';
 Dio createAuthenticatedDio({
   required String baseUrl,
   required TokenService tokenService,
+  DeviceInfoService? deviceInfoService,
 }) {
   // Build a temporary Dio first — AuthInterceptor needs a Dio reference
   // for retry, but we replace it with the real one below.
@@ -29,9 +31,13 @@ Dio createAuthenticatedDio({
       try {
         // Use a bare Dio (no auth interceptor) to avoid recursion
         final refreshDio = DioClient.create(baseUrl: baseUrl);
+        final deviceId = await deviceInfoService?.getDeviceId();
         final response = await refreshDio.post<Map<String, dynamic>>(
           '/v1/auth/token/refresh',
           data: {'refresh_token': refreshToken},
+          options: deviceId != null
+              ? Options(headers: {'X-Device-ID': deviceId})
+              : null,
         );
         final data = response.data!;
         final newAccessToken = data['access_token'] as String;

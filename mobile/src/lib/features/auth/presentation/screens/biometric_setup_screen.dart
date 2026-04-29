@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:local_auth/local_auth.dart';
 
+import '../../../../core/auth/local_auth_service.dart';
 import '../../../../core/logging/app_logger.dart';
 import '../../../../core/routing/route_names.dart';
 import '../../../../core/storage/secure_storage_service.dart';
@@ -27,7 +28,6 @@ class BiometricSetupScreen extends ConsumerStatefulWidget {
 }
 
 class _BiometricSetupScreenState extends ConsumerState<BiometricSetupScreen> {
-  final _localAuth = LocalAuthentication();
   bool _isLoading = false;
 
   static const _skipCountKey = 'auth.biometric_skip_count';
@@ -36,22 +36,20 @@ class _BiometricSetupScreenState extends ConsumerState<BiometricSetupScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Check device biometric availability
-      final canCheck = await _localAuth.canCheckBiometrics;
+      final localAuth = ref.read(localAuthServiceProvider);
+      final canCheck = await localAuth.isAvailable();
       if (!canCheck) {
         _showNoBiometricDialog();
         return;
       }
 
-      // Trigger local biometric prompt
-      final authenticated = await _localAuth.authenticate(
+      final authenticated = await localAuth.authenticate(
         localizedReason: '开启 Face ID 快捷登录',
       );
 
       if (!authenticated) return;
 
-      // Get biometric type
-      final types = await _localAuth.getAvailableBiometrics();
+      final types = await localAuth.getAvailableBiometrics();
       final biometricType = _mapBiometricType(types);
 
       // Register on server

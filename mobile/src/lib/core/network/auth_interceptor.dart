@@ -71,32 +71,37 @@ class AuthInterceptor extends Interceptor {
 
       // Start a new refresh operation
       _refreshCompleter = Completer<String?>();
+      String? newToken;
       try {
         AppLogger.debug('AuthInterceptor: attempting token refresh for ${err.requestOptions.path}');
-        final newToken = await refreshAccessToken();
-
-        if (newToken != null) {
-          AppLogger.info('AuthInterceptor: token refresh successful');
-          _refreshCompleter!.complete(newToken);
-
-          // Retry the original request
-          final options = err.requestOptions
-            ..headers['Authorization'] = 'Bearer $newToken';
-          final retryResponse = await _dio.fetch<dynamic>(options);
-          return handler.resolve(retryResponse);
-        } else {
-          AppLogger.warning('AuthInterceptor: token refresh returned null');
-          _refreshCompleter!.complete(null);
-        }
+        newToken = await refreshAccessToken();
       } on Object catch (e, stack) {
         AppLogger.error(
           'AuthInterceptor: token refresh failed',
           error: e,
           stackTrace: stack,
         );
-        _refreshCompleter!.completeError(e, stack);
-      } finally {
+        // Null before completeError so new 401s start fresh rather than waiting.
+        final completer = _refreshCompleter!;
         _refreshCompleter = null;
+        completer.completeError(e, stack);
+        return handler.next(err);
+      }
+
+      // Null before complete so new 401s start fresh rather than waiting.
+      final completer = _refreshCompleter!;
+      _refreshCompleter = null;
+
+      if (newToken != null) {
+        AppLogger.info('AuthInterceptor: token refresh successful');
+        completer.complete(newToken);
+        final options = err.requestOptions
+          ..headers['Authorization'] = 'Bearer $newToken';
+        final retryResponse = await _dio.fetch<dynamic>(options);
+        return handler.resolve(retryResponse);
+      } else {
+        AppLogger.warning('AuthInterceptor: token refresh returned null');
+        completer.complete(null);
       }
     }
     handler.next(err);

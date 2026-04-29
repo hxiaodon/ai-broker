@@ -41,8 +41,7 @@ class VerifyOtpUseCase {
     // ─── Idempotency Key ────────────────────────────────────────────────
     final idempotencyKey = _uuidGenerator.v4();
     AppLogger.debug(
-      'VerifyOtpUseCase: requestId=$requestId, '
-      'phone=$phoneNumber, idempotency=$idempotencyKey',
+      'VerifyOtpUseCase: requestId=$requestId, idempotency=$idempotencyKey',
     );
 
     try {
