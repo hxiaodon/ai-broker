@@ -5,10 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/routing/route_names.dart';
+import '../../../../core/security/screen_protection_service.dart';
 import '../../../../shared/theme/color_tokens.dart';
 import '../../application/portfolio_summary_provider.dart';
 import '../../application/positions_provider.dart';
 import '../../domain/entities/order.dart';
+import '../../domain/entities/portfolio_summary.dart';
+import '../../domain/entities/position.dart';
 import '../widgets/slide_to_confirm_widget.dart';
 
 class OrderEntryScreen extends ConsumerStatefulWidget {
@@ -29,7 +32,8 @@ class OrderEntryScreen extends ConsumerStatefulWidget {
   ConsumerState<OrderEntryScreen> createState() => _OrderEntryScreenState();
 }
 
-class _OrderEntryScreenState extends ConsumerState<OrderEntryScreen> {
+class _OrderEntryScreenState extends ConsumerState<OrderEntryScreen>
+    with ScreenProtectionMixin {
   late OrderSide _side;
   OrderType _orderType = OrderType.limit;
   OrderValidity _validity = OrderValidity.day;
@@ -63,9 +67,19 @@ class _OrderEntryScreenState extends ConsumerState<OrderEntryScreen> {
     return Decimal.tryParse(t);
   }
 
+  // Market-appropriate quantity and price limits.
+  static const _maxQty = 100000;
+  static final _minLimitPrice = Decimal.parse('0.0001');
+
   bool get _canSubmit {
-    if (_qty <= 0) return false;
-    if (_orderType == OrderType.limit && _limitPrice == null) return false;
+    if (_qty <= 0 || _qty > _maxQty) return false;
+    if (_orderType == OrderType.limit) {
+      final p = _limitPrice;
+      if (p == null || p < _minLimitPrice) return false;
+      // Enforce market-specific decimal precision.
+      if (widget.market == 'HK' && p.scale > 3) return false;
+      if (widget.market == 'US' && p.scale > 4) return false;
+    }
     return true;
   }
 
@@ -276,8 +290,8 @@ class _BalanceCard extends StatelessWidget {
   });
 
   final OrderSide side;
-  final AsyncValue<dynamic> portfolioAsync;
-  final AsyncValue<dynamic> positionsAsync;
+  final AsyncValue<PortfolioSummary> portfolioAsync;
+  final AsyncValue<List<Position>> positionsAsync;
   final String symbol;
   final ColorTokens colors;
 
@@ -293,7 +307,7 @@ class _BalanceCard extends StatelessWidget {
           ? portfolioAsync.when(
               loading: () => _label('可用资金', '加载中...', colors),
               error: (_, _) => _label('可用资金', '--', colors),
-              data: (p) => _label(
+              data: (PortfolioSummary p) => _label(
                 '可用资金',
                 '\$${p.buyingPower.toStringAsFixed(2)}',
                 colors,
@@ -302,11 +316,10 @@ class _BalanceCard extends StatelessWidget {
           : positionsAsync.when(
               loading: () => _label('可卖数量', '加载中...', colors),
               error: (_, _) => _label('可卖数量', '--', colors),
-              data: (positions) {
-                final pos = (positions as List).cast<dynamic>().firstWhere(
-                      (p) => p.symbol == symbol,
-                      orElse: () => null,
-                    );
+              data: (List<Position> positions) {
+                final pos = positions
+                    .where((p) => p.symbol == symbol)
+                    .firstOrNull;
                 return _label(
                   '可卖数量',
                   pos != null ? '${pos.availableQty} 股' : '0 股',

@@ -8,6 +8,15 @@ import 'models/order_model.dart';
 import 'models/portfolio_summary_model.dart';
 import 'models/position_model.dart';
 
+// Safe decimal parser — surfaces field name in the error for easier debugging.
+Decimal _d(String? raw, String field) {
+  if (raw == null || raw.isEmpty) {
+    throw FormatException('Missing required field: $field');
+  }
+  return Decimal.tryParse(raw) ??
+      (throw FormatException('Invalid decimal for field: $field'));
+}
+
 extension OrderModelMapper on OrderModel {
   Order toDomain() => Order(
         orderId: orderId,
@@ -18,10 +27,9 @@ extension OrderModelMapper on OrderModel {
         status: _parseStatus(status),
         qty: qty,
         filledQty: filledQty,
-        limitPrice:
-            limitPrice != null ? Decimal.parse(limitPrice!) : null,
+        limitPrice: limitPrice != null ? _d(limitPrice!, 'limit_price') : null,
         avgFillPrice:
-            avgFillPrice != null ? Decimal.parse(avgFillPrice!) : null,
+            avgFillPrice != null ? _d(avgFillPrice!, 'avg_fill_price') : null,
         validity: _parseValidity(validity),
         extendedHours: extendedHours,
         fees: fees.toDomain(),
@@ -32,11 +40,11 @@ extension OrderModelMapper on OrderModel {
 
 extension OrderFeesModelMapper on OrderFeesModel {
   OrderFees toDomain() => OrderFees(
-        commission: Decimal.parse(commission),
-        exchangeFee: Decimal.parse(exchangeFee),
-        secFee: Decimal.parse(secFee),
-        finraFee: Decimal.parse(finraFee),
-        total: Decimal.parse(total),
+        commission: _d(commission, 'commission'),
+        exchangeFee: _d(exchangeFee, 'exchange_fee'),
+        secFee: _d(secFee, 'sec_fee'),
+        finraFee: _d(finraFee, 'finra_fee'),
+        total: _d(total, 'total'),
       );
 }
 
@@ -45,7 +53,7 @@ extension OrderFillModelMapper on OrderFillModel {
         fillId: fillId,
         orderId: orderId,
         qty: qty,
-        price: Decimal.parse(price),
+        price: _d(price, 'price'),
         exchange: exchange,
         filledAt: DateTime.parse(filledAt).toUtc(),
       );
@@ -57,13 +65,13 @@ extension PositionModelMapper on PositionModel {
         market: market,
         qty: qty,
         availableQty: availableQty,
-        avgCost: Decimal.parse(avgCost),
-        currentPrice: Decimal.parse(currentPrice),
-        marketValue: Decimal.parse(marketValue),
-        unrealizedPnl: Decimal.parse(unrealizedPnl),
-        unrealizedPnlPct: Decimal.parse(unrealizedPnlPct),
-        todayPnl: Decimal.parse(todayPnl),
-        todayPnlPct: Decimal.parse(todayPnlPct),
+        avgCost: _d(avgCost, 'avg_cost'),
+        currentPrice: _d(currentPrice, 'current_price'),
+        marketValue: _d(marketValue, 'market_value'),
+        unrealizedPnl: _d(unrealizedPnl, 'unrealized_pnl'),
+        unrealizedPnlPct: _d(unrealizedPnlPct, 'unrealized_pnl_pct'),
+        todayPnl: _d(todayPnl, 'today_pnl'),
+        todayPnlPct: _d(todayPnlPct, 'today_pnl_pct'),
         pendingSettlements: pendingSettlements
             .map((s) => PendingSettlement(
                   qty: s.qty,
@@ -75,48 +83,45 @@ extension PositionModelMapper on PositionModel {
 
 extension PortfolioSummaryModelMapper on PortfolioSummaryModel {
   PortfolioSummary toDomain() => PortfolioSummary(
-        totalEquity: Decimal.parse(totalEquity),
-        cashBalance: Decimal.parse(cashBalance),
-        marketValue: Decimal.parse(marketValue),
-        dayPnl: Decimal.parse(dayPnl),
-        dayPnlPct: Decimal.parse(dayPnlPct),
-        totalPnl: Decimal.parse(totalPnl),
-        totalPnlPct: Decimal.parse(totalPnlPct),
-        buyingPower: Decimal.parse(buyingPower),
-        unsettledCash: Decimal.parse(unsettledCash),
+        totalEquity: _d(totalEquity, 'total_equity'),
+        cashBalance: _d(cashBalance, 'cash_balance'),
+        marketValue: _d(marketValue, 'market_value'),
+        dayPnl: _d(dayPnl, 'day_pnl'),
+        dayPnlPct: _d(dayPnlPct, 'day_pnl_pct'),
+        totalPnl: _d(totalPnl, 'total_pnl'),
+        totalPnlPct: _d(totalPnlPct, 'total_pnl_pct'),
+        buyingPower: _d(buyingPower, 'buying_power'),
+        unsettledCash: _d(unsettledCash, 'unsettled_cash'),
       );
 }
 
-OrderSide _parseSide(String s) =>
-    s == 'buy' ? OrderSide.buy : OrderSide.sell;
+OrderSide _parseSide(String s) => switch (s) {
+      'buy' => OrderSide.buy,
+      'sell' => OrderSide.sell,
+      _ => throw FormatException('Unknown order side'),
+    };
 
-OrderType _parseOrderType(String s) =>
-    s == 'market' ? OrderType.market : OrderType.limit;
+OrderType _parseOrderType(String s) => switch (s) {
+      'market' => OrderType.market,
+      'limit' => OrderType.limit,
+      _ => throw FormatException('Unknown order type'),
+    };
 
-OrderValidity _parseValidity(String s) =>
-    s == 'gtc' ? OrderValidity.gtc : OrderValidity.day;
+OrderValidity _parseValidity(String s) => switch (s) {
+      'gtc' => OrderValidity.gtc,
+      'day' => OrderValidity.day,
+      _ => throw FormatException('Unknown order validity'),
+    };
 
-OrderStatus _parseStatus(String s) {
-  switch (s) {
-    case 'RISK_CHECKING':
-      return OrderStatus.riskChecking;
-    case 'PENDING':
-      return OrderStatus.pending;
-    case 'PARTIALLY_FILLED':
-      return OrderStatus.partiallyFilled;
-    case 'FILLED':
-      return OrderStatus.filled;
-    case 'CANCELLED':
-      return OrderStatus.cancelled;
-    case 'PARTIALLY_FILLED_CANCELLED':
-      return OrderStatus.partiallyFilledCancelled;
-    case 'EXPIRED':
-      return OrderStatus.expired;
-    case 'REJECTED':
-      return OrderStatus.rejected;
-    case 'EXCHANGE_REJECTED':
-      return OrderStatus.exchangeRejected;
-    default:
-      return OrderStatus.rejected;
-  }
-}
+OrderStatus _parseStatus(String s) => switch (s) {
+      'RISK_CHECKING' => OrderStatus.riskChecking,
+      'PENDING' => OrderStatus.pending,
+      'PARTIALLY_FILLED' => OrderStatus.partiallyFilled,
+      'FILLED' => OrderStatus.filled,
+      'CANCELLED' => OrderStatus.cancelled,
+      'PARTIALLY_FILLED_CANCELLED' => OrderStatus.partiallyFilledCancelled,
+      'EXPIRED' => OrderStatus.expired,
+      'REJECTED' => OrderStatus.rejected,
+      'EXCHANGE_REJECTED' => OrderStatus.exchangeRejected,
+      _ => throw FormatException('Unknown order status'),
+    };

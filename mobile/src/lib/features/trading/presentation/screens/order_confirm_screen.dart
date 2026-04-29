@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/routing/route_names.dart';
+import '../../../../core/security/screen_protection_service.dart';
 import '../../../../shared/theme/color_tokens.dart';
 import '../../../auth/application/auth_notifier.dart';
 import '../../application/order_submit_notifier.dart';
@@ -12,7 +13,7 @@ import '../../application/recent_order_banner_provider.dart';
 import '../../domain/entities/order.dart';
 import '../../domain/entities/portfolio_summary.dart';
 
-class OrderConfirmScreen extends ConsumerWidget {
+class OrderConfirmScreen extends ConsumerStatefulWidget {
   const OrderConfirmScreen({
     super.key,
     required this.symbol,
@@ -37,7 +38,22 @@ class OrderConfirmScreen extends ConsumerWidget {
   static const _colors = ColorTokens.greenUp;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<OrderConfirmScreen> createState() => _OrderConfirmScreenState();
+}
+
+class _OrderConfirmScreenState extends ConsumerState<OrderConfirmScreen>
+    with ScreenProtectionMixin {
+  @override
+  Widget build(BuildContext context) {
+    final symbol = widget.symbol;
+    final side = widget.side;
+    final orderType = widget.orderType;
+    final qty = widget.qty;
+    final limitPrice = widget.limitPrice;
+    final validity = widget.validity;
+    final extendedHours = widget.extendedHours;
+    const colors = OrderConfirmScreen._colors;
+
     final submitState = ref.watch(orderSubmitProvider);
     final portfolioAsync = ref.watch(portfolioSummaryProvider);
     final estimatedTotal = _estimatedTotal();
@@ -79,16 +95,16 @@ class OrderConfirmScreen extends ConsumerWidget {
         : const Color(0xFFFF4747);
 
     return Scaffold(
-      backgroundColor: _colors.background,
+      backgroundColor: colors.background,
       appBar: AppBar(
-        backgroundColor: _colors.surface,
+        backgroundColor: colors.surface,
         title: Text(
           '确认委托',
           style: TextStyle(
-              color: _colors.onSurface, fontWeight: FontWeight.w700),
+              color: colors.onSurface, fontWeight: FontWeight.w700),
         ),
         leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: _colors.onSurface),
+          icon: Icon(Icons.arrow_back, color: colors.onSurface),
           onPressed: () => context.pop(),
         ),
       ),
@@ -108,12 +124,12 @@ class OrderConfirmScreen extends ConsumerWidget {
               extendedHours: extendedHours,
               estimatedTotal: estimatedTotal,
               buyingPower: buyingPower,
-              colors: _colors,
+              colors: colors,
             ),
             const SizedBox(height: 16),
 
             // Best execution disclosure
-            _DisclosureCard(colors: _colors),
+            _DisclosureCard(colors: colors),
             const SizedBox(height: 24),
 
             // Submit state feedback
@@ -138,7 +154,7 @@ class OrderConfirmScreen extends ConsumerWidget {
                 onPressed: submitState.maybeWhen(
                   submitting: () => null,
                   awaitingBiometric: () => null,
-                  orElse: () => isBuyInsufficient ? null : () => _submit(ref),
+                  orElse: () => isBuyInsufficient ? null : _submit,
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: actionColor,
@@ -182,50 +198,46 @@ class OrderConfirmScreen extends ConsumerWidget {
   }
 
   Decimal? _estimatedTotal() {
-    final perShare = switch (orderType) {
-      OrderType.limit => limitPrice,
-      // Conservative estimate for market order in mock / pre-trade UI:
-      // use a placeholder floor of $100 so zero/empty values don't bypass buying power check.
+    final perShare = switch (widget.orderType) {
+      OrderType.limit => widget.limitPrice,
       OrderType.market => Decimal.parse('100.00'),
     };
     if (perShare == null) return null;
-    return perShare * Decimal.fromInt(qty);
+    return perShare * Decimal.fromInt(widget.qty);
   }
 
   Widget _buildErrorBanner(String message) {
+    const colors = OrderConfirmScreen._colors;
     return Container(
       padding: const EdgeInsets.all(12),
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: _colors.error.withValues(alpha: 0.1),
+        color: colors.error.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _colors.error.withValues(alpha: 0.4)),
+        border: Border.all(color: colors.error.withValues(alpha: 0.4)),
       ),
       child: Text(
         message,
-        style: TextStyle(color: _colors.error, fontSize: 13),
+        style: TextStyle(color: colors.error, fontSize: 13),
       ),
     );
   }
 
-  void _submit(WidgetRef ref) {
-    // Biometric gating derives from AuthState — `_isBiometricRegistered()` is
-    // resolved on login/session-restore. Guest/unauthenticated users can't
-    // reach this screen (router guard), but fall back to `false` defensively.
+  void _submit() {
     final biometricEnabled = ref.read(authProvider).maybeWhen(
           authenticated: (String _, String _, bool biometricEnabled) =>
               biometricEnabled,
           orElse: () => false,
         );
     ref.read(orderSubmitProvider.notifier).submit(
-          symbol: symbol,
-          market: market,
-          side: side,
-          orderType: orderType,
-          qty: qty,
-          limitPrice: limitPrice,
-          validity: validity,
-          extendedHours: extendedHours,
+          symbol: widget.symbol,
+          market: widget.market,
+          side: widget.side,
+          orderType: widget.orderType,
+          qty: widget.qty,
+          limitPrice: widget.limitPrice,
+          validity: widget.validity,
+          extendedHours: widget.extendedHours,
           biometricEnabled: biometricEnabled,
         );
   }

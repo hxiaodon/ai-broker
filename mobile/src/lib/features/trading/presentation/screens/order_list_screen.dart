@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../core/auth/local_auth_service.dart';
+import '../../../../core/logging/app_logger.dart';
+import '../../../../core/security/screen_protection_service.dart';
 import '../../../../shared/theme/color_tokens.dart';
 import '../../application/orders_notifier.dart';
 import '../../application/recent_order_banner_provider.dart';
@@ -17,7 +20,7 @@ class OrderListScreen extends ConsumerStatefulWidget {
 }
 
 class _OrderListScreenState extends ConsumerState<OrderListScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, ScreenProtectionMixin {
   late TabController _tabController;
 
   static const _colors = ColorTokens.greenUp;
@@ -88,7 +91,7 @@ class _OrderListScreenState extends ConsumerState<OrderListScreen>
   }
 }
 
-class _OrderTab extends ConsumerWidget {
+class _OrderTab extends ConsumerStatefulWidget {
   const _OrderTab({
     required this.filterStatus,
     required this.colors,
@@ -100,7 +103,18 @@ class _OrderTab extends ConsumerWidget {
   final String? highlightOrderId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_OrderTab> createState() => _OrderTabState();
+}
+
+class _OrderTabState extends ConsumerState<_OrderTab> {
+  // Persist per-order cancel keys so retries reuse the same key (M2).
+  final Map<String, String> _cancelKeys = {};
+
+  ColorTokens get colors => widget.colors;
+  OrderStatus? get filterStatus => widget.filterStatus;
+
+  @override
+  Widget build(BuildContext context) {
     final ordersAsync =
         ref.watch(ordersProvider(filterStatus: filterStatus));
 
@@ -147,12 +161,11 @@ class _OrderTab extends ConsumerWidget {
               return OrderCardWidget(
                 order: order,
                 colors: colors,
-                isHighlighted:
-                    highlightOrderId != null && order.orderId == highlightOrderId,
-                onTap: () => _showOrderDetail(context, ref, order),
+                isHighlighted: widget.highlightOrderId != null &&
+                    order.orderId == widget.highlightOrderId,
+                onTap: () => _showOrderDetail(context, order),
                 onCancel: order.isCancellable
-                    ? () => _confirmCancel(context, ref, order)
-                    : null,
+                    ? () => _confirmCancel(context, order)                    : null,
               );
             },
           ),
@@ -161,9 +174,9 @@ class _OrderTab extends ConsumerWidget {
     );
   }
 
-  void _confirmCancel(
-      BuildContext context, WidgetRef ref, Order order) {
-    showDialog<void>(
+  Future<void> _confirmCancel(BuildContext context, Order order) async {
+    // Step 1: text confirmation dialog
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: colors.surface,
@@ -177,31 +190,50 @@ class _OrderTab extends ConsumerWidget {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(context, false),
             child: Text('取消', style: TextStyle(color: colors.onSurfaceVariant)),
           ),
           TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await ref
-                  .read(tradingRepositoryProvider)
-                  .cancelOrder(
-                    order.orderId,
-                    idempotencyKey: const Uuid().v4(),
-                  );
-              ref.invalidate(
-                  ordersProvider(filterStatus: filterStatus));
-            },
-            child: Text('确认撤单',
-                style: TextStyle(color: colors.error)),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('确认撤单', style: TextStyle(color: colors.error)),
           ),
         ],
       ),
     );
+    if (confirmed != true || !mounted) return;
+
+    // Step 2: biometric re-authentication (C4)
+    final localAuth = ref.read(localAuthServiceProvider);
+    final canCheck = await localAuth.isAvailable();
+    if (canCheck) {
+      final authenticated = await localAuth.authenticate(
+        localizedReason: '验证身份以撤销 ${order.symbol} 委托',
+      );
+      if (!authenticated || !mounted) return;
+    }
+
+    // Step 3: cancel with persistent idempotency key (M2)
+    final idempotencyKey =
+        _cancelKeys.putIfAbsent(order.orderId, () => const Uuid().v4());
+    try {
+      await ref.read(tradingRepositoryProvider).cancelOrder(
+            order.orderId,
+            idempotencyKey: idempotencyKey,
+          );
+      _cancelKeys.remove(order.orderId); // clear on success
+      if (mounted) {
+        ref.invalidate(ordersProvider(filterStatus: filterStatus));
+      }
+    } on Object catch (e) {
+      AppLogger.warning('Cancel order failed: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(this.context).showSnackBar(
+        const SnackBar(content: Text('撤单失败，请重试')),
+      );
+    }
   }
 
-  void _showOrderDetail(
-      BuildContext context, WidgetRef ref, Order order) {
+  void _showOrderDetail(BuildContext context, Order order) {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: colors.surface,

@@ -189,12 +189,16 @@ class TradingWsNotifier extends _$TradingWsNotifier {
 
   void _onError(Object error) {
     AppLogger.warning('TradingWS: error: $error');
+    // Reset counter so each new disconnection episode gets a fresh 5-attempt budget.
+    _reconnectAttempts = 0;
     _scheduleReconnect();
   }
 
   void _onDone() {
     if (!_disposed) {
       AppLogger.debug('TradingWS: connection closed, reconnecting');
+      // Reset counter so each new disconnection episode gets a fresh 5-attempt budget.
+      _reconnectAttempts = 0;
       _scheduleReconnect();
     }
   }
@@ -243,12 +247,25 @@ class TradingWsNotifier extends _$TradingWsNotifier {
     }
   }
 
+  static final _symbolRe = RegExp(r'^[A-Z0-9.]{1,10}$');
+  static const _validMarkets = {'US', 'HK'};
+
   Position _parsePosition(Map<String, dynamic> m) {
+    final symbol = m['symbol'] as String;
+    final market = m['market'] as String;
+    if (!_symbolRe.hasMatch(symbol)) {
+      throw FormatException('WS position has invalid symbol');
+    }
+    if (!_validMarkets.contains(market)) {
+      throw FormatException('WS position has invalid market');
+    }
+    final qty = m['quantity'] as int;
+    if (qty < 0) throw FormatException('WS position qty is negative');
     return Position(
-      symbol: m['symbol'] as String,
-      market: m['market'] as String,
-      qty: m['quantity'] as int,
-      availableQty: (m['settled_qty'] as int?) ?? (m['quantity'] as int),
+      symbol: symbol,
+      market: market,
+      qty: qty,
+      availableQty: (m['settled_qty'] as int?) ?? qty,
       avgCost: _d(m['avg_cost']),
       currentPrice: _d(m['current_price']),
       marketValue: _d(m['market_value']),
@@ -274,7 +291,9 @@ class TradingWsNotifier extends _$TradingWsNotifier {
   }
 
   static Decimal _d(dynamic v) {
+    if (v == null) throw FormatException('WS field is null');
     final s = v is String ? v : v.toString();
-    return Decimal.parse(s);
+    return Decimal.tryParse(s) ??
+        (throw FormatException('WS field is not a valid decimal'));
   }
 }

@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/auth/device_info_service.dart';
 import '../../../core/auth/local_auth_service.dart';
+import '../../../core/errors/app_exception.dart';
 import '../../../core/logging/app_logger.dart';
 import '../../../core/security/bio_challenge_service.dart';
 import '../../../core/security/session_key_service.dart';
@@ -51,6 +52,14 @@ class OrderSubmitNotifier extends _$OrderSubmitNotifier {
     required bool extendedHours,
     required bool biometricEnabled,
   }) async {
+    // C2: idle guard — reject concurrent calls before the first async gap.
+    // Protects against rapid double-tap on the confirm button.
+    if (state != const OrderSubmitState.idle()) return;
+
+    // C2: generate idempotency key before any await so all retries within
+    // the same submit attempt reuse the same key.
+    _pendingIdempotencyKey ??= const Uuid().v4();
+
     // Prevent autoDispose from firing mid-submit (can have 5+ async gaps in
     // the biometric path). keepAlive is released at the end of this method.
     final keepAlive = ref.keepAlive();
@@ -113,8 +122,7 @@ class OrderSubmitNotifier extends _$OrderSubmitNotifier {
     }
 
     state = const OrderSubmitState.submitting();
-    // Reuse existing key on retry; generate new key only on fresh submission.
-    _pendingIdempotencyKey ??= const Uuid().v4();
+    // Key already generated before first await — safe to use directly.
     final idempotencyKey = _pendingIdempotencyKey!;
 
     try {
@@ -137,9 +145,18 @@ class OrderSubmitNotifier extends _$OrderSubmitNotifier {
       ref.invalidate(ordersProvider);
       _pendingIdempotencyKey = null; // order reached terminal state
       state = OrderSubmitState.success(orderId: order.orderId, requestId: requestId);
+    } on BusinessException catch (e) {
+      AppLogger.warning('Order submit business error: ${e.errorCode}');
+      state = OrderSubmitState.error(message: _mapBusinessError(e.errorCode) ?? e.message);
+    } on NetworkException catch (_) {
+      state = const OrderSubmitState.error(message: '网络异常，请检查网络后重试');
+    } on AuthException catch (_) {
+      state = const OrderSubmitState.error(message: '会话已过期，请重新登录');
+    } on ServerException catch (_) {
+      state = const OrderSubmitState.error(message: '服务暂时不可用，请稍后重试');
     } on Object catch (e) {
       AppLogger.warning('Order submit failed: $e');
-      state = OrderSubmitState.error(message: e.toString());
+      state = const OrderSubmitState.error(message: '提交委托失败，请稍后重试');
     } finally {
       keepAlive.close();
     }
@@ -149,4 +166,15 @@ class OrderSubmitNotifier extends _$OrderSubmitNotifier {
     _pendingIdempotencyKey = null;
     state = const OrderSubmitState.idle();
   }
+
+  static String? _mapBusinessError(String? code) => switch (code) {
+        'INSUFFICIENT_BUYING_POWER' => '可用资金不足',
+        'MARKET_CLOSED' => '当前市场已收盘',
+        'SYMBOL_NOT_TRADABLE' => '该股票暂不可交易',
+        'ORDER_SIZE_EXCEEDED' => '委托数量超出限额',
+        'PRICE_OUT_OF_RANGE' => '委托价格超出范围',
+        'DUPLICATE_ORDER' => '重复委托，请勿重复提交',
+        'NONCE_ALREADY_USED' => '请求已被处理，请勿重复提交',
+        _ => null,
+      };
 }
