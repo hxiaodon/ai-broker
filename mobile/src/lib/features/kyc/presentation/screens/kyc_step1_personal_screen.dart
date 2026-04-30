@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../shared/theme/color_tokens.dart';
 import '../../application/personal_info_notifier.dart';
 import '../../domain/entities/kyc_enums.dart';
 import '../../domain/entities/personal_info.dart';
@@ -30,7 +29,6 @@ class _KycStep1PersonalScreenState
   bool _isPep = false;
   bool _isInsider = false;
 
-  static const _colors = ColorTokens.greenUp;
 
   @override
   void dispose() {

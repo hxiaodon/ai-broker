@@ -155,6 +155,7 @@ class _KycStep3AddressScreenState
     if (picked == null) return;
     final bytes = await picked.readAsBytes();
     if (bytes.length > 10 * 1024 * 1024) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('文件大小不能超过 10MB')));
       return;

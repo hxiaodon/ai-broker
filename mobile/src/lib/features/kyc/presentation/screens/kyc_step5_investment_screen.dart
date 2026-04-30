@@ -140,16 +140,23 @@ class _RadioGroup<T> extends StatelessWidget {
                 fontSize: 14,
                 fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
-        ...items.map(
-          (item) => RadioListTile<T>(
-            value: item.$1,
-            groupValue: value,
-            onChanged: (v) => onChanged(v as T),
-            title: Text(item.$2,
-                style: const TextStyle(color: Colors.white70, fontSize: 14)),
-            activeColor: const Color(0xFF0DC582),
-            contentPadding: EdgeInsets.zero,
-            dense: true,
+        RadioGroup<T>(
+          groupValue: value,
+          onChanged: (v) => onChanged(v as T),
+          child: Column(
+            children: items
+                .map(
+                  (item) => RadioListTile<T>(
+                    value: item.$1,
+                    title: Text(item.$2,
+                        style: const TextStyle(
+                            color: Colors.white70, fontSize: 14)),
+                    activeColor: const Color(0xFF0DC582),
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                  ),
+                )
+                .toList(),
           ),
         ),
       ],

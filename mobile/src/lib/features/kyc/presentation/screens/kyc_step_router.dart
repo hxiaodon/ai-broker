@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/routing/route_names.dart';
 import '../../../../shared/theme/color_tokens.dart';
 import '../../application/kyc_session_notifier.dart';
 import 'kyc_step1_personal_screen.dart';

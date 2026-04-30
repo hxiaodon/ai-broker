@@ -2,7 +2,6 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../core/auth/local_auth_service.dart';
-import '../../../core/logging/app_logger.dart';
 import '../data/kyc_repository_impl.dart';
 import '../domain/entities/document_upload.dart';
 import 'kyc_session_notifier.dart';

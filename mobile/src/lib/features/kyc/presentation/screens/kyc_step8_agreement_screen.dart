@@ -156,7 +156,7 @@ class _KycStep8AgreementScreenState
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: isLoading || !_agreed
+                  onPressed: isLoading || !_agreed || !_agreementsRead
                       ? null
                       : () => _submitAll(expectedName),
                   style: ElevatedButton.styleFrom(

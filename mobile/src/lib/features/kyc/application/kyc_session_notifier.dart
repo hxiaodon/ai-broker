@@ -41,7 +41,7 @@ class KycSessionNotifier extends _$KycSessionNotifier {
     const storage = FlutterSecureStorage();
     final sessionId = await storage.read(
       key: _kSessionIdKey,
-      aOptions: const AndroidOptions(encryptedSharedPreferences: true),
+      
     );
     if (sessionId == null) {
       state = const KycSessionState.noSession();
@@ -79,7 +79,7 @@ class KycSessionNotifier extends _$KycSessionNotifier {
     await storage.write(
       key: _kSessionIdKey,
       value: session.sessionId,
-      aOptions: const AndroidOptions(encryptedSharedPreferences: true),
+      
     );
     state = KycSessionState.active(session: session);
   }
@@ -141,7 +141,7 @@ class KycSessionNotifier extends _$KycSessionNotifier {
     const storage = FlutterSecureStorage();
     await storage.delete(
       key: _kSessionIdKey,
-      aOptions: const AndroidOptions(encryptedSharedPreferences: true),
+      
     );
   }
 }

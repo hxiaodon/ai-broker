@@ -7,7 +7,6 @@ import 'package:uuid/uuid.dart';
 import '../../../core/auth/local_auth_service.dart';
 import '../../../core/logging/app_logger.dart';
 import '../data/kyc_repository_impl.dart';
-import '../data/remote/kyc_remote_data_source.dart';
 import '../domain/entities/address_proof.dart';
 import 'kyc_error_messages.dart';
 import 'kyc_session_notifier.dart';
@@ -65,7 +64,7 @@ class AddressProofNotifier extends _$AddressProofNotifier {
 
       state = const AddressProofState.uploading(progressPct: 40);
       final dataSource = ref.read(kycRemoteDataSourceProvider);
-      final (:fileHash, :fileSize) = await dataSource.uploadToS3(
+      await dataSource.uploadToS3(
         uploadUrl: upload.uploadUrl,
         fileBytes: fileBytes,
         mimeType: mimeType,

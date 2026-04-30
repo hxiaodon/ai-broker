@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
@@ -173,7 +172,7 @@ class KycRemoteDataSource {
     final resp = await _dio.post<Map<String, dynamic>>(
       '/v1/kyc/submit',
       queryParameters: {'kyc_session_id': sessionId},
-      data: {'review_checklist': {}},
+      data: {'review_checklist': <String, dynamic>{}},
       options: Options(headers: {'Idempotency-Key': idempotencyKey}),
     );
     return KycSessionModel.fromJson(resp.data!);
