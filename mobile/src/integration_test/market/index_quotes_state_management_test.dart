@@ -1,8 +1,12 @@
 import 'package:flutter/foundation.dart';
 import 'package:decimal/decimal.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:trading_app/core/auth/token_service.dart';
+import 'package:trading_app/core/config/environment_config.dart';
 import 'package:trading_app/core/logging/app_logger.dart';
+import 'package:trading_app/core/storage/secure_storage_service.dart';
 import 'package:trading_app/features/market/application/index_quotes_notifier.dart';
 import 'package:trading_app/features/market/application/quote_websocket_notifier.dart';
 import 'package:trading_app/features/market/data/market_data_repository_impl.dart';
@@ -13,6 +17,36 @@ import 'package:trading_app/features/market/domain/entities/quote.dart';
 import '../test_helpers/mock_market_data_repository.dart';
 import '../test_helpers/mock_websocket_client.dart';
 
+/// Fake TokenService for tests — returns a test token so WS connects as
+/// WsUserType.registered (non-empty token → registered tier).
+/// Override getAccessToken() to return null if you need guest tier.
+class _TestTokenService extends TokenService {
+  _TestTokenService()
+      : super(const SecureStorageService(FlutterSecureStorage()));
+
+  @override
+  Future<String?> getAccessToken() async => 'test-access-token';
+
+  @override
+  Future<String?> getRefreshToken() async => null;
+
+  @override
+  Future<bool> isAccessTokenValid() async => true;
+
+  @override
+  Future<void> saveTokens({
+    required String accessToken,
+    required String refreshToken,
+    required DateTime accessTokenExpiresAt,
+  }) async {}
+
+  @override
+  Future<void> clearTokens() async {}
+
+  @override
+  String? get cachedAccessToken => 'test-access-token';
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Index Quotes State Management Tests
 // ─────────────────────────────────────────────────────────────────────────────
@@ -21,6 +55,7 @@ void main() {
   // Initialize logger for tests
   setUpAll(() {
     AppLogger.init();
+    EnvironmentConfig.initialize(); // required by _wsUrl getter in WS notifier
   });
 
   group('IndexQuotesNotifier - State Management', () {
@@ -28,7 +63,7 @@ void main() {
     late MockMarketDataRepository mockRepo;
     late MockWebSocketClient mockWsClient;
 
-    setUp(() {
+    setUp(() async {
       mockRepo = MockMarketDataRepository();
       mockWsClient = MockWebSocketClient();
 
@@ -38,8 +73,13 @@ void main() {
           wsClientFactoryProvider.overrideWithValue(
             (_) => mockWsClient,
           ),
+          tokenServiceProvider.overrideWithValue(_TestTokenService()),
         ],
       );
+
+      // Prime the WS connection so tests can rely on it being established.
+      // quoteWebSocketProvider.future awaits the connect() handshake (10ms mock).
+      await container.read(quoteWebSocketProvider.future);
     });
 
     tearDown(() {

@@ -92,7 +92,12 @@ class IndexQuotesNotifier extends _$IndexQuotesNotifier {
   void _attachQuoteStream() {
     _quoteSubscription?.cancel();
     final wsNotifier = ref.read(quoteWebSocketProvider.notifier);
-    _quoteSubscription = wsNotifier.quoteStream.listen(_patchQuote);
+    _quoteSubscription = wsNotifier.quoteStream.listen(
+      _patchQuote,
+      onError: (Object e) =>
+          AppLogger.warning('IndexQuotes: WS stream error: $e'),
+      cancelOnError: false,
+    );
   }
 
   void _patchQuote(WsQuoteUpdate update) {

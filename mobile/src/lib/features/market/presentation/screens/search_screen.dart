@@ -167,6 +167,7 @@ class _SearchBar extends StatelessWidget {
               controller: controller,
               focusNode: focusNode,
               onChanged: onChanged,
+              maxLength: 50,
               style: Theme.of(context).textTheme.bodyMedium,
               decoration: InputDecoration(
                 hintText: '输入股票代码或名称…',
@@ -176,6 +177,7 @@ class _SearchBar extends StatelessWidget {
                 border: InputBorder.none,
                 isDense: true,
                 contentPadding: EdgeInsets.zero,
+                counterText: '', // hide the n/50 counter
               ),
               textInputAction: TextInputAction.search,
             ),

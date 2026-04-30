@@ -1,8 +1,11 @@
 import 'dart:convert';
+import 'dart:math';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
 import '../../../../core/logging/app_logger.dart';
+import '../../../../core/storage/secure_storage_service.dart';
 import '../../domain/entities/candle.dart';
 import '../../domain/entities/quote.dart';
 import '../mappers/market_mappers.dart';
@@ -52,11 +55,28 @@ class _CacheEntry {
 /// is already json_serializable).  Domain entities are produced by applying
 /// the standard DTO → entity mappers, keeping this class in the data layer.
 class QuoteLocalCache {
+  QuoteLocalCache(this._storage);
+
+  final SecureStorageService _storage;
+
   static const _quoteBoxName = 'market_quotes';
   static const _klineBoxName = 'market_kline';
+  static const _encKeyStorageKey = 'market_cache_enc_key';
 
   static const Duration _quoteTtl = Duration(minutes: 5);
   static const Duration _klineTtl = Duration(hours: 1);
+
+  Future<HiveCipher> _getCipher() async {
+    final stored = await _storage.read(_encKeyStorageKey);
+    List<int> keyBytes;
+    if (stored != null) {
+      keyBytes = base64.decode(stored);
+    } else {
+      keyBytes = List<int>.generate(32, (_) => Random.secure().nextInt(256));
+      await _storage.write(_encKeyStorageKey, base64.encode(keyBytes));
+    }
+    return HiveAesCipher(keyBytes);
+  }
 
   // ─── Quote ────────────────────────────────────────────────────────────────
 
@@ -75,7 +95,10 @@ class QuoteLocalCache {
   Future<Quote?> getQuoteStale(String symbol) async {
     final entry = await _readEntry(_quoteBoxName, symbol);
     if (entry == null) return null;
-    return _quoteFromEntry(entry);
+    final quote = _quoteFromEntry(entry);
+    // Mark as stale and populate age so StaleQuoteWarningBanner can show.
+    final ageMs = DateTime.now().toUtc().millisecondsSinceEpoch - entry.cachedAtMs;
+    return quote.copyWith(isStale: true, staleSinceMs: ageMs);
   }
 
   /// Stores [dto] for [symbol], stamping it with the current time.
@@ -90,7 +113,9 @@ class QuoteLocalCache {
 
   /// Removes all quote cache entries.
   Future<void> clearQuotes() async {
-    final box = await Hive.openBox<dynamic>(_quoteBoxName);
+    final cipher = await _getCipher();
+    final box = await Hive.openBox<dynamic>(_quoteBoxName,
+        encryptionCipher: cipher);
     await box.clear();
   }
 
@@ -138,7 +163,9 @@ class QuoteLocalCache {
 
   /// Removes all K-line cache entries.
   Future<void> clearKline() async {
-    final box = await Hive.openBox<dynamic>(_klineBoxName);
+    final cipher = await _getCipher();
+    final box = await Hive.openBox<dynamic>(_klineBoxName,
+        encryptionCipher: cipher);
     await box.clear();
   }
 
@@ -146,7 +173,9 @@ class QuoteLocalCache {
 
   Future<_CacheEntry?> _readEntry(String boxName, String key) async {
     try {
-      final box = await Hive.openBox<dynamic>(boxName);
+      final cipher = await _getCipher();
+      final box = await Hive.openBox<dynamic>(boxName,
+          encryptionCipher: cipher);
       final raw = box.get(key) as String?;
       if (raw == null || raw.isEmpty) return null;
       return _CacheEntry.fromMap(
@@ -164,7 +193,9 @@ class QuoteLocalCache {
     _CacheEntry entry,
   ) async {
     try {
-      final box = await Hive.openBox<dynamic>(boxName);
+      final cipher = await _getCipher();
+      final box = await Hive.openBox<dynamic>(boxName,
+          encryptionCipher: cipher);
       await box.put(key, jsonEncode(entry.toMap()));
     } catch (e) {
       AppLogger.warning('QuoteLocalCache: write error [$boxName/$key]: $e');
@@ -188,3 +219,8 @@ class QuoteLocalCache {
         .toList();
   }
 }
+
+/// Provider for [QuoteLocalCache] with encrypted Hive boxes.
+final quoteLocalCacheProvider = Provider<QuoteLocalCache>(
+  (ref) => QuoteLocalCache(ref.read(secureStorageServiceProvider)),
+);

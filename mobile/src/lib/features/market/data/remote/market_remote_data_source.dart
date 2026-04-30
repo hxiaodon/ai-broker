@@ -42,6 +42,16 @@ class MarketRemoteDataSource {
   /// Maximum seconds to honour a Retry-After header before failing fast.
   static const int _maxRetryAfterSeconds = 30;
 
+  static final _usSymbolPattern = RegExp(r'^[A-Z]{1,5}$');
+  static final _hkSymbolPattern = RegExp(r'^\d{4,5}$');
+
+  static void _validateSymbol(String symbol) {
+    if (!_usSymbolPattern.hasMatch(symbol) &&
+        !_hkSymbolPattern.hasMatch(symbol)) {
+      throw ArgumentError('Invalid symbol format: use 1-5 uppercase letters (US) or 4-5 digits (HK)');
+    }
+  }
+
   // ─── Quotes ───────────────────────────────────────────────────────────────
 
   /// GET /v1/market/quotes?symbols=AAPL,TSLA,...
@@ -159,6 +169,7 @@ class MarketRemoteDataSource {
 
   /// GET /v1/market/stocks/{symbol}
   Future<StockDetailDto> getStockDetail(String symbol) async {
+    _validateSymbol(symbol);
     return _withConnectivityCheck(
       operation: 'getStockDetail',
       call: () => _withRateLimitRetry(
@@ -181,6 +192,7 @@ class MarketRemoteDataSource {
     int page = 1,
     int pageSize = 10,
   }) async {
+    _validateSymbol(symbol);
     return _withConnectivityCheck(
       operation: 'getNews',
       call: () => _withRateLimitRetry(
@@ -201,6 +213,7 @@ class MarketRemoteDataSource {
 
   /// GET /v1/market/financials/{symbol}
   Future<FinancialsResponseDto> getFinancials(String symbol) async {
+    _validateSymbol(symbol);
     return _withConnectivityCheck(
       operation: 'getFinancials',
       call: () => _withRateLimitRetry(

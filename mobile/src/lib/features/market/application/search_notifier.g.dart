@@ -8,58 +8,6 @@ part of 'search_notifier.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Injectable [SharedPreferences] provider.
-///
-/// Override in tests with `sharedPreferencesProvider.overrideWithValue(mock)`.
-
-@ProviderFor(sharedPreferences)
-final sharedPreferencesProvider = SharedPreferencesProvider._();
-
-/// Injectable [SharedPreferences] provider.
-///
-/// Override in tests with `sharedPreferencesProvider.overrideWithValue(mock)`.
-
-final class SharedPreferencesProvider
-    extends
-        $FunctionalProvider<
-          AsyncValue<SharedPreferences>,
-          SharedPreferences,
-          FutureOr<SharedPreferences>
-        >
-    with
-        $FutureModifier<SharedPreferences>,
-        $FutureProvider<SharedPreferences> {
-  /// Injectable [SharedPreferences] provider.
-  ///
-  /// Override in tests with `sharedPreferencesProvider.overrideWithValue(mock)`.
-  SharedPreferencesProvider._()
-    : super(
-        from: null,
-        argument: null,
-        retry: null,
-        name: r'sharedPreferencesProvider',
-        isAutoDispose: false,
-        dependencies: null,
-        $allTransitiveDependencies: null,
-      );
-
-  @override
-  String debugGetCreateSourceHash() => _$sharedPreferencesHash();
-
-  @$internal
-  @override
-  $FutureProviderElement<SharedPreferences> $createElement(
-    $ProviderPointer pointer,
-  ) => $FutureProviderElement(pointer);
-
-  @override
-  FutureOr<SharedPreferences> create(Ref ref) {
-    return sharedPreferences(ref);
-  }
-}
-
-String _$sharedPreferencesHash() => r'ad13470fe866595ad0f58a3e26f11048d94ef22e';
-
 /// Manages the search screen state.
 ///
 /// ## Usage
@@ -153,7 +101,7 @@ final class SearchNotifierProvider
   }
 }
 
-String _$searchNotifierHash() => r'6f2a46c9513df2e711e97f4bd17179b41eae5cbe';
+String _$searchNotifierHash() => r'8fa5109f535a9203b96124d5f3aaaa06b389de22';
 
 /// Manages the search screen state.
 ///

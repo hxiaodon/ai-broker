@@ -2,12 +2,17 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:decimal/decimal.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_ce/hive.dart';
+import 'package:mocktail/mocktail.dart';
 
 import 'package:trading_app/core/logging/app_logger.dart';
+import 'package:trading_app/core/storage/secure_storage_service.dart';
 import 'package:trading_app/features/market/data/local/quote_local_cache.dart';
 import 'package:trading_app/features/market/data/remote/market_response_models.dart';
+
+class MockFlutterSecureStorage extends Mock implements FlutterSecureStorage {}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Test helpers
@@ -92,7 +97,27 @@ void main() {
         await Hive.box<dynamic>(name).clear();
       }
     }
-    sut = QuoteLocalCache();
+    // Use a mock SecureStorageService that returns a fixed key for tests.
+    final mockStorage = MockFlutterSecureStorage();
+    when(() => mockStorage.read(
+          key: any(named: 'key'),
+          iOptions: any(named: 'iOptions'),
+          aOptions: any(named: 'aOptions'),
+          lOptions: any(named: 'lOptions'),
+          wOptions: any(named: 'wOptions'),
+          webOptions: any(named: 'webOptions'),
+        )).thenAnswer((_) async => null); // first call → no key stored
+    when(() => mockStorage.write(
+          key: any(named: 'key'),
+          value: any(named: 'value'),
+          iOptions: any(named: 'iOptions'),
+          aOptions: any(named: 'aOptions'),
+          lOptions: any(named: 'lOptions'),
+          wOptions: any(named: 'wOptions'),
+          webOptions: any(named: 'webOptions'),
+        )).thenAnswer((_) async {});
+    final storage = SecureStorageService(mockStorage);
+    sut = QuoteLocalCache(storage);
   });
 
   tearDownAll(() async {

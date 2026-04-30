@@ -1,10 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../core/logging/app_logger.dart';
+import '../../../core/storage/secure_storage_service.dart';
 import '../data/market_data_repository_impl.dart';
 import '../domain/entities/search_result.dart';
 
@@ -79,16 +80,6 @@ abstract class SearchState with _$SearchState {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SharedPreferences provider
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Injectable [SharedPreferences] provider.
-///
-/// Override in tests with `sharedPreferencesProvider.overrideWithValue(mock)`.
-@Riverpod(keepAlive: true)
-Future<SharedPreferences> sharedPreferences(Ref ref) =>
-    SharedPreferences.getInstance();
-
 // ─────────────────────────────────────────────────────────────────────────────
 // SearchNotifier
 // ─────────────────────────────────────────────────────────────────────────────
@@ -137,9 +128,11 @@ class SearchNotifier extends _$SearchNotifier {
 
   Future<void> _loadHistory() async {
     try {
-      final prefs = await ref.read(sharedPreferencesProvider.future);
-      final raw = prefs.getStringList(_kHistoryKey) ?? [];
-      state = state.copyWith(history: raw);
+      final storage = ref.read(secureStorageServiceProvider);
+      final raw = await storage.read(_kHistoryKey);
+      if (raw == null) return;
+      final list = (jsonDecode(raw) as List<dynamic>).cast<String>();
+      state = state.copyWith(history: list);
     } on Object catch (e) {
       AppLogger.warning('SearchNotifier: failed to load history: $e');
     }
@@ -177,15 +170,17 @@ class SearchNotifier extends _$SearchNotifier {
   ///
   /// Clears results immediately when [query] is empty.
   void updateQuery(String query) {
+    // Belt-and-suspenders: cap at 50 chars regardless of UI enforcement.
+    final sanitized = query.length > 50 ? query.substring(0, 50) : query;
     _debounceTimer?.cancel();
-    state = state.copyWith(query: query, error: null);
+    state = state.copyWith(query: sanitized, error: null);
 
-    if (query.isEmpty) {
+    if (sanitized.isEmpty) {
       state = state.copyWith(results: [], isLoading: false);
       return;
     }
 
-    if (!_meetsMinLength(query)) {
+    if (!_meetsMinLength(sanitized)) {
       // Too short — clear results without network call.
       state = state.copyWith(results: [], isLoading: false);
       return;
@@ -194,7 +189,7 @@ class SearchNotifier extends _$SearchNotifier {
     state = state.copyWith(isLoading: true);
     _debounceTimer = Timer(
       const Duration(milliseconds: _kDebounceMs),
-      () => _doSearch(query),
+      () => _doSearch(sanitized),
     );
   }
 
@@ -248,8 +243,8 @@ class SearchNotifier extends _$SearchNotifier {
 
   Future<void> _persistHistory(List<String> items) async {
     try {
-      final prefs = await ref.read(sharedPreferencesProvider.future);
-      await prefs.setStringList(_kHistoryKey, items);
+      final storage = ref.read(secureStorageServiceProvider);
+      await storage.write(_kHistoryKey, jsonEncode(items));
     } on Object catch (e) {
       AppLogger.warning('SearchNotifier: failed to persist history: $e');
     }

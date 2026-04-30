@@ -402,9 +402,9 @@ class QuoteWebSocketClient {
   // ─── Connection lifecycle events ──────────────────────────────────────────
 
   void _onError(Object error) {
-    AppLogger.warning('WS socket error: $error');
+    AppLogger.warning('WS socket error: $error'); // full detail in logs only
     _quoteController.addError(
-      NetworkException(message: 'WS 连接错误: $error', cause: error),
+      NetworkException(message: '行情连接错误，正在重连...', cause: error),
     );
     _cleanup();
   }

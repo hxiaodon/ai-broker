@@ -1023,13 +1023,18 @@ class _ChartViewState extends State<_ChartView> {
 
   List<_MaPoint> _calcMA(List<_CandleChartData> data, int period) {
     if (data.length < period) return [];
+    final candles = widget.candles;
+    if (candles.length < period) return [];
+    // Use Decimal for accumulation to avoid floating-point drift over many candles.
     final result = <_MaPoint>[];
-    double sum = 0;
-    for (int i = 0; i < data.length; i++) {
-      sum += data[i].close;
-      if (i >= period) sum -= data[i - period].close;
+    var sum = Decimal.zero;
+    for (int i = 0; i < candles.length && i < data.length; i++) {
+      sum += candles[i].c;
+      if (i >= period) sum -= candles[i - period].c;
       if (i >= period - 1) {
-        result.add(_MaPoint(data[i].x, sum / period));
+        final ma = (sum / Decimal.fromInt(period))
+            .toDecimal(scaleOnInfinitePrecision: 10);
+        result.add(_MaPoint(data[i].x, ma.toDouble()));
       }
     }
     return result;
@@ -1091,12 +1096,13 @@ class _OhlcvInfoBar extends StatelessWidget {
     final priceColor = info.isUp ? const Color(0xFF0DC582) : const Color(0xFFFF4747);
     final changeColor = info.change >= Decimal.zero ? const Color(0xFF0DC582) : const Color(0xFFFF4747);
     final labelColor = Theme.of(context).colorScheme.onSurfaceVariant;
-    final priceFmt = intl.NumberFormat('0.00##');
     final volFmt = intl.NumberFormat.compact();
     final changePctStr =
         '${info.changePercent >= Decimal.zero ? '+' : ''}${info.changePercent.toStringAsFixed(2)}%';
+    // Use Decimal.toStringAsFixed for all price display — consistent with project
+    // financial-coding-standards; no intermediate double conversion.
     final changeStr =
-        '${info.change >= Decimal.zero ? '+' : ''}${priceFmt.format(info.change.toDouble())}';
+        '${info.change >= Decimal.zero ? '+' : ''}${info.change.abs().toStringAsFixed(4)}';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
@@ -1139,13 +1145,13 @@ class _OhlcvInfoBar extends StatelessWidget {
           // OHLCV row
           Row(
             children: [
-              _InfoCell(label: '开', value: priceFmt.format(info.open.toDouble()), color: priceColor),
+              _InfoCell(label: '开', value: info.open.toStringAsFixed(4), color: priceColor),
               const SizedBox(width: 10),
-              _InfoCell(label: '高', value: priceFmt.format(info.high.toDouble()), color: priceColor),
+              _InfoCell(label: '高', value: info.high.toStringAsFixed(4), color: priceColor),
               const SizedBox(width: 10),
-              _InfoCell(label: '低', value: priceFmt.format(info.low.toDouble()), color: priceColor),
+              _InfoCell(label: '低', value: info.low.toStringAsFixed(4), color: priceColor),
               const SizedBox(width: 10),
-              _InfoCell(label: '收', value: priceFmt.format(info.close.toDouble()), color: priceColor),
+              _InfoCell(label: '收', value: info.close.toStringAsFixed(4), color: priceColor),
               const SizedBox(width: 10),
               _InfoCell(label: '量', value: volFmt.format(info.volume), color: labelColor),
             ],

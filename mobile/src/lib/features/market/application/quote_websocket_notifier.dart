@@ -127,6 +127,9 @@ class QuoteWebSocketNotifier extends _$QuoteWebSocketNotifier {
   int _reconnectAttempts = 0;
   bool _paused = false;
   QuoteWebSocketConnectionState _connectionState = QuoteWebSocketConnectionState.disconnected;
+  // Track the authenticated tier so we can enforce it on incoming frames.
+  // null = not yet connected; only demote when explicitly WsUserType.guest.
+  WsUserType? _currentUserType;
 
   /// Last error for reconnect logging
   Object? _lastError;
@@ -179,6 +182,7 @@ class QuoteWebSocketNotifier extends _$QuoteWebSocketNotifier {
 
     _client = client;
     _reconnectAttempts = 0;
+    _currentUserType = userType;
     _pendingOperations.clear();
     _pipeClientEvents(client);
 
@@ -190,7 +194,7 @@ class QuoteWebSocketNotifier extends _$QuoteWebSocketNotifier {
   void _pipeClientEvents(QuoteWebSocketClient client) {
     _pipeSubscription?.cancel();
     _pipeSubscription = client.quoteStream.listen(
-      _outputController.add,
+      (update) => _outputController.add(_enforceTierPolicy(update)),
       onError: _onClientError,
       cancelOnError: false,
     );
@@ -286,7 +290,7 @@ class QuoteWebSocketNotifier extends _$QuoteWebSocketNotifier {
     } on Object catch (e) {
       AppLogger.warning(
           'QuoteWS: reconnect attempt $_reconnectAttempts failed: $e');
-      _scheduleReconnect();
+      await _scheduleReconnect();
     }
   }
 
@@ -354,6 +358,23 @@ class QuoteWebSocketNotifier extends _$QuoteWebSocketNotifier {
   ///
   /// Survives individual WS reconnects — consumers never need to re-listen.
   Stream<WsQuoteUpdate> get quoteStream => _outputController.stream;
+
+  /// Enforces quote tier policy: guest connections must only receive delayed frames.
+  /// Demotes real-time frames to delayed if a malicious server sends them to a guest.
+  WsQuoteUpdate _enforceTierPolicy(WsQuoteUpdate update) {
+    if (_currentUserType == WsUserType.guest &&
+        update.frameType != WsFrameType.delayed) {
+      AppLogger.warning(
+        'QuoteWS: server sent ${update.frameType} to guest — demoting to delayed',
+      );
+      return WsQuoteUpdate(
+        frameType: WsFrameType.delayed,
+        symbol: update.symbol,
+        quote: update.quote.copyWith(delayed: true),
+      );
+    }
+    return update;
+  }
 
   /// Subscribe to real-time (or delayed) quotes for [symbols].
   ///

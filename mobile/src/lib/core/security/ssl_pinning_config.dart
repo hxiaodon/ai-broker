@@ -43,9 +43,9 @@ library;
 
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 
 import '../logging/app_logger.dart';
 
@@ -84,14 +84,29 @@ const Map<String, List<String>> _spkiPins = {
 /// handshake — including handshakes where the server presents a valid
 /// CA-signed certificate. This defeats MitM proxies that rely on a
 /// user-installed root CA to produce apparently-valid certificates.
+///
+/// IMPORTANT: This pins REST API connections only. The market-data WebSocket
+/// (QuoteWebSocketClient) uses `web_socket_channel` which does not support
+/// a custom HttpClient/SecurityContext. WebSocket certificate pinning requires
+/// a platform-channel implementation (Phase 2 — tracked in BiometricKeyManager).
 HttpClient createPinnedHttpClient() {
-  // Fail fast in any build if placeholder pins are still present.
-  // In release builds this will throw at startup; catch it in integration tests.
-  assert(
-    _spkiPins.values.every((pins) => pins.every((p) => !p.startsWith('PLACEHOLDER_'))),
-    'SSL pins contain placeholder values. Replace with real certificate '
-    'fingerprints before releasing. See ssl_pinning_config.dart for instructions.',
-  );
+  // In release builds: hard fail if placeholder pins are present.
+  // In debug/profile/test builds: assert only (developer visibility, not blocking).
+  if (kReleaseMode) {
+    final hasPlaceholders = _spkiPins.values
+        .any((pins) => pins.any((p) => p.startsWith('PLACEHOLDER_')));
+    if (hasPlaceholders) {
+      throw StateError(
+        'SSL pins contain placeholder values. Replace with real certificate '
+        'fingerprints before releasing. See ssl_pinning_config.dart for instructions.',
+      );
+    }
+  } else {
+    assert(
+      _spkiPins.values.every((pins) => pins.every((p) => !p.startsWith('PLACEHOLDER_'))),
+      'SSL pins contain placeholder values. Replace before release.',
+    );
+  }
   // every connection, not just self-signed or expired certs.
   final context = SecurityContext(withTrustedRoots: false);
   final client = HttpClient(context: context);

@@ -12,6 +12,7 @@ import '../../application/stock_detail_notifier.dart';
 import '../../application/watchlist_notifier.dart';
 import '../../domain/entities/quote.dart';
 import '../../domain/entities/stock_detail.dart';
+import '../widgets/delayed_quote_banner.dart';
 import '../widgets/kline_chart_widget.dart';
 import '../widgets/market_status_indicator.dart';
 import '../widgets/stale_quote_warning_banner.dart';
@@ -42,8 +43,7 @@ class StockDetailScreen extends ConsumerWidget {
         centerTitle: true,
         surfaceTintColor: Colors.transparent,
         actions: [
-          _WatchlistToggleButton(symbol: symbol),
-          const SizedBox(width: 8),
+          _WatchlistToggleButton(symbol: symbol),          const SizedBox(width: 8),
         ],
       ),
       body: detailAsync.when(
@@ -52,7 +52,12 @@ class StockDetailScreen extends ConsumerWidget {
           message: '加载失败，请重试',
           onRetry: () => ref.invalidate(stockDetailProvider(symbol)),
         ),
-        data: (detail) => _DetailBody(detail: detail),
+        data: (detail) => Column(
+          children: [
+            if (detail.delayed) const DelayedQuoteBanner(),
+            Expanded(child: _DetailBody(detail: detail)),
+          ],
+        ),
       ),
     );
   }
@@ -77,6 +82,10 @@ class _WatchlistToggleButton extends ConsumerWidget {
     final inWatchlist = watchlistAsync.asData?.value
             .any((Quote q) => q.symbol == symbol) ??
         false;
+    // Read market from detail provider — falls back to 'US' if still loading.
+    final market = ref.watch(stockDetailProvider(symbol))
+            .asData?.value.market ??
+        'US';
 
     return IconButton(
       icon: Icon(
@@ -94,7 +103,7 @@ class _WatchlistToggleButton extends ConsumerWidget {
         if (inWatchlist) {
           await notifier.remove(symbol);
         } else {
-          await notifier.add(symbol: symbol, market: 'US');
+          await notifier.add(symbol: symbol, market: market);
         }
       },
     );
