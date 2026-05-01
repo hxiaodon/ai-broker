@@ -26,7 +26,7 @@ final class PortfolioRepositoryProvider
         argument: null,
         retry: null,
         name: r'portfolioRepositoryProvider',
-        isAutoDispose: false,
+        isAutoDispose: true,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -55,4 +55,4 @@ final class PortfolioRepositoryProvider
 }
 
 String _$portfolioRepositoryHash() =>
-    r'5740abf7bdeb8dd707aedd02605284aca939b922';
+    r'18ca50fd45e149e59143faa4b4ae57cdf732ee8e';

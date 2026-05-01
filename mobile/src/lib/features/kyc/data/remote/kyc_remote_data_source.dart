@@ -23,7 +23,7 @@ class KycRemoteDataSource {
   Future<SumsubTokenModel> getSumsubToken(String sessionId) async {
     final resp = await _dio.get<Map<String, dynamic>>(
       '/v1/kyc/sumsub-token',
-      queryParameters: {'kyc_session_id': sessionId},
+      options: Options(headers: {'X-KYC-Session-ID': sessionId}),
     );
     return SumsubTokenModel.fromJson(resp.data!);
   }
@@ -34,10 +34,8 @@ class KycRemoteDataSource {
   }) async {
     final resp = await _dio.get<Map<String, dynamic>>(
       '/v1/kyc/upload-url',
-      queryParameters: {
-        'kyc_session_id': sessionId,
-        'document_type': documentType,
-      },
+      queryParameters: {'document_type': documentType},
+      options: Options(headers: {'X-KYC-Session-ID': sessionId}),
     );
     return UploadUrlModel.fromJson(resp.data!);
   }
@@ -107,8 +105,7 @@ class KycRemoteDataSource {
   }) async {
     await _dio.post<void>(
       '/v1/kyc/financial-profile',
-      queryParameters: {'kyc_session_id': sessionId},
-      data: body,
+      data: {'kyc_session_id': sessionId, ...body},
       options: Options(headers: {'Idempotency-Key': idempotencyKey}),
     );
   }
@@ -120,8 +117,7 @@ class KycRemoteDataSource {
   }) async {
     await _dio.post<void>(
       '/v1/kyc/address-proof',
-      queryParameters: {'kyc_session_id': sessionId},
-      data: body,
+      data: {'kyc_session_id': sessionId, ...body},
       options: Options(headers: {'Idempotency-Key': idempotencyKey}),
     );
   }
@@ -133,8 +129,7 @@ class KycRemoteDataSource {
   }) async {
     await _dio.post<void>(
       '/v1/kyc/investment-assessment',
-      queryParameters: {'kyc_session_id': sessionId},
-      data: body,
+      data: {'kyc_session_id': sessionId, ...body},
       options: Options(headers: {'Idempotency-Key': idempotencyKey}),
     );
   }
@@ -146,8 +141,7 @@ class KycRemoteDataSource {
   }) async {
     await _dio.post<void>(
       '/v1/kyc/tax-forms',
-      queryParameters: {'kyc_session_id': sessionId},
-      data: body,
+      data: {'kyc_session_id': sessionId, ...body},
       options: Options(headers: {'Idempotency-Key': idempotencyKey}),
     );
   }
@@ -159,8 +153,7 @@ class KycRemoteDataSource {
   }) async {
     await _dio.post<void>(
       '/v1/kyc/agreements',
-      queryParameters: {'kyc_session_id': sessionId},
-      data: body,
+      data: {'kyc_session_id': sessionId, ...body},
       options: Options(headers: {'Idempotency-Key': idempotencyKey}),
     );
   }
@@ -171,8 +164,7 @@ class KycRemoteDataSource {
   }) async {
     final resp = await _dio.post<Map<String, dynamic>>(
       '/v1/kyc/submit',
-      queryParameters: {'kyc_session_id': sessionId},
-      data: {'review_checklist': <String, dynamic>{}},
+      data: {'kyc_session_id': sessionId, 'review_checklist': <String, dynamic>{}},
       options: Options(headers: {'Idempotency-Key': idempotencyKey}),
     );
     return KycSessionModel.fromJson(resp.data!);
@@ -181,7 +173,7 @@ class KycRemoteDataSource {
   Future<KycSessionModel> getKycStatus(String sessionId) async {
     final resp = await _dio.get<Map<String, dynamic>>(
       '/v1/kyc/status',
-      queryParameters: {'kyc_session_id': sessionId},
+      options: Options(headers: {'X-KYC-Session-ID': sessionId}),
     );
     return KycSessionModel.fromJson(resp.data!);
   }

@@ -302,11 +302,18 @@ as String,
 
 class _AwaitingBiometric implements DepositFormState {
   const _AwaitingBiometric();
+  
+
+
+
+
+
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _AwaitingBiometric);
 }
+
 
 @override
 int get hashCode => runtimeType.hashCode;
@@ -315,6 +322,7 @@ int get hashCode => runtimeType.hashCode;
 String toString() {
   return 'DepositFormState.awaitingBiometric()';
 }
+
 
 }
 

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../../core/security/screen_protection_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/investment_assessment_notifier.dart';
@@ -14,7 +16,8 @@ class KycStep5InvestmentScreen extends ConsumerStatefulWidget {
 }
 
 class _KycStep5InvestmentScreenState
-    extends ConsumerState<KycStep5InvestmentScreen> {
+    extends ConsumerState<KycStep5InvestmentScreen>
+    with ScreenProtectionMixin {
   InvestmentObjective _objective = InvestmentObjective.growth;
   RiskTolerance _risk = RiskTolerance.moderate;
   TimeHorizon _horizon = TimeHorizon.medium;

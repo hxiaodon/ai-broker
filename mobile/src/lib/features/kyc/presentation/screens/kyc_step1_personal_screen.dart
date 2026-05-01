@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../../core/security/screen_protection_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/personal_info_notifier.dart';
@@ -15,7 +17,8 @@ class KycStep1PersonalScreen extends ConsumerStatefulWidget {
 }
 
 class _KycStep1PersonalScreenState
-    extends ConsumerState<KycStep1PersonalScreen> {
+    extends ConsumerState<KycStep1PersonalScreen>
+    with ScreenProtectionMixin {
   final _formKey = GlobalKey<FormState>();
   final _firstNameCtrl = TextEditingController();
   final _lastNameCtrl = TextEditingController();

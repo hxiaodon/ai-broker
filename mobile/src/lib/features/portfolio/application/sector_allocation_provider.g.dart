@@ -64,4 +64,4 @@ final class SectorAllocationProvider
   }
 }
 
-String _$sectorAllocationHash() => r'3df9e9aabb6b46b70a7baaa3f7392d1fb337ab93';
+String _$sectorAllocationHash() => r'b1c9ed825eb337d3fffc4aaa0f848b42f9f3ae03';

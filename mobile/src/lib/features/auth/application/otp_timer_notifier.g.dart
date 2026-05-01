@@ -62,7 +62,7 @@ final class OtpTimerNotifierProvider
   }
 }
 
-String _$otpTimerNotifierHash() => r'f3a4ee23f7cedf09299e1c98907541bb471d06a3';
+String _$otpTimerNotifierHash() => r'84bf41bc6da905be3a97bb599f4bc343415d5cbf';
 
 /// OTP countdown + error count + lockout management (T10).
 ///

@@ -36,6 +36,13 @@ class AddressProofNotifier extends _$AddressProofNotifier {
     required Uint8List fileBytes,
     required String mimeType,
   }) async {
+    // C3: MIME whitelist — only allow known safe document formats.
+    const allowedMimeTypes = {'image/jpeg', 'image/png', 'application/pdf'};
+    if (!allowedMimeTypes.contains(mimeType)) {
+      state = const AddressProofState.error(message: '不支持的文件格式，请上传 JPG、PNG 或 PDF');
+      return;
+    }
+
     final sessionId = ref.read(kycSessionProvider).maybeWhen(
       active: (session) => session.sessionId,
       orElse: () => null,

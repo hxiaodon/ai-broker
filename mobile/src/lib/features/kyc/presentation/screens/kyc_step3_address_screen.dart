@@ -1,6 +1,8 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+
+import '../../../../core/security/screen_protection_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -17,7 +19,8 @@ class KycStep3AddressScreen extends ConsumerStatefulWidget {
 }
 
 class _KycStep3AddressScreenState
-    extends ConsumerState<KycStep3AddressScreen> {
+    extends ConsumerState<KycStep3AddressScreen>
+    with ScreenProtectionMixin {
   final _formKey = GlobalKey<FormState>();
   final _streetCtrl = TextEditingController();
   final _cityCtrl = TextEditingController();
@@ -160,11 +163,33 @@ class _KycStep3AddressScreenState
           const SnackBar(content: Text('文件大小不能超过 10MB')));
       return;
     }
+    // C3: detect MIME from magic bytes instead of hardcoding image/jpeg.
+    final detectedMime = _detectMimeType(bytes);
     setState(() {
       _fileName = picked.name;
       _fileBytes = bytes;
-      _mimeType = 'image/jpeg';
+      _mimeType = detectedMime;
     });
+  }
+
+  /// Detect image MIME type from magic bytes (first few bytes of file).
+  static String _detectMimeType(Uint8List bytes) {
+    if (bytes.length >= 3 &&
+        bytes[0] == 0xFF && bytes[1] == 0xD8 && bytes[2] == 0xFF) {
+      return 'image/jpeg';
+    }
+    if (bytes.length >= 8 &&
+        bytes[0] == 0x89 && bytes[1] == 0x50 && bytes[2] == 0x4E &&
+        bytes[3] == 0x47 && bytes[4] == 0x0D && bytes[5] == 0x0A) {
+      return 'image/png';
+    }
+    if (bytes.length >= 4 &&
+        bytes[0] == 0x25 && bytes[1] == 0x50 && bytes[2] == 0x44 &&
+        bytes[3] == 0x46) {
+      return 'application/pdf';
+    }
+    // Default to jpeg for ImagePicker results (always images)
+    return 'image/jpeg';
   }
 
   Future<void> _submit() async {

@@ -164,7 +164,7 @@ final class QuoteWebSocketNotifierProvider
 }
 
 String _$quoteWebSocketNotifierHash() =>
-    r'7a6d6e5f4af57c9e5120ea71dcf6e9f207a18413';
+    r'939f870ba1d89f83cbf4045113d10fbdbca59aeb';
 
 /// Manages the lifecycle of a [QuoteWebSocketClient] connection and exposes a
 /// persistent broadcast stream of [WsQuoteUpdate] events to the UI layer.

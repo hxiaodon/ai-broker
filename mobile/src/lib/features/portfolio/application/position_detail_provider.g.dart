@@ -9,13 +9,17 @@ part of 'position_detail_provider.dart';
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
 /// Private provider: performs the REST fetch only.
-/// Cached independently so WS overlay rebuilds do not re-trigger the network call.
+/// keepAlive: REST result is cached across screen navigation; rebuilt only on
+/// explicit invalidation (e.g. pull-to-refresh). WS overlay is handled separately
+/// by [positionDetailProvider] to avoid re-fetching on every quote update.
 
 @ProviderFor(_positionDetailRest)
 final _positionDetailRestProvider = _PositionDetailRestFamily._();
 
 /// Private provider: performs the REST fetch only.
-/// Cached independently so WS overlay rebuilds do not re-trigger the network call.
+/// keepAlive: REST result is cached across screen navigation; rebuilt only on
+/// explicit invalidation (e.g. pull-to-refresh). WS overlay is handled separately
+/// by [positionDetailProvider] to avoid re-fetching on every quote update.
 
 final class _PositionDetailRestProvider
     extends
@@ -26,14 +30,16 @@ final class _PositionDetailRestProvider
         >
     with $FutureModifier<PositionDetail>, $FutureProvider<PositionDetail> {
   /// Private provider: performs the REST fetch only.
-  /// Cached independently so WS overlay rebuilds do not re-trigger the network call.
+  /// keepAlive: REST result is cached across screen navigation; rebuilt only on
+  /// explicit invalidation (e.g. pull-to-refresh). WS overlay is handled separately
+  /// by [positionDetailProvider] to avoid re-fetching on every quote update.
   _PositionDetailRestProvider._({
     required _PositionDetailRestFamily super.from,
     required String super.argument,
   }) : super(
          retry: null,
          name: r'_positionDetailRestProvider',
-         isAutoDispose: true,
+         isAutoDispose: false,
          dependencies: null,
          $allTransitiveDependencies: null,
        );
@@ -72,10 +78,12 @@ final class _PositionDetailRestProvider
 }
 
 String _$_positionDetailRestHash() =>
-    r'b3dae7425c613c833a1c5cd8575eae4462c49d16';
+    r'580c5e3c0dab8d13c80a3f81e8dd46ec789834c4';
 
 /// Private provider: performs the REST fetch only.
-/// Cached independently so WS overlay rebuilds do not re-trigger the network call.
+/// keepAlive: REST result is cached across screen navigation; rebuilt only on
+/// explicit invalidation (e.g. pull-to-refresh). WS overlay is handled separately
+/// by [positionDetailProvider] to avoid re-fetching on every quote update.
 
 final class _PositionDetailRestFamily extends $Family
     with $FunctionalFamilyOverride<FutureOr<PositionDetail>, String> {
@@ -85,11 +93,13 @@ final class _PositionDetailRestFamily extends $Family
         name: r'_positionDetailRestProvider',
         dependencies: null,
         $allTransitiveDependencies: null,
-        isAutoDispose: true,
+        isAutoDispose: false,
       );
 
   /// Private provider: performs the REST fetch only.
-  /// Cached independently so WS overlay rebuilds do not re-trigger the network call.
+  /// keepAlive: REST result is cached across screen navigation; rebuilt only on
+  /// explicit invalidation (e.g. pull-to-refresh). WS overlay is handled separately
+  /// by [positionDetailProvider] to avoid re-fetching on every quote update.
 
   _PositionDetailRestProvider call(String symbol) =>
       _PositionDetailRestProvider._(argument: symbol, from: this);
@@ -173,7 +183,7 @@ final class PositionDetailProvider
   }
 }
 
-String _$positionDetailHash() => r'04193585f0924b94fef49d449a5cf05eca8969fa';
+String _$positionDetailHash() => r'39736e291f1a47f0c069c99941e3d433472106bf';
 
 /// Public provider: overlays real-time WS data on top of the cached REST result.
 ///

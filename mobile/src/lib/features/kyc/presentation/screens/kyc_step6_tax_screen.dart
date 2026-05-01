@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/security/screen_protection_service.dart';
 import '../../application/tax_form_notifier.dart';
 import '../widgets/kyc_shared_widgets.dart';
 
@@ -11,7 +12,8 @@ class KycStep6TaxScreen extends ConsumerStatefulWidget {
   ConsumerState<KycStep6TaxScreen> createState() => _KycStep6TaxScreenState();
 }
 
-class _KycStep6TaxScreenState extends ConsumerState<KycStep6TaxScreen> {
+class _KycStep6TaxScreenState extends ConsumerState<KycStep6TaxScreen>
+    with ScreenProtectionMixin {
   bool _isUsTaxResident = false;
 
   // W-8BEN fields
@@ -134,9 +136,17 @@ class _KycStep6TaxScreenState extends ConsumerState<KycStep6TaxScreen> {
             const SnackBar(content: Text('请完整填写 W-9 信息')));
         return;
       }
+      // C4: validate SSN format XXX-XX-XXXX before sending to server.
+      final ssn = _ssnCtrl.text.trim();
+      final ssnRegex = RegExp(r'^\d{3}-\d{2}-\d{4}$');
+      if (!ssnRegex.hasMatch(ssn)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('SSN 格式不正确，请输入 XXX-XX-XXXX 格式')));
+        return;
+      }
       await ref.read(taxFormProvider.notifier).submitW9(
             fullName: _w9NameCtrl.text.trim(),
-            ssn: _ssnCtrl.text.trim(),
+            ssn: ssn,
             address: _w9AddressCtrl.text.trim(),
           );
     } else {

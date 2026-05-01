@@ -1,5 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import '../../../../core/logging/app_logger.dart';
+
 part 'kyc_session.freezed.dart';
 
 enum KycStatus {
@@ -22,10 +24,7 @@ enum KycStatus {
         'REJECTED' => rejected,
         'EXPIRED' => expired,
         _ => () {
-            // Log unknown status so backend additions are surfaced during development.
-            // Return pendingReview so polling continues — user sees spinner until resolved.
-            // ignore: avoid_print
-            print('[KycStatus] Unknown status from API: "$value" — defaulting to pendingReview');
+            AppLogger.warning('[KycStatus] Unknown status from API — defaulting to pendingReview');
             return pendingReview;
           }(),
       };

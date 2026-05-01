@@ -190,7 +190,7 @@ void main() {
         body: jsonEncode({
           'form_type': 'W9',
           'full_name': 'John Doe',
-          'ssn': '***-**-1234',
+          'ssn': 'TEST-ONLY-NOT-REAL',
           'address': '123 Main St, New York, NY 10001',
         }),
       );
@@ -227,7 +227,7 @@ void main() {
           ...headers,
           'Idempotency-Key': 'idem-submit-001',
         },
-        body: jsonEncode({'review_checklist': {}}),
+        body: jsonEncode(<String, dynamic>{'review_checklist': <String, dynamic>{}}),
       );
 
       expect(resp.statusCode, 202);
@@ -276,7 +276,7 @@ void main() {
           ...headers,
           'Idempotency-Key': idempotencyKey,
         },
-        body: jsonEncode({'review_checklist': {}}),
+        body: jsonEncode(<String, dynamic>{'review_checklist': <String, dynamic>{}}),
       );
 
       final resp2 = await http.post(
@@ -285,7 +285,7 @@ void main() {
           ...headers,
           'Idempotency-Key': idempotencyKey,
         },
-        body: jsonEncode({'review_checklist': {}}),
+        body: jsonEncode(<String, dynamic>{'review_checklist': <String, dynamic>{}}),
       );
 
       // Both should succeed — idempotent behavior

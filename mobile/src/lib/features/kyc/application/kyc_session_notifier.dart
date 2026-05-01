@@ -1,18 +1,23 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:dio/dio.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/auth/token_service.dart';
 import '../../../core/logging/app_logger.dart';
+import '../../../core/storage/secure_storage_service.dart';
 import '../data/kyc_repository_impl.dart';
 import '../domain/entities/kyc_session.dart';
 
 part 'kyc_session_notifier.freezed.dart';
 part 'kyc_session_notifier.g.dart';
 
-const _kSessionIdKey = 'kyc_session_id';
+// M1: session key is namespaced by user ID to prevent cross-account pollution
+// on shared devices. Falls back to generic key if userId is unavailable.
+String _sessionKey(String? userId) =>
+    userId != null ? 'kyc_session_id_$userId' : 'kyc_session_id';
 const _kPollIntervalSeconds = 5;
 const _kMaxPollAttempts = 120; // 10 minutes max
 
@@ -38,11 +43,10 @@ class KycSessionNotifier extends _$KycSessionNotifier {
   }
 
   Future<void> _restoreSession() async {
-    const storage = FlutterSecureStorage();
-    final sessionId = await storage.read(
-      key: _kSessionIdKey,
-      
-    );
+    final storage = ref.read(secureStorageServiceProvider);
+    final userId = await ref.read(tokenServiceProvider).getAccessToken()
+        .then((t) => t != null ? _extractUserId(t) : null);
+    final sessionId = await storage.read(_sessionKey(userId));
     if (sessionId == null) {
       state = const KycSessionState.noSession();
       return;
@@ -75,12 +79,10 @@ class KycSessionNotifier extends _$KycSessionNotifier {
 
   /// Called after Step 1 startKyc succeeds — persists sessionId.
   Future<void> setSession(KycSession session) async {
-    const storage = FlutterSecureStorage();
-    await storage.write(
-      key: _kSessionIdKey,
-      value: session.sessionId,
-      
-    );
+    final storage = ref.read(secureStorageServiceProvider);
+    final userId = await ref.read(tokenServiceProvider).getAccessToken()
+        .then((t) => t != null ? _extractUserId(t) : null);
+    await storage.write(_sessionKey(userId), session.sessionId);
     state = KycSessionState.active(session: session);
   }
 
@@ -138,10 +140,23 @@ class KycSessionNotifier extends _$KycSessionNotifier {
   }
 
   Future<void> _clearStoredSessionId() async {
-    const storage = FlutterSecureStorage();
-    await storage.delete(
-      key: _kSessionIdKey,
-      
-    );
+    final storage = ref.read(secureStorageServiceProvider);
+    final userId = await ref.read(tokenServiceProvider).getAccessToken()
+        .then((t) => t != null ? _extractUserId(t) : null);
+    await storage.delete(_sessionKey(userId));
+  }
+
+  /// Extract user ID from JWT sub claim for storage key namespacing.
+  static String? _extractUserId(String jwt) {
+    try {
+      final parts = jwt.split('.');
+      if (parts.length != 3) return null;
+      final payload = String.fromCharCodes(
+        base64Url.decode(base64Url.normalize(parts[1])));
+      final map = jsonDecode(payload) as Map<String, dynamic>;
+      return (map['sub'] ?? map['account_id'] ?? map['user_id']) as String?;
+    } catch (_) {
+      return null;
+    }
   }
 }

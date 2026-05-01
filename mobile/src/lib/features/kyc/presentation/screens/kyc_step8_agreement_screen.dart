@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+
+import '../../../../core/security/screen_protection_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -21,7 +23,8 @@ class KycStep8AgreementScreen extends ConsumerStatefulWidget {
 }
 
 class _KycStep8AgreementScreenState
-    extends ConsumerState<KycStep8AgreementScreen> {
+    extends ConsumerState<KycStep8AgreementScreen>
+    with ScreenProtectionMixin {
   late final WebViewController _webViewController;
   final _signatureCtrl = TextEditingController();
   bool _agreed = false;
@@ -52,8 +55,16 @@ class _KycStep8AgreementScreenState
         onMessageReceived: _onBridgeMessage,
       )
       ..setNavigationDelegate(NavigationDelegate(
+        onNavigationRequest: (request) {
+          final uri = Uri.tryParse(request.url);
+          const trustedHost = 'app.trading.example.com';
+          if (uri == null ||
+              (uri.scheme != 'about' && uri.host != trustedHost)) {
+            return NavigationDecision.prevent;
+          }
+          return NavigationDecision.navigate;
+        },
         onPageFinished: (url) {
-          // jsonEncode prevents JS injection if token contains quotes/backslashes.
           final payload = jsonEncode({
             'token': token,
             'step': 'kyc_step8',
@@ -67,9 +78,18 @@ class _KycStep8AgreementScreenState
   }
 
   void _onBridgeMessage(JavaScriptMessage msg) {
-    if (msg.message.contains('agreements_scrolled')) {
-      setState(() => _agreementsRead = true);
-      ref.read(agreementProvider.notifier).onAgreementsRead();
+    // M2: parse structured JSON instead of contains() to prevent injection.
+    try {
+      final data = jsonDecode(msg.message) as Map<String, dynamic>;
+      if (data['event'] == 'agreements_scrolled') {
+        setState(() => _agreementsRead = true);
+        ref.read(agreementProvider.notifier).onAgreementsRead();
+      }
+    } on FormatException {
+      if (msg.message == 'agreements_scrolled') {
+        setState(() => _agreementsRead = true);
+        ref.read(agreementProvider.notifier).onAgreementsRead();
+      }
     }
   }
 

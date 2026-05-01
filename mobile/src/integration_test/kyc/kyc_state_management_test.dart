@@ -125,13 +125,10 @@ void main() {
       'K8: TaxFormType — US resident routes to W-9, non-US to W-8BEN',
       (tester) async {
         debugPrint('\n🧪 K8: TaxForm branch determination');
-        const isUsTaxResident = false;
-        final formType = isUsTaxResident ? 'W9' : 'W8BEN';
-        expect(formType, equals('W8BEN'));
-
-        const isUsResident2 = true;
-        final formType2 = isUsResident2 ? 'W9' : 'W8BEN';
-        expect(formType2, equals('W9'));
+        // Verify W-9 for US resident, W-8BEN for non-US resident.
+        String taxFormType(bool isUsResident) => isUsResident ? 'W9' : 'W8BEN';
+        expect(taxFormType(false), equals('W8BEN'));
+        expect(taxFormType(true), equals('W9'));
         debugPrint('    ✅ Branch selection correct');
       },
     );
@@ -201,10 +198,10 @@ void main() {
       'K12: PersonalInfo.requiresManualReview is true for PEP',
       (tester) async {
         debugPrint('\n🧪 K12: PEP triggers manual review flag');
-        const isPep = true;
-        const isInsider = false;
-        final requiresManual = isPep || isInsider;
-        expect(requiresManual, isTrue);
+        bool requiresManualReview({required bool isPep, required bool isInsider}) =>
+            isPep || isInsider;
+        expect(requiresManualReview(isPep: true, isInsider: false), isTrue);
+        expect(requiresManualReview(isPep: false, isInsider: false), isFalse);
         debugPrint('    ✅ PEP manual review flag correct');
       },
     );

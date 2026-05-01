@@ -42,7 +42,7 @@ final class DepositFormNotifierProvider
 }
 
 String _$depositFormNotifierHash() =>
-    r'38b29c5af123e0825f9153eafa81cb10959fd85e';
+    r'da9b90a14ba0d45336c45afae5a9ab0e01c07a35';
 
 abstract class _$DepositFormNotifier extends $Notifier<DepositFormState> {
   DepositFormState build();

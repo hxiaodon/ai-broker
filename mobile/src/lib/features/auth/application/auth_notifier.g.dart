@@ -53,7 +53,7 @@ final class AuthNotifierProvider
   }
 }
 
-String _$authNotifierHash() => r'a704a30f5e5ccc317bbb472c0343a461ff477ed7';
+String _$authNotifierHash() => r'6391aafd04111deb9081da5dbbf1c4e6eb80e688';
 
 /// Core authentication state machine.
 ///

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../../core/security/screen_protection_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/financial_profile_notifier.dart';
@@ -15,7 +17,8 @@ class KycStep4FinanceScreen extends ConsumerStatefulWidget {
 }
 
 class _KycStep4FinanceScreenState
-    extends ConsumerState<KycStep4FinanceScreen> {
+    extends ConsumerState<KycStep4FinanceScreen>
+    with ScreenProtectionMixin {
   IncomeRange _income = IncomeRange.k25To50k;
   NetWorthRange _totalNetWorth = NetWorthRange.k25To100k;
   NetWorthRange _liquidNetWorth = NetWorthRange.k25To100k;

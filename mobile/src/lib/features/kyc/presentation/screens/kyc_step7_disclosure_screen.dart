@@ -1,4 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+
+import '../../../../core/logging/app_logger.dart';
+import '../../../../core/security/screen_protection_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -19,7 +24,8 @@ class KycStep7DisclosureScreen extends ConsumerStatefulWidget {
 }
 
 class _KycStep7DisclosureScreenState
-    extends ConsumerState<KycStep7DisclosureScreen> {
+    extends ConsumerState<KycStep7DisclosureScreen>
+    with ScreenProtectionMixin {
   late final WebViewController _webViewController;
   bool _hasScrolledToBottom = false;
   bool _hasAdvanced = false;
@@ -45,6 +51,16 @@ class _KycStep7DisclosureScreenState
       )
       ..setNavigationDelegate(
         NavigationDelegate(
+          onNavigationRequest: (request) {
+            // M3: only allow trusted host; about:blank is dev placeholder.
+            final uri = Uri.tryParse(request.url);
+            const trustedHost = 'app.trading.example.com';
+            if (uri == null ||
+                (uri.scheme != 'about' && uri.host != trustedHost)) {
+              return NavigationDecision.prevent;
+            }
+            return NavigationDecision.navigate;
+          },
           onPageFinished: (url) => _injectAuthContext(token, url),
         ),
       )
@@ -54,15 +70,28 @@ class _KycStep7DisclosureScreenState
   Future<void> _injectAuthContext(String token, String url) async {
     // Only inject into trusted pages (about:blank is dev placeholder).
     await _webViewController.runJavaScript(
-      'window.JSBridge?.setAuthContext(${_jsonString(token)}, ${_jsonString("kyc_step7")})',
+      'window.JSBridge?.setAuthContext(${jsonEncode(token)}, ${jsonEncode("kyc_step7")})',
     );
   }
 
   void _onBridgeMessage(JavaScriptMessage msg) {
-    if (msg.message.contains('risk_disclosure_read')) {
-      setState(() => _hasScrolledToBottom = true);
-      ref.read(agreementProvider.notifier).onRiskDisclosureRead();
-      _advanceOnce();
+    // M2: parse structured JSON instead of contains() to prevent injection.
+    try {
+      final data = jsonDecode(msg.message) as Map<String, dynamic>;
+      if (data['event'] == 'risk_disclosure_read') {
+        setState(() => _hasScrolledToBottom = true);
+        ref.read(agreementProvider.notifier).onRiskDisclosureRead();
+        _advanceOnce();
+      }
+    } on FormatException {
+      // Fallback: accept plain string event for legacy compatibility.
+      if (msg.message == 'risk_disclosure_read') {
+        setState(() => _hasScrolledToBottom = true);
+        ref.read(agreementProvider.notifier).onRiskDisclosureRead();
+        _advanceOnce();
+      } else {
+        AppLogger.warning('KYC Step7: invalid JSBridge message format');
+      }
     }
   }
 
@@ -88,15 +117,6 @@ class _KycStep7DisclosureScreenState
       ],
     );
   }
-}
-
-/// JSON-encodes a string value for safe insertion into a JS call.
-String _jsonString(String value) {
-  // Using JSON encoding prevents injection if value contains quotes/backslashes.
-  final escaped = value
-      .replaceAll(r'\', r'\\')
-      .replaceAll('"', r'\"');
-  return '"$escaped"';
 }
 
 class _DisclosureBottomBar extends StatelessWidget {

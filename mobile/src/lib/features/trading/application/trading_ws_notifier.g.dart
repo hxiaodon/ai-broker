@@ -33,7 +33,7 @@ final class TradingWsNotifierProvider
   TradingWsNotifier create() => TradingWsNotifier();
 }
 
-String _$tradingWsNotifierHash() => r'ae0c3c194364a5528d0af1140b8d59d935c08e12';
+String _$tradingWsNotifierHash() => r'38aece00e944683d0bbbf8dbfc3d9f70bb4736cd';
 
 abstract class _$TradingWsNotifier extends $AsyncNotifier<void> {
   FutureOr<void> build();

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../../../core/security/screen_protection_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../application/document_upload_notifier.dart';
@@ -14,7 +16,8 @@ class KycStep2DocumentScreen extends ConsumerStatefulWidget {
 }
 
 class _KycStep2DocumentScreenState
-    extends ConsumerState<KycStep2DocumentScreen> {
+    extends ConsumerState<KycStep2DocumentScreen>
+    with ScreenProtectionMixin {
   DocumentType _docType = DocumentType.chinaResidentId;
 
   @override

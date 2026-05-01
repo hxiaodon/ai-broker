@@ -42,7 +42,7 @@ final class WithdrawFormNotifierProvider
 }
 
 String _$withdrawFormNotifierHash() =>
-    r'5436d925958c202dd3b99f145c24a8039c17d9f8';
+    r'5ecbfe6f8e14540bb4bde4298fa8e7cc80f78f3f';
 
 abstract class _$WithdrawFormNotifier extends $Notifier<WithdrawFormState> {
   WithdrawFormState build();
