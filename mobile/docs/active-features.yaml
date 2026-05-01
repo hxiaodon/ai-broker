@@ -12,7 +12,7 @@
 #   shipped     — 审核通过，合并至 main
 
 domain: mobile
-last_updated: 2026-04-29
+last_updated: 2026-04-30
 current_focus: settings
 
 development_order:
@@ -59,10 +59,22 @@ modules:
     contracts:
       - docs/contracts/market-data-to-mobile.md
     notes: >
-      Phase 1 实现 20/22（T21 性能优化延迟至 Syncfusion 接入后）。
-      flutter analyze 0 issues，191 单元测试全部通过。
-      T19 路由已接入真实 screens；T20 港股搜索检测已实现。
-      待 security-engineer + code-reviewer 审核。
+      security-engineer + code-reviewer 审核完成（2026-04-30）：
+      3 Critical + 9 Major 已全部修复。修复要点：
+      C1 ssl_pinning_config kReleaseMode guard 替换 assert、
+      C2 QuoteWebSocketNotifier tier policy 强制（_enforceTierPolicy）、
+      C3 QuoteLocalCache Hive 加密（HiveAesCipher + secure_storage key）、
+      M1 MA 计算改 Decimal 消除浮点漂移、_OhlcvInfoBar 改 toStringAsFixed、
+      M2 搜索 maxLength:50 + 历史迁移至 flutter_secure_storage、
+      M3 _scheduleReconnect catch 改 await 防并发竞态、
+      M4 watchlist add 读 detail.market（不再硬编码 US）、
+      M5 getQuoteStale 填充 isStale/staleSinceMs、
+      M6 symbol 路径校验（US 1-5大写/HK 4-5数字）、
+      M7 StockDetailScreen 加 DelayedQuoteBanner、
+      M8 搜索历史迁移至 flutter_secure_storage、
+      M9 WS _onError 脱敏用户友好消息、
+      index_quotes_notifier quoteStream 加 onError handler。
+      53 测试全绿。待合并至 main。
 
   - id: trading
     name: 交易模块
@@ -138,11 +150,19 @@ modules:
     contracts:
       - docs/contracts/ams-to-mobile.md   # § KYC
     notes: >
-      Phase 1 实现完成（T01-T36），flutter analyze 0 errors。
-      8步开户流程（Step 1-6 Native + Step 7-8 H5 WebView），
-      Sumsub SDK 集成，KycSessionNotifier 断点续传 + 状态轮询，
-      W-8BEN/W-9 税务申报，审核状态页（5节点时间轴），三层测试套件（12+13+12 cases）。
-      待 security-engineer + code-reviewer 审核。
+      security-engineer 审核完成（2026-04-30）：
+      4 Critical + 6 Medium 已全部修复。修复要点：
+      C1 全部 8 个步骤页加 ScreenProtectionMixin（KYC 是全 App PII 密度最高区域）、
+      C2 kyc_session_notifier 改用 SecureStorageService（iOS/Android 硬化选项）、
+      C3 MIME 白名单 + magic bytes 检测（不再硬编码 image/jpeg）、
+      C4 W-9 SSN 格式校验（^\d{3}-\d{2}-\d{4}$）+ 测试文件清理（TEST-ONLY-NOT-REAL）、
+      M1 session key 加用户 ID 命名空间（防多账户污染）、
+      M2 JSBridge 消息改 jsonDecode 解析（防注入）、
+      M3 WebView NavigationDelegate 域名白名单（app.trading.example.com）、
+      M4 kyc_session_id 从 URL query string 移入请求体/header、
+      M5 print() 改 AppLogger.warning()（不再暴露 API 原始值）、
+      M6 test 文件 dead code/类型推断修复。
+      37 测试全绿。待合并至 main。
 
   - id: settings
     name: 设置模块
