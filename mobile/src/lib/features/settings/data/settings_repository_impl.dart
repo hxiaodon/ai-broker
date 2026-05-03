@@ -48,12 +48,14 @@ class SettingsRepositoryImpl implements SettingsRepository {
     required String bioToken,
     required String bioChallenge,
     required String bioTimestamp,
+    required String idempotencyKey,
   }) =>
       _remote.revokeDevice(
         deviceId: deviceId,
         bioToken: bioToken,
         bioChallenge: bioChallenge,
         bioTimestamp: bioTimestamp,
+        idempotencyKey: idempotencyKey,
       );
 
   @override
@@ -82,11 +84,22 @@ class SettingsRepositoryImpl implements SettingsRepository {
       _remote.checkDeactivationEligibility();
 
   @override
+  Future<void> sendOtpForDeactivation() => _remote.sendOtpForDeactivation();
+
+  @override
   Future<void> deactivateAccount({
     required String otpCode,
     required String idempotencyKey,
   }) =>
       _remote.deactivateAccount(otpCode: otpCode, idempotencyKey: idempotencyKey);
+
+  @override
+  Future<void> sendOtpForBiometricDisable() =>
+      _remote.sendOtpForBiometricDisable();
+
+  @override
+  Future<void> disableBiometricLogin({required String otpCode}) =>
+      _remote.disableBiometricLogin(otpCode: otpCode);
 }
 
 @Riverpod(keepAlive: true)

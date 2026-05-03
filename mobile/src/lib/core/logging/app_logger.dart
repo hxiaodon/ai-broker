@@ -60,7 +60,16 @@ class AppLogger {
   /// - Bank account numbers (digits 8-20 chars)
   static String _mask(String message) {
     return message
-        // Phone: keep country code + last 4
+        // International phones (+86 CN, +852 HK) — must run before NANP rule
+        .replaceAllMapped(
+          RegExp(r'\+(?:86|852)[\s\-]?\d{7,11}'),
+          (m) {
+            final digits = m.group(0)!.replaceAll(RegExp(r'[^\d]'), '');
+            final last4 = digits.substring(digits.length > 4 ? digits.length - 4 : 0);
+            return '***-***-$last4';
+          },
+        )
+        // NANP phone: +1 or 10-digit US/CA format — keep last 4
         .replaceAllMapped(
           RegExp(r'\+?1?[\s\-]?\(?\d{3}\)?[\s\-]?\d{3}[\s\-]?\d{4}'),
           (m) => '***-***-${m.group(0)!.replaceAll(RegExp(r'\D'), '').substring(m.group(0)!.replaceAll(RegExp(r'\D'), '').length - 4)}',

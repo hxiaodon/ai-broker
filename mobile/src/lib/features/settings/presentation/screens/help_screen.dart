@@ -68,8 +68,11 @@ class HelpScreen extends ConsumerWidget {
 
   void _openCustomerService(BuildContext context) {
     final now = DateTime.now().toUtc();
-    // 09:00–18:00 ET = 14:00–23:00 UTC
-    final isServiceHours = now.hour >= 14 && now.hour < 23;
+    // 09:00–18:00 ET = 13:00–22:00 UTC (EDT, UTC-4).
+    // Using the EDT window conservatively: avoids false "closed" during summer
+    // (Mar–Nov). In winter EST (UTC-5) the window is 14:00–23:00 UTC; using
+    // 13:00–23:00 means we allow contact 1 h early in winter — acceptable.
+    final isServiceHours = now.hour >= 13 && now.hour < 23;
     if (!isServiceHours) {
       showDialog<void>(
         context: context,

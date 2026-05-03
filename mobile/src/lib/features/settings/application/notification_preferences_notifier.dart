@@ -18,8 +18,8 @@ class NotificationPreferencesNotifier
     required NotificationCategory category,
     required bool enabled,
   }) async {
-    final current = state.asData?.value;
-    if (current == null) return;
+    if (state is! AsyncData<NotificationPreferences>) return;
+    final current = state.requireValue;
     if (!current.isMutable(category)) return; // securityAlerts are non-mutable
 
     final updated = switch (category) {
@@ -49,8 +49,8 @@ class NotificationPreferencesNotifier
     required NotificationChannel channel,
     required bool enabled,
   }) async {
-    final current = state.asData?.value;
-    if (current == null) return;
+    if (state is! AsyncData<NotificationPreferences>) return;
+    final current = state.requireValue;
 
     final updated = switch (channel) {
       NotificationChannel.push => current.copyWith(pushEnabled: enabled),

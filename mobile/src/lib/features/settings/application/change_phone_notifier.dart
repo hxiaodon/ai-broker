@@ -1,6 +1,7 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../../core/errors/app_exception.dart';
 import '../../../core/logging/app_logger.dart';
 import '../data/settings_repository_impl.dart';
 
@@ -64,9 +65,8 @@ class ChangePhoneNotifier extends _$ChangePhoneNotifier {
 
   Future<void> submitOldOtp(String otpCode) async {
     final current = state;
-    // Guard: reject if not in the expected step or already loading
+    // Guard: reject if not in the expected step
     if (current is! _Step || current.step != ChangePhoneStep.verifyOldOtp) return;
-    if (state is _Loading) return;
     state = const ChangePhoneState.loading();
     try {
       await ref
@@ -82,12 +82,13 @@ class ChangePhoneNotifier extends _$ChangePhoneNotifier {
       );
     } on Object catch (e) {
       AppLogger.warning('changePhone.submitOldOtp failed: ${e.runtimeType}');
-      // Return to the OTP step so user can retry — only unrecoverable errors use error state
-      final humanized = _humanize(e);
-      if (humanized.contains('30 天') || humanized.contains('失败')) {
-        state = ChangePhoneState.error(message: humanized);
+      // Rate-limit and cooldown are unrecoverable — show error state
+      if (e is BusinessException &&
+          (e.errorCode == 'RATE_LIMIT' ||
+              e.errorCode == 'PHONE_CHANGE_COOLDOWN')) {
+        state = ChangePhoneState.error(message: '更换手机号每 30 天仅可操作一次');
       } else {
-        // OTP wrong — stay on verify step so user can re-enter
+        // Network errors, wrong OTP, etc. — stay on step so user can retry
         state = current;
       }
     }
@@ -96,7 +97,6 @@ class ChangePhoneNotifier extends _$ChangePhoneNotifier {
   Future<void> submitNewOtp(String otpCode) async {
     final current = state;
     if (current is! _Step || current.step != ChangePhoneStep.verifyNewOtp) return;
-    if (state is _Loading) return;
     state = const ChangePhoneState.loading();
     try {
       await ref.read(settingsRepositoryProvider).verifyNewPhoneAndUpdate(

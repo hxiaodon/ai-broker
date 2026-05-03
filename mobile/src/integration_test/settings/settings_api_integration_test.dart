@@ -19,6 +19,10 @@ import 'package:integration_test/integration_test.dart';
 ///   DELETE /v1/auth/devices/:id              — device revocation (biometric headers)
 ///   POST /v1/account/lock                    — emergency account lock
 ///   GET  /v1/account/deactivation/eligibility — eligibility check
+///   POST /v1/auth/otp/send (VERIFY_CURRENT_PHONE) — change-phone step 1
+///   POST /v1/auth/phone/verify-old           — change-phone step 2
+///   POST /v1/auth/otp/send (CHANGE_PHONE)    — change-phone step 3
+///   POST /v1/auth/phone/change               — change-phone step 4 (finalize)
 ///
 /// **Setup**: Before running these tests, start Mock Server:
 /// ```bash
@@ -181,21 +185,13 @@ void main() {
       'SA7: POST /v1/account/lock returns success',
       (tester) async {
         debugPrint('\n🔒 SA7: Lock account');
-        try {
-          final resp = await dio.post<void>(
-            '/v1/account/lock',
-            data: <String, dynamic>{},
-            options: Options(headers: {'Content-Type': 'application/json'}),
-          );
-          expect(resp.statusCode, anyOf(200, 204));
-          debugPrint('    ✅ Account lock request accepted');
-        } on DioException catch (e) {
-          if (e.response?.statusCode == 404) {
-            debugPrint('    ⏭ Endpoint not in mock server yet — skip');
-            return;
-          }
-          rethrow;
-        }
+        final resp = await dio.post<void>(
+          '/v1/account/lock',
+          data: <String, dynamic>{},
+          options: Options(headers: {'Content-Type': 'application/json'}),
+        );
+        expect(resp.statusCode, anyOf(200, 204));
+        debugPrint('    ✅ Account lock request accepted');
       },
     );
   });
@@ -214,10 +210,6 @@ void main() {
           expect(resp.statusCode, anyOf(200, 422));
           debugPrint('    ✅ Eligibility check responded: ${resp.statusCode}');
         } on DioException catch (e) {
-          if (e.response?.statusCode == 404) {
-            debugPrint('    ⏭ Endpoint not in mock server yet — skip');
-            return;
-          }
           // 422 = ineligible is a valid response (has positions/balance)
           if (e.response?.statusCode == 422) {
             debugPrint('    ✅ Server correctly rejected as ineligible (422)');
@@ -225,6 +217,66 @@ void main() {
           }
           rethrow;
         }
+      },
+    );
+  });
+
+  // ─── Change Phone ──────────────────────────────────────────────────────────
+
+  group('Settings API - Change Phone', () {
+    testWidgets(
+      'SA9: POST /v1/auth/otp/send (VERIFY_CURRENT_PHONE) returns 200',
+      (tester) async {
+        debugPrint('\n📱 SA9: Send OTP to current phone');
+        final resp = await dio.post<void>(
+          '/v1/auth/otp/send',
+          data: {'purpose': 'VERIFY_CURRENT_PHONE'},
+          options: Options(headers: {'Content-Type': 'application/json'}),
+        );
+        expect(resp.statusCode, 200);
+        debugPrint('    ✅ OTP sent to current phone');
+      },
+    );
+
+    testWidgets(
+      'SA10: POST /v1/auth/phone/verify-old with valid OTP returns 200',
+      (tester) async {
+        debugPrint('\n📱 SA10: Verify old phone OTP');
+        final resp = await dio.post<void>(
+          '/v1/auth/phone/verify-old',
+          data: {'otp_code': '123456'},
+          options: Options(headers: {'Content-Type': 'application/json'}),
+        );
+        expect(resp.statusCode, 200);
+        debugPrint('    ✅ Old phone OTP verified');
+      },
+    );
+
+    testWidgets(
+      'SA11: POST /v1/auth/otp/send (CHANGE_PHONE) to new number returns 200',
+      (tester) async {
+        debugPrint('\n📱 SA11: Send OTP to new phone');
+        final resp = await dio.post<void>(
+          '/v1/auth/otp/send',
+          data: {'phone': '+8613912345678', 'purpose': 'CHANGE_PHONE'},
+          options: Options(headers: {'Content-Type': 'application/json'}),
+        );
+        expect(resp.statusCode, 200);
+        debugPrint('    ✅ OTP sent to new phone');
+      },
+    );
+
+    testWidgets(
+      'SA12: POST /v1/auth/phone/change with valid OTP finalizes update',
+      (tester) async {
+        debugPrint('\n📱 SA12: Finalize phone change');
+        final resp = await dio.post<void>(
+          '/v1/auth/phone/change',
+          data: {'new_phone': '+8613912345678', 'otp_code': '123456'},
+          options: Options(headers: {'Content-Type': 'application/json'}),
+        );
+        expect(resp.statusCode, 200);
+        debugPrint('    ✅ Phone number updated');
       },
     );
   });

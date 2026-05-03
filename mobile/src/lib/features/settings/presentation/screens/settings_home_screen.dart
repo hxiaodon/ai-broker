@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/routing/route_names.dart';
+import '../../../../core/security/screen_protection_service.dart';
 import '../../../../shared/theme/color_tokens.dart';
 import '../../../../shared/widgets/loading/skeleton_loader.dart';
 import '../../../auth/application/auth_notifier.dart';
@@ -16,11 +17,17 @@ import '../../../trading/domain/entities/portfolio_summary.dart';
 /// "我的" tab root screen.
 ///
 /// Shows: user card (avatar + name + KYC badge) + asset summary card + menu sections.
-class SettingsHomeScreen extends ConsumerWidget {
+class SettingsHomeScreen extends ConsumerStatefulWidget {
   const SettingsHomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsHomeScreen> createState() => _SettingsHomeScreenState();
+}
+
+class _SettingsHomeScreenState extends ConsumerState<SettingsHomeScreen>
+    with ScreenProtectionMixin {
+  @override
+  Widget build(BuildContext context) {
     final profileAsync = ref.watch(userProfileProvider);
     final statusAsync = ref.watch(accountStatusProvider);
     final summaryAsync = ref.watch(portfolioSummaryProvider);
@@ -115,7 +122,7 @@ class SettingsHomeScreen extends ConsumerWidget {
                   side: BorderSide(color: ColorTokens.greenUp.error),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
-                onPressed: () => _confirmLogout(context, ref),
+                onPressed: () => _confirmLogout(context),
                 child: const Text('退出登录'),
               ),
             ),
@@ -126,7 +133,7 @@ class SettingsHomeScreen extends ConsumerWidget {
     );
   }
 
-  void _confirmLogout(BuildContext context, WidgetRef ref) {
+  void _confirmLogout(BuildContext context) {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(

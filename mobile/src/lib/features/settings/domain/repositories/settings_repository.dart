@@ -21,6 +21,7 @@ abstract interface class SettingsRepository {
     required String bioToken,
     required String bioChallenge,
     required String bioTimestamp,
+    required String idempotencyKey,
   });
 
   /// Sends OTP to the user's **current** (old) phone — server derives phone from JWT.
@@ -39,8 +40,17 @@ abstract interface class SettingsRepository {
 
   Future<void> checkDeactivationEligibility();
 
+  /// Sends OTP to current phone to confirm account deactivation identity (PRD §6.4).
+  Future<void> sendOtpForDeactivation();
+
   Future<void> deactivateAccount({
     required String otpCode,
     required String idempotencyKey,
   });
+
+  /// Sends OTP to current phone to confirm disabling biometric login (PRD §6.1).
+  Future<void> sendOtpForBiometricDisable();
+
+  /// Verifies OTP and disables biometric login on the server.
+  Future<void> disableBiometricLogin({required String otpCode});
 }

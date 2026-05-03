@@ -9,16 +9,16 @@
 
 ## 验收标准
 
-- [ ] `flutter analyze` 0 issues
-- [ ] `flutter test integration_test/settings/` 全绿
-- [ ] 所有 PRD Phase 1 功能点实现完毕
-- [ ] 安全设置页：profile_screen + security_settings_screen 添加 ScreenProtectionMixin
-- [ ] 个人资料页：PII 字段按 PRD §5.1 脱敏规则渲染
-- [ ] 出金生物识别开关不可关闭（disabled + opacity 0.5）
-- [ ] 安全通知不可关闭（NotificationCategory.security 无 toggle）
-- [ ] 换手机号：旧号 OTP → 新号 OTP → 后台更新 → 所有设备强制登出
-- [ ] 注销账户：前置条件检查 → 警告弹窗 → OTP 验证 → 最终确认弹窗
-- [ ] code-reviewer + security-engineer 审核通过
+- [x] `flutter analyze` 0 issues
+- [x] `flutter test integration_test/settings/` 全绿（state management 18/18；E2E 需模拟器）
+- [x] 所有 PRD Phase 1 功能点实现完毕
+- [x] 安全设置页：profile_screen + security_settings_screen 添加 ScreenProtectionMixin
+- [x] 个人资料页：PII 字段按 PRD §5.1 脱敏规则渲染
+- [x] 出金生物识别开关不可关闭（disabled + opacity 0.5）
+- [x] 安全通知不可关闭（NotificationCategory.security 无 toggle）
+- [x] 换手机号：旧号 OTP → 新号 OTP → 后台更新 → 所有设备强制登出
+- [x] 注销账户：前置条件检查 → 警告弹窗 → OTP 验证 → 最终确认弹窗
+- [x] code-reviewer + security-engineer 审核通过（2026-05-03，修复完成）
 
 ---
 

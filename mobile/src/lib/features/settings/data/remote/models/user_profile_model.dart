@@ -1,5 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import '../../../../../core/logging/app_logger.dart';
 import '../../../domain/entities/user_profile.dart';
 
 part 'user_profile_model.freezed.dart';
@@ -58,6 +59,12 @@ abstract class UserProfileModel with _$UserProfileModel {
         'UNEMPLOYED' => EmploymentStatus.unemployed,
         'RETIRED' => EmploymentStatus.retired,
         'STUDENT' => EmploymentStatus.student,
-        _ => EmploymentStatus.employed,
+        'EMPLOYED' => EmploymentStatus.employed,
+        final v => _unknownEmploymentStatus(v),
       };
+
+  static EmploymentStatus _unknownEmploymentStatus(String v) {
+    AppLogger.warning('Unknown employment_status: $v — defaulting to employed');
+    return EmploymentStatus.employed;
+  }
 }

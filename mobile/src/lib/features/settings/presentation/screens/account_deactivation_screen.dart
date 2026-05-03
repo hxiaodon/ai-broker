@@ -117,13 +117,35 @@ class _AccountDeactivationScreenState
           TextButton(
             onPressed: () {
               Navigator.of(ctx).pop(true);
-              setState(() => _step = _DeactivationStep.otpVerify);
+              _sendDeactivationOtp();
             },
             child: Text('确认注销', style: TextStyle(color: ColorTokens.greenUp.error)),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _sendDeactivationOtp() async {
+    if (!mounted) return;
+    setState(() => _loading = true);
+    try {
+      await ref.read(settingsRepositoryProvider).sendOtpForDeactivation();
+      if (mounted) {
+        setState(() {
+          _step = _DeactivationStep.otpVerify;
+          _loading = false;
+        });
+      }
+    } on Object catch (e) {
+      AppLogger.warning('sendOtpForDeactivation failed: $e');
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('发送验证码失败，请稍后重试')),
+        );
+      }
+    }
   }
 
   Future<void> _submitDeactivation() async {

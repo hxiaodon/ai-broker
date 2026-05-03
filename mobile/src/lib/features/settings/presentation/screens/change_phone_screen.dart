@@ -2,17 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/security/screen_protection_service.dart';
 import '../../../../shared/theme/color_tokens.dart';
 import '../../application/change_phone_notifier.dart';
 
 /// Change phone number screen — PRD §6.3.
 ///
 /// Flow: enter new phone → verify old OTP → verify new OTP → success.
-class ChangePhoneScreen extends ConsumerWidget {
+class ChangePhoneScreen extends ConsumerStatefulWidget {
   const ChangePhoneScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ChangePhoneScreen> createState() => _ChangePhoneScreenState();
+}
+
+class _ChangePhoneScreenState extends ConsumerState<ChangePhoneScreen>
+    with ScreenProtectionMixin {
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(changePhoneProvider);
 
     ref.listen<ChangePhoneState>(changePhoneProvider, (_, next) {

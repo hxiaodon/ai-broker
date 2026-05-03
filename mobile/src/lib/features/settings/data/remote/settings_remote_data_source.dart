@@ -153,6 +153,7 @@ class SettingsRemoteDataSource {
     required String bioToken,
     required String bioChallenge,
     required String bioTimestamp,
+    required String idempotencyKey,
   }) async {
     await _checkConnectivity();
     final path = '/v1/auth/devices/$deviceId';
@@ -160,7 +161,7 @@ class SettingsRemoteDataSource {
       method: 'DELETE',
       path: path,
       bodyJson: '',
-      idempotencyKey: 'revoke-$deviceId',
+      idempotencyKey: idempotencyKey,
     );
     headers['X-Biometric-Token'] = bioToken;
     headers['X-Bio-Challenge'] = bioChallenge;
@@ -282,6 +283,23 @@ class SettingsRemoteDataSource {
     }
   }
 
+  Future<void> sendOtpForDeactivation() async {
+    await _checkConnectivity();
+    const path = '/v1/auth/otp/send';
+    final body = jsonEncode({'purpose': 'DEACTIVATE_ACCOUNT'});
+    final headers = await _buildMutatingHeaders(
+      method: 'POST',
+      path: path,
+      bodyJson: body,
+      idempotencyKey: const Uuid().v4(),
+    );
+    try {
+      await _dio.post<void>(path, data: body, options: Options(headers: headers));
+    } on DioException catch (e) {
+      throw _mapDioError(e, 'sendOtpForDeactivation');
+    }
+  }
+
   Future<void> deactivateAccount({
     required String otpCode,
     required String idempotencyKey,
@@ -300,6 +318,43 @@ class SettingsRemoteDataSource {
       AppLogger.info('deactivateAccount success');
     } on DioException catch (e) {
       throw _mapDioError(e, 'deactivateAccount');
+    }
+  }
+
+  // ─── Biometric login management ──────────────────────────────────────────
+
+  Future<void> sendOtpForBiometricDisable() async {
+    await _checkConnectivity();
+    const path = '/v1/auth/otp/send';
+    final body = jsonEncode({'purpose': 'DISABLE_BIOMETRIC_LOGIN'});
+    final headers = await _buildMutatingHeaders(
+      method: 'POST',
+      path: path,
+      bodyJson: body,
+      idempotencyKey: const Uuid().v4(),
+    );
+    try {
+      await _dio.post<void>(path, data: body, options: Options(headers: headers));
+    } on DioException catch (e) {
+      throw _mapDioError(e, 'sendOtpForBiometricDisable');
+    }
+  }
+
+  Future<void> disableBiometricLogin({required String otpCode}) async {
+    await _checkConnectivity();
+    const path = '/v1/auth/security/biometric/disable';
+    final body = jsonEncode({'otp_code': otpCode});
+    final headers = await _buildMutatingHeaders(
+      method: 'POST',
+      path: path,
+      bodyJson: body,
+      idempotencyKey: const Uuid().v4(),
+    );
+    try {
+      await _dio.post<void>(path, data: body, options: Options(headers: headers));
+      AppLogger.info('disableBiometricLogin success');
+    } on DioException catch (e) {
+      throw _mapDioError(e, 'disableBiometricLogin');
     }
   }
 
@@ -353,18 +408,16 @@ class SettingsRemoteDataSource {
   }
 
   AppException _mapDioError(DioException e, String op) {
-    AppLogger.warning('$op failed: ${e.message}');
+    final statusCode = e.response?.statusCode;
+    final body = e.response?.data;
+    final msg = body is Map ? body['message'] as String? : null;
+    final errorCode = body is Map ? body['error_code'] as String? : null;
+    // Log status + error code only — never log e.message (may contain PII from request data)
+    AppLogger.warning('$op failed: status=$statusCode code=${errorCode ?? e.type.name}');
     if (e.type == DioExceptionType.connectionTimeout ||
         e.type == DioExceptionType.receiveTimeout) {
       return NetworkException(message: '$op timed out', cause: e);
     }
-    final statusCode = e.response?.statusCode;
-    if (statusCode == 401 || statusCode == 403) {
-      return AuthException(message: 'Unauthorized', cause: e);
-    }
-    final body = e.response?.data;
-    final msg = body is Map ? body['message'] as String? : null;
-    final errorCode = body is Map ? body['error_code'] as String? : null;
     if (statusCode != null && statusCode >= 500) {
       return ServerException(statusCode: statusCode, message: msg ?? 'Server error');
     }

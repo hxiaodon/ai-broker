@@ -5,13 +5,19 @@ import 'package:go_router/go_router.dart';
 import 'package:local_auth/local_auth.dart';
 
 import '../../../../core/auth/device_info_service.dart' as svc;
+import '../../../../core/logging/app_logger.dart';
 import '../../../../core/routing/route_names.dart';
 import '../../../../core/security/screen_protection_service.dart';
+import '../../../../core/storage/secure_storage_service.dart';
 import '../../../../shared/theme/color_tokens.dart';
 import '../../../../shared/widgets/error/error_view.dart';
 import '../../application/device_list_notifier.dart';
+import '../../application/trade_settings_notifier.dart';
 import '../../data/settings_repository_impl.dart';
 import '../../domain/entities/device_info.dart';
+import '../../domain/entities/trade_settings.dart';
+
+const _kBiometricLoginEnabledKey = 'settings.security.biometricLogin';
 
 /// Security settings screen — PRD §6.
 ///
@@ -29,10 +35,28 @@ class _SecuritySettingsScreenState
     extends ConsumerState<SecuritySettingsScreen>
     with ScreenProtectionMixin {
   final _localAuth = LocalAuthentication();
+  bool _biometricLoginEnabled = true;
+  bool _biometricStateLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBiometricLoginState();
+  }
+
+  Future<void> _loadBiometricLoginState() async {
+    final value = await ref
+        .read(secureStorageServiceProvider)
+        .read(_kBiometricLoginEnabledKey);
+    if (mounted) setState(() => _biometricLoginEnabled = value != 'false');
+  }
 
   @override
   Widget build(BuildContext context) {
     final devicesAsync = ref.watch(deviceListProvider);
+    final tradeAsync = ref.watch(tradeSettingsProvider);
+    final orderBiometricEnabled =
+        tradeAsync.value?.confirmationMethod != OrderConfirmationMethod.slideOnly;
 
     return Scaffold(
       backgroundColor: ColorTokens.greenUp.background,
@@ -48,13 +72,15 @@ class _SecuritySettingsScreenState
           _SettingsToggleItem(
             title: '生物识别登录',
             subtitle: 'Face ID / 指纹，下次打开可免 OTP',
-            value: true, // read from auth state
-            onChanged: (v) => _toggleBiometricLogin(context, v),
+            value: _biometricLoginEnabled,
+            onChanged: _biometricStateLoading
+                ? null
+                : (v) => _toggleBiometricLogin(context, v),
           ),
           _SettingsToggleItem(
             title: '下单生物识别确认',
             subtitle: '每次委托下单需要生物识别',
-            value: true,
+            value: orderBiometricEnabled,
             onChanged: (v) => _toggleOrderBiometric(context, v),
           ),
           _SettingsToggleItem(
@@ -158,19 +184,110 @@ class _SecuritySettingsScreenState
   // ─── Action handlers ────────────────────────────────────────────────────────
 
   Future<void> _toggleBiometricLogin(BuildContext ctx, bool enable) async {
-    if (!enable) {
-      // Require OTP before disabling (PRD §6.1)
-      ScaffoldMessenger.of(ctx).showSnackBar(
-        const SnackBar(content: Text('请输入 OTP 验证码以关闭生物识别登录')),
-      );
+    if (enable) {
+      final ss = ref.read(secureStorageServiceProvider);
+      await ss.write(_kBiometricLoginEnabledKey, 'true');
+      if (mounted) setState(() => _biometricLoginEnabled = true);
+    } else {
+      await _disableBiometricLoginWithOtp();
+    }
+  }
+
+  Future<void> _disableBiometricLoginWithOtp() async {
+    if (!mounted) return;
+    setState(() => _biometricStateLoading = true);
+
+    // Step 1: Send OTP to current phone
+    try {
+      await ref.read(settingsRepositoryProvider).sendOtpForBiometricDisable();
+    } on Object catch (e) {
+      AppLogger.warning('sendOtpForBiometricDisable failed: ${e.runtimeType}');
+      if (mounted) {
+        setState(() => _biometricStateLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('发送验证码失败，请稍后重试')),
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _biometricStateLoading = false);
+
+    // Step 2: OTP input dialog — use widget's own context (guarded by mounted above)
+    final otpController = TextEditingController();
+    final otpCode = await showDialog<String?>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('关闭生物识别登录'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('请输入发送至您手机的 6 位验证码以确认关闭生物识别登录'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: otpController,
+              keyboardType: TextInputType.number,
+              obscureText: true,
+              maxLength: 6,
+              decoration: const InputDecoration(
+                labelText: '6 位验证码',
+                counterText: '',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(null),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.of(dialogCtx).pop(otpController.text.trim()),
+            child: const Text('确认'),
+          ),
+        ],
+      ),
+    );
+    otpController.dispose();
+
+    if (otpCode == null || otpCode.length != 6 || !mounted) return;
+
+    // Step 3: Verify OTP + disable on server
+    setState(() => _biometricStateLoading = true);
+    try {
+      await ref
+          .read(settingsRepositoryProvider)
+          .disableBiometricLogin(otpCode: otpCode);
+      await ref
+          .read(secureStorageServiceProvider)
+          .write(_kBiometricLoginEnabledKey, 'false');
+      if (mounted) {
+        setState(() {
+          _biometricLoginEnabled = false;
+          _biometricStateLoading = false;
+        });
+      }
+    } on Object catch (e) {
+      AppLogger.warning('disableBiometricLogin failed: ${e.runtimeType}');
+      if (mounted) {
+        setState(() => _biometricStateLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('验证失败，请重试')),
+        );
+      }
     }
   }
 
   Future<void> _toggleOrderBiometric(BuildContext ctx, bool enable) async {
-    // TODO: persist preference
-    ScaffoldMessenger.of(ctx).showSnackBar(
-      SnackBar(content: Text(enable ? '下单生物识别已开启' : '下单生物识别已关闭')),
-    );
+    final tradeSettings = ref.read(tradeSettingsProvider).value;
+    if (tradeSettings == null) return;
+    final method = enable
+        ? OrderConfirmationMethod.slideAndBiometric
+        : OrderConfirmationMethod.slideOnly;
+    await ref
+        .read(tradeSettingsProvider.notifier)
+        .saveSettings(tradeSettings.copyWith(confirmationMethod: method));
   }
 
   Future<void> _confirmRevokeDevice(BuildContext ctx, DeviceInfo device) async {
@@ -261,6 +378,13 @@ class _SecuritySettingsScreenState
       ),
     );
     if (confirmed != true || !mounted) return;
+
+    // Require biometric before locking — high-risk irreversible operation (PRD §6.1)
+    final authenticated = await _localAuth.authenticate(
+      localizedReason: '请验证身份以锁定账户',
+      biometricOnly: true,
+    );
+    if (!authenticated || !mounted) return;
 
     try {
       await ref.read(settingsRepositoryProvider).lockAccount();

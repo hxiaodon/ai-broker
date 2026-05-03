@@ -174,7 +174,17 @@ modules:
     contracts:
       - docs/contracts/ams-to-mobile.md   # § Profile / Notifications / Devices
     notes: >
-      Phase 1 实现完成（T01-T35），35/35 任务，flutter analyze 0 issues，
-      35 个集成测试全绿（18 state + 8 API + 9 E2E）。
-      Mock Server 新增 settings.go（7 个端点）。
-      待 security-engineer + code-reviewer 审核。
+      security-engineer + code-reviewer 审核完成（2026-05-03）：
+      4 Critical + 8 Major 已全部修复。修复要点：
+      C1 注销账户流程补发 OTP（sendOtpForDeactivation）+ setState mounted 守卫、
+      C2 生物识别登录 Switch 绑定 SecureStorage 真实 state + OTP 门控三步流程（sendOtpForBiometricDisable → dialog → disableBiometricLogin）、
+      C3 revokeDevice 幂等键改 UUID v4（DeviceListNotifier 持久化 _pendingRevokeKey，成功后清零）、
+      C4 账户锁定增加 biometricOnly 二次验证、
+      M1 ChangePhoneScreen 改 ConsumerStatefulWidget + ScreenProtectionMixin、
+      M2 ChangePhoneNotifier 错误分类改类型化 BusinessException 检查（去除 humanized 字符串匹配 + 死代码）、
+      M3 account_deactivation_screen dialog 回调 setState 补 mounted 守卫（含于 C1）、
+      M4 NotificationPreferencesNotifier 替换 .asData?.value → AsyncData 类型检查 + requireValue、
+      M5 help_screen 客服时段改 EDT 保守窗口（UTC 13:00–23:00）并加 DST 注释、
+      M6 AppLogger 补 +86/+852 国际手机号掩码规则、
+      M7 TradeSettings.confirmationMethod 迁移至 flutter_secure_storage（SharedPreferences 只读回退）。
+      flutter analyze 0 issues，state management 18/18 全绿。待合并至 main。
