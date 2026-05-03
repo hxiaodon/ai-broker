@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Push notifications.
+	     Value is overridden by the provisioning profile at archive time:
+	     development → Debug/AdHoc, production → App Store/TestFlight. -->
+	<key>aps-environment</key>
+	<string>production</string>
+
+	<!-- Universal Links — HTTPS deep links via app.trading.example.com.
+	     Requires /.well-known/apple-app-site-association on the host.
+	     See A3 commit for the matching Android App Link configuration. -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:app.trading.example.com</string>
+	</array>
+</dict>
+</plist>

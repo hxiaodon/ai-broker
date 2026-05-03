@@ -79,6 +79,12 @@
 			</dict>
 		</dict>
 	</dict>
+	<!-- Background modes: remote-notification for push, fetch for background token refresh -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+		<string>fetch</string>
+	</array>
 	<!-- Custom URL scheme for deep links (tradingapp://…).
 	     Universal Links (HTTPS) require Associated Domains entitlement — see Runner.entitlements. -->
 	<key>CFBundleURLTypes</key>
