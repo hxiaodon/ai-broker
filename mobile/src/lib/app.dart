@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'core/lifecycle/app_lifecycle_observer.dart';
 import 'core/routing/app_router.dart';
 import 'shared/theme/app_theme.dart';
 import 'shared/theme/trading_color_scheme.dart';
@@ -29,20 +30,22 @@ class TradingApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
 
-    return MaterialApp.router(
-      title: 'Trading App',
-      debugShowCheckedModeBanner: false,
-      scrollBehavior: const _NoStretchScrollBehavior(),
-      theme: AppTheme.build(
-        colorScheme: TradingColorScheme.greenUp,
-        brightness: Brightness.light,
+    return AppLifecycleObserver(
+      child: MaterialApp.router(
+        title: 'Trading App',
+        debugShowCheckedModeBanner: false,
+        scrollBehavior: const _NoStretchScrollBehavior(),
+        theme: AppTheme.build(
+          colorScheme: TradingColorScheme.greenUp,
+          brightness: Brightness.light,
+        ),
+        darkTheme: AppTheme.build(
+          colorScheme: TradingColorScheme.greenUp,
+          brightness: Brightness.dark,
+        ),
+        themeMode: ThemeMode.dark, // Dark-first per design spec
+        routerConfig: router,
       ),
-      darkTheme: AppTheme.build(
-        colorScheme: TradingColorScheme.greenUp,
-        brightness: Brightness.dark,
-      ),
-      themeMode: ThemeMode.dark, // Dark-first per design spec
-      routerConfig: router,
     );
   }
 }
