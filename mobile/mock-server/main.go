@@ -28,6 +28,9 @@ func main() {
 	// Initialize strategy
 	currentStrategy = getStrategy(*strategy)
 
+	// Seed settings test data (pre-populate device registry)
+	initSettingsSeedData()
+
 	// Routes
 	// Auth endpoints
 	http.HandleFunc("/v1/auth/otp/send", handleOtpSend)
@@ -36,8 +39,18 @@ func main() {
 	http.HandleFunc("/v1/auth/biometric/register", handleBiometricRegister)
 	http.HandleFunc("/v1/auth/biometric/verify", handleBiometricVerify)
 	http.HandleFunc("/v1/auth/logout", handleLogout)
-	http.HandleFunc("/v1/auth/devices", handleGetDevices)
-	http.HandleFunc("/v1/auth/devices/", handleDeleteDevice)
+	// Settings view of devices (returns last_active_at + is_current_device)
+	http.HandleFunc("/v1/auth/devices", handleSettingsDevices)
+	http.HandleFunc("/v1/auth/devices/", handleSettingsDeleteDevice)
+
+	// Settings endpoints
+	http.HandleFunc("/v1/profile", handleGetProfile)
+	http.HandleFunc("/v1/profile/account-status", handleGetAccountStatus)
+	http.HandleFunc("/v1/notifications/preferences", handleNotificationPreferences)
+	http.HandleFunc("/v1/auth/phone/change", handlePhoneChange)
+	http.HandleFunc("/v1/auth/phone/verify-old", handlePhoneChange)
+	http.HandleFunc("/v1/account/lock", handleAccountLock)
+	http.HandleFunc("/v1/account/deactivation/eligibility", handleDeactivationEligibility)
 
 	// Trading endpoints
 	http.HandleFunc("/api/v1/auth/session-key", handleSessionKey)

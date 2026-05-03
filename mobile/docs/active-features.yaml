@@ -12,7 +12,7 @@
 #   shipped     — 审核通过，合并至 main
 
 domain: mobile
-last_updated: 2026-04-30
+last_updated: 2026-05-01
 current_focus: settings
 
 development_order:
@@ -166,11 +166,15 @@ modules:
 
   - id: settings
     name: 设置模块
-    status: pending
-    phase1_tasks: "0/?"
+    status: review
+    phase1_tasks: "35/35"
     prd: mobile/docs/prd/08-settings-profile.md
-    tracker: mobile/docs/specs/settings.tracker.md  # JIT
-    hifi: mobile/prototypes/08-settings-profile/
+    tracker: mobile/docs/specs/settings.tracker.md
+    hifi: mobile/prototypes/08-settings-profile/hifi/
     contracts:
-      - docs/contracts/ams-to-mobile.md   # § Profile / Notifications
-    notes: "包含跨模块的通知设置（PRD-07）和安全设置（设备管理在 auth 模块）"
+      - docs/contracts/ams-to-mobile.md   # § Profile / Notifications / Devices
+    notes: >
+      Phase 1 实现完成（T01-T35），35/35 任务，flutter analyze 0 issues，
+      35 个集成测试全绿（18 state + 8 API + 9 E2E）。
+      Mock Server 新增 settings.go（7 个端点）。
+      待 security-engineer + code-reviewer 审核。

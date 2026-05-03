@@ -42,7 +42,7 @@ final class AddressProofNotifierProvider
 }
 
 String _$addressProofNotifierHash() =>
-    r'06b558aafe73297eb1b9eeda0f0c82c65bd4fa7b';
+    r'd3fb4fc127468b21a2a12971627d81d13553c7cb';
 
 abstract class _$AddressProofNotifier extends $Notifier<AddressProofState> {
   AddressProofState build();

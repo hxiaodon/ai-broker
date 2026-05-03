@@ -58,8 +58,10 @@ class RouteNames {
 
   // Settings sub-routes
   static const securitySettings = '/settings/security';
-  static const notificationSettings = '/settings/notifications';
-  static const colorSchemeSettings = '/settings/color-scheme';
+  static const generalSettings = '/settings/general';
+  static const tradeSettings = '/settings/trading';
   static const profile = '/settings/profile';
   static const helpCenter = '/settings/help';
+  static const changePhone = '/settings/security/change-phone';
+  static const accountDeactivation = '/settings/security/deactivation';
 }

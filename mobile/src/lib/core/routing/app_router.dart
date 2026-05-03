@@ -25,6 +25,14 @@ import '../../features/trading/presentation/screens/order_entry_screen.dart';
 import '../../features/trading/presentation/screens/order_list_screen.dart';
 import '../../features/portfolio/presentation/screens/portfolio_screen.dart';
 import '../../features/portfolio/presentation/screens/position_detail_screen.dart';
+import '../../features/settings/presentation/screens/account_deactivation_screen.dart';
+import '../../features/settings/presentation/screens/change_phone_screen.dart';
+import '../../features/settings/presentation/screens/general_settings_screen.dart';
+import '../../features/settings/presentation/screens/help_screen.dart';
+import '../../features/settings/presentation/screens/profile_screen.dart';
+import '../../features/settings/presentation/screens/security_settings_screen.dart';
+import '../../features/settings/presentation/screens/settings_home_screen.dart';
+import '../../features/settings/presentation/screens/trade_settings_screen.dart';
 import 'route_names.dart';
 import 'scaffold_with_nav.dart';
 
@@ -216,19 +224,37 @@ GoRouter appRouter(Ref ref) {
             routes: [
               GoRoute(
                 path: RouteNames.settings,
-                builder: (_, _) => const _Placeholder('Settings'),
+                builder: (_, _) => const SettingsHomeScreen(),
                 routes: [
                   GoRoute(
-                    path: 'security',
-                    builder: (_, _) => const _Placeholder('Security Settings'),
+                    path: 'profile',
+                    builder: (_, _) => const ProfileScreen(),
                   ),
                   GoRoute(
-                    path: 'profile',
-                    builder: (_, _) => const _Placeholder('Profile'),
+                    path: 'security',
+                    builder: (_, _) => const SecuritySettingsScreen(),
+                    routes: [
+                      GoRoute(
+                        path: 'change-phone',
+                        builder: (_, _) => const ChangePhoneScreen(),
+                      ),
+                      GoRoute(
+                        path: 'deactivation',
+                        builder: (_, _) => const AccountDeactivationScreen(),
+                      ),
+                    ],
+                  ),
+                  GoRoute(
+                    path: 'general',
+                    builder: (_, _) => const GeneralSettingsScreen(),
+                  ),
+                  GoRoute(
+                    path: 'trading',
+                    builder: (_, _) => const TradeSettingsScreen(),
                   ),
                   GoRoute(
                     path: 'help',
-                    builder: (_, _) => const _Placeholder('Help Center'),
+                    builder: (_, _) => const HelpScreen(),
                   ),
                 ],
               ),

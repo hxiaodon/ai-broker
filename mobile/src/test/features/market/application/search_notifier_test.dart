@@ -1,12 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:decimal/decimal.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:trading_app/core/logging/app_logger.dart';
+import 'package:trading_app/core/storage/secure_storage_service.dart';
 import 'package:trading_app/features/market/application/search_notifier.dart';
 import 'package:trading_app/features/market/data/market_data_repository_impl.dart';
 import 'package:trading_app/features/market/domain/entities/market_status.dart';
@@ -19,6 +20,8 @@ import 'package:trading_app/features/market/domain/repositories/market_data_repo
 // ─────────────────────────────────────────────────────────────────────────────
 
 class MockMarketDataRepository extends Mock implements MarketDataRepository {}
+
+class MockSecureStorageService extends Mock implements SecureStorageService {}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -49,20 +52,17 @@ MoverItem makeMover(String symbol, {int rank = 1}) => MoverItem(
 
 ProviderContainer buildContainer({
   required MockMarketDataRepository mockRepo,
-  required SharedPreferences prefs,
+  required MockSecureStorageService mockStorage,
 }) {
   return ProviderContainer(
     overrides: [
       marketDataRepositoryProvider.overrideWith((_) => mockRepo),
-      sharedPreferencesProvider.overrideWith((_) async => prefs),
+      secureStorageServiceProvider.overrideWith((_) => mockStorage),
     ],
   );
 }
 
 /// Activates [searchProvider] and waits for `_init()` to complete.
-///
-/// Returns a [ProviderSubscription] that keeps the provider alive.
-/// The caller must call `sub.close()` (or just `container.dispose()`) in tearDown.
 ProviderSubscription<SearchState> activateSearch(ProviderContainer container) {
   return container.listen(searchProvider, (_, _) {});
 }
@@ -78,12 +78,15 @@ void main() {
   setUpAll(() => AppLogger.init());
 
   late MockMarketDataRepository mockRepo;
-  late SharedPreferences prefs;
+  late MockSecureStorageService mockStorage;
 
   setUp(() async {
     mockRepo = MockMarketDataRepository();
-    SharedPreferences.setMockInitialValues({});
-    prefs = await SharedPreferences.getInstance();
+    mockStorage = MockSecureStorageService();
+
+    // Default: empty history in secure storage
+    when(() => mockStorage.read(_kHistoryKey)).thenAnswer((_) async => null);
+    when(() => mockStorage.write(any(), any())).thenAnswer((_) async {});
 
     // Default stubs — safe fallbacks
     when(() => mockRepo.getMovers(
@@ -101,7 +104,7 @@ void main() {
 
   group('initial state', () {
     test('starts with empty query and empty results', () async {
-      final container = buildContainer(mockRepo: mockRepo, prefs: prefs);
+      final container = buildContainer(mockRepo: mockRepo, mockStorage: mockStorage);
       addTearDown(container.dispose);
       activateSearch(container);
       await pump();
@@ -122,7 +125,7 @@ void main() {
             [makeMover('AAPL', rank: 1), makeMover('TSLA', rank: 2)],
       );
 
-      final container = buildContainer(mockRepo: mockRepo, prefs: prefs);
+      final container = buildContainer(mockRepo: mockRepo, mockStorage: mockStorage);
       addTearDown(container.dispose);
       activateSearch(container);
       await pump();
@@ -137,7 +140,7 @@ void main() {
             market: any(named: 'market'),
           )).thenThrow(Exception('network error'));
 
-      final container = buildContainer(mockRepo: mockRepo, prefs: prefs);
+      final container = buildContainer(mockRepo: mockRepo, mockStorage: mockStorage);
       addTearDown(container.dispose);
       activateSearch(container);
       await pump();
@@ -147,13 +150,12 @@ void main() {
       expect(state.error, isNull);
     });
 
-    test('loads history from SharedPreferences on init', () async {
-      SharedPreferences.setMockInitialValues({
-        'search_history_symbols': ['AAPL', 'TSLA'],
-      });
-      prefs = await SharedPreferences.getInstance();
+    test('loads history from SecureStorage on init', () async {
+      when(() => mockStorage.read(_kHistoryKey)).thenAnswer(
+        (_) async => jsonEncode(['AAPL', 'TSLA']),
+      );
 
-      final container = buildContainer(mockRepo: mockRepo, prefs: prefs);
+      final container = buildContainer(mockRepo: mockRepo, mockStorage: mockStorage);
       addTearDown(container.dispose);
       activateSearch(container);
       await pump();
@@ -168,7 +170,7 @@ void main() {
     late ProviderContainer container;
 
     setUp(() async {
-      container = buildContainer(mockRepo: mockRepo, prefs: prefs);
+      container = buildContainer(mockRepo: mockRepo, mockStorage: mockStorage);
       activateSearch(container);
       await pump();
     });
@@ -194,7 +196,6 @@ void main() {
       container.read(searchProvider.notifier).updateQuery('AAPL');
 
       expect(container.read(searchProvider).isLoading, isTrue);
-      // Timer not fired yet
       verifyNever(() => mockRepo.searchStocks(
             q: any(named: 'q'),
             market: any(named: 'market'),
@@ -211,7 +212,6 @@ void main() {
 
       container.read(searchProvider.notifier).updateQuery('AAPL');
 
-      // Wait past the 300ms debounce
       await Future<void>.delayed(const Duration(milliseconds: 350));
 
       final state = container.read(searchProvider);
@@ -234,7 +234,6 @@ void main() {
 
       await Future<void>.delayed(const Duration(milliseconds: 350));
 
-      // Only final query fires search
       verify(() => mockRepo.searchStocks(
             q: 'TSLA',
             market: any(named: 'market'),
@@ -271,11 +270,9 @@ void main() {
 
       notifier.updateQuery('AAPL');
       await Future<void>.delayed(const Duration(milliseconds: 350));
-      // AAPL search is in-flight; user changes query
       notifier.updateQuery('TSLA');
       await Future<void>.delayed(const Duration(milliseconds: 350));
 
-      // Now complete the stale AAPL response
       aaplCompleter.complete([makeResult('AAPL')]);
       await pump();
 
@@ -292,7 +289,7 @@ void main() {
     late ProviderContainer container;
 
     setUp(() async {
-      container = buildContainer(mockRepo: mockRepo, prefs: prefs);
+      container = buildContainer(mockRepo: mockRepo, mockStorage: mockStorage);
       activateSearch(container);
       await pump();
     });
@@ -352,7 +349,7 @@ void main() {
     late ProviderContainer container;
 
     setUp(() async {
-      container = buildContainer(mockRepo: mockRepo, prefs: prefs);
+      container = buildContainer(mockRepo: mockRepo, mockStorage: mockStorage);
       activateSearch(container);
       await pump();
     });
@@ -366,8 +363,8 @@ void main() {
       final history = container.read(searchProvider).history;
       expect(history.first, 'TSLA'); // newest first
       expect(history, containsAll(['TSLA', 'AAPL']));
-      expect(prefs.getStringList('search_history_symbols'),
-          containsAllInOrder(['TSLA', 'AAPL']));
+      // Verify the history was persisted to SecureStorage
+      verify(() => mockStorage.write(_kHistoryKey, any())).called(2);
     });
 
     test('addToHistory deduplicates — re-added entry moves to front', () async {
@@ -408,15 +405,14 @@ void main() {
       await notifier.clearHistory();
 
       expect(container.read(searchProvider).history, isEmpty);
-      expect(prefs.getStringList('search_history_symbols'), isEmpty);
+      verify(() => mockStorage.write(_kHistoryKey, any())).called(greaterThan(0));
     });
 
-    test('history loaded from prefs on init', () async {
-      SharedPreferences.setMockInitialValues({
-        'search_history_symbols': ['MSFT', 'GOOG'],
-      });
-      final freshPrefs = await SharedPreferences.getInstance();
-      final freshContainer = buildContainer(mockRepo: mockRepo, prefs: freshPrefs);
+    test('history loaded from SecureStorage on init', () async {
+      when(() => mockStorage.read(_kHistoryKey)).thenAnswer(
+        (_) async => jsonEncode(['MSFT', 'GOOG']),
+      );
+      final freshContainer = buildContainer(mockRepo: mockRepo, mockStorage: mockStorage);
       addTearDown(freshContainer.dispose);
       activateSearch(freshContainer);
       await pump();
@@ -502,3 +498,6 @@ void main() {
     });
   });
 }
+
+// Re-export constant so we can reference it in test assertions
+const _kHistoryKey = 'search_history_symbols';
