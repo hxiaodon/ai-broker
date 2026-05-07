@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/foundation.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:dio/dio.dart';
+import 'package:trading_app/core/security/fund_withdrawal_bio_service.dart';
 
 /// Funding Module — API Integration Tests
 ///
@@ -249,9 +250,11 @@ void main() {
     );
 
     testWidgets(
-      'FB10: Micro-deposit verify with correct amounts succeeds',
+      'FB10: Micro-deposit verify with correct amounts succeeds (PRD-05 §4.1)',
       (tester) async {
         debugPrint('\n✅ FB10: Micro-deposit verification');
+        // Mock server correct amounts: $0.15 + $0.23 (per mock-server/funding.go).
+        // Both values are within PRD-05 §4.1 range of $0.01–$0.99.
         final resp = await dio.post<Map<String, dynamic>>(
           '/api/v1/bank-accounts/ba-002/verify-micro-deposit',
           data: {'amount_1': '0.15', 'amount_2': '0.23'},
@@ -276,7 +279,7 @@ void main() {
         try {
           await dio.post<Map<String, dynamic>>(
             '/api/v1/bank-accounts/ba-002/verify-micro-deposit',
-            data: {'amount_1': '0.99', 'amount_2': '0.99'},
+            data: {'amount_1': '0.50', 'amount_2': '0.50'}, // wrong but in-range
             options: Options(headers: {
               'Idempotency-Key':
                   'test-wrong-${DateTime.now().millisecondsSinceEpoch}',
@@ -295,6 +298,81 @@ void main() {
     );
 
     testWidgets(
+      'FB11b: Micro-deposit amounts below \$0.01 are rejected as out-of-range (PRD-05 §4.1)',
+      (tester) async {
+        debugPrint('\n❌ FB11b: Micro-deposit amount below \$0.01 boundary');
+        try {
+          await dio.post<Map<String, dynamic>>(
+            '/api/v1/bank-accounts/ba-002/verify-micro-deposit',
+            data: {'amount_1': '0.00', 'amount_2': '0.15'},
+            options: Options(headers: {
+              'Idempotency-Key': 'fb11b-below-${DateTime.now().millisecondsSinceEpoch}',
+              'X-Key-Id': 'sk-test',
+              'X-Nonce': 'nonce-fb11b',
+              'X-Signature': 'sig-test',
+            }),
+          );
+          fail('Should have thrown DioException for out-of-range amount');
+        } on DioException catch (e) {
+          expect(e.response?.statusCode, 422);
+          expect(e.response?.data['error_code'], 'MICRO_DEPOSIT_AMOUNT_OUT_OF_RANGE');
+          debugPrint('    ✅ \$0.00 rejected: ${e.response?.data['error_code']}');
+        }
+      },
+    );
+
+    testWidgets(
+      'FB11c: Micro-deposit amounts above \$0.99 are rejected as out-of-range (PRD-05 §4.1)',
+      (tester) async {
+        debugPrint('\n❌ FB11c: Micro-deposit amount above \$0.99 boundary');
+        try {
+          await dio.post<Map<String, dynamic>>(
+            '/api/v1/bank-accounts/ba-002/verify-micro-deposit',
+            data: {'amount_1': '1.00', 'amount_2': '0.23'},
+            options: Options(headers: {
+              'Idempotency-Key': 'fb11c-above-${DateTime.now().millisecondsSinceEpoch}',
+              'X-Key-Id': 'sk-test',
+              'X-Nonce': 'nonce-fb11c',
+              'X-Signature': 'sig-test',
+            }),
+          );
+          fail('Should have thrown DioException for out-of-range amount');
+        } on DioException catch (e) {
+          expect(e.response?.statusCode, 422);
+          expect(e.response?.data['error_code'], 'MICRO_DEPOSIT_AMOUNT_OUT_OF_RANGE');
+          debugPrint('    ✅ \$1.00 rejected: ${e.response?.data['error_code']}');
+        }
+      },
+    );
+
+    testWidgets(
+      'FB11d: Micro-deposit boundary values \$0.01 and \$0.99 are within valid range (PRD-05 §4.1)',
+      (tester) async {
+        debugPrint('\n🔢 FB11d: Micro-deposit boundary \$0.01 and \$0.99 are in-range');
+        // These are wrong amounts (not matching mock server $0.15/$0.23) but
+        // they must reach MISMATCH — not OUT_OF_RANGE — proving the range check passes.
+        try {
+          await dio.post<Map<String, dynamic>>(
+            '/api/v1/bank-accounts/ba-002/verify-micro-deposit',
+            data: {'amount_1': '0.01', 'amount_2': '0.99'},
+            options: Options(headers: {
+              'Idempotency-Key': 'fb11d-boundary-${DateTime.now().millisecondsSinceEpoch}',
+              'X-Key-Id': 'sk-test',
+              'X-Nonce': 'nonce-fb11d',
+              'X-Signature': 'sig-test',
+            }),
+          );
+          fail('Should have thrown DioException');
+        } on DioException catch (e) {
+          expect(e.response?.statusCode, 422);
+          expect(e.response?.data['error_code'], 'MICRO_DEPOSIT_MISMATCH',
+              reason: '\$0.01 and \$0.99 are in-range — must reach MISMATCH not OUT_OF_RANGE');
+          debugPrint('    ✅ \$0.01/\$0.99 passed range check → MISMATCH as expected');
+        }
+      },
+    );
+
+    testWidgets(
       'FB12: POST /api/v1/funding/bio-challenge issues challenge',
       (tester) async {
         debugPrint('\n🔐 FB12: Fund bio challenge');
@@ -307,5 +385,190 @@ void main() {
         debugPrint('    ✅ Bio challenge issued: ${challenge.substring(0, 16)}...');
       },
     );
+
+    // ── P0-05: AML screening status flow ──────────────────────────────────────
+
+    testWidgets(
+      'FB13: AML REVIEW — deposit status maps to UNDER_REVIEW (PRD-05 §4.2; fund-transfer-compliance Rule 2)',
+      (tester) async {
+        debugPrint('\n🔍 FB13: AML REVIEW status flow');
+        final resp = await dio.post<Map<String, dynamic>>(
+          '/api/v1/deposit',
+          data: {'amount': '500.00', 'bank_account_id': 'ba-001', 'channel': 'ACH'},
+          options: Options(
+            headers: {
+              'Idempotency-Key': 'fb13-aml-review-${DateTime.now().millisecondsSinceEpoch}',
+              'X-Mock-AML-Status': 'REVIEW',
+            },
+            validateStatus: (s) => s! < 500,
+          ),
+        );
+        expect(resp.statusCode, 201);
+        expect(resp.data!['status'], 'UNDER_REVIEW',
+            reason: 'AML REVIEW must map to UNDER_REVIEW — not PENDING or COMPLETED');
+        debugPrint('    ✅ AML REVIEW → status=UNDER_REVIEW: ${resp.data!['status']}');
+      },
+    );
+
+    testWidgets(
+      'FB14: AML REJECTED — deposit returns 422 with AML_REJECTED error code (fund-transfer-compliance Rule 2)',
+      (tester) async {
+        debugPrint('\n🚫 FB14: AML REJECTED status flow');
+        try {
+          await dio.post<Map<String, dynamic>>(
+            '/api/v1/deposit',
+            data: {'amount': '500.00', 'bank_account_id': 'ba-001', 'channel': 'ACH'},
+            options: Options(
+              headers: {
+                'Idempotency-Key': 'fb14-aml-rejected-${DateTime.now().millisecondsSinceEpoch}',
+                'X-Mock-AML-Status': 'REJECTED',
+              },
+            ),
+          );
+          fail('Should have thrown DioException for AML rejection');
+        } on DioException catch (e) {
+          expect(e.response?.statusCode, 422);
+          expect(e.response?.data['error_code'], 'AML_REJECTED',
+              reason: 'AML rejection must return AML_REJECTED error code');
+          debugPrint('    ✅ AML REJECTED → 422 AML_REJECTED: ${e.response?.data['error_code']}');
+        }
+      },
+    );
+
+    // ── P0-06: Same-name account principle ────────────────────────────────────
+
+    testWidgets(
+      'FB15: Bank account binding rejects mismatched name — NAME_MISMATCH (fund-transfer-compliance Rule 1)',
+      (tester) async {
+        debugPrint('\n🚫 FB15: Same-name account principle — name mismatch rejected');
+        try {
+          await dio.post<Map<String, dynamic>>(
+            '/api/v1/bank-accounts',
+            data: {
+              'account_name': 'Different Person',
+              'account_number': '123456789',
+              'routing_number': '021000021',
+              'bank_name': 'Test Bank',
+            },
+            options: Options(
+              headers: {
+                'Idempotency-Key': 'fb15-name-mismatch-${DateTime.now().millisecondsSinceEpoch}',
+              },
+            ),
+          );
+          fail('Should have thrown DioException for name mismatch');
+        } on DioException catch (e) {
+          expect(e.response?.statusCode, 422);
+          expect(e.response?.data['error_code'], 'NAME_MISMATCH',
+              reason: 'Third-party bank accounts must be rejected with NAME_MISMATCH');
+          debugPrint('    ✅ Name mismatch → 422 NAME_MISMATCH: ${e.response?.data['error_code']}');
+        }
+      },
+    );
+
+    testWidgets(
+      'FB16: Bank account binding accepts matching name (case-insensitive) (fund-transfer-compliance Rule 1)',
+      (tester) async {
+        debugPrint('\n✅ FB16: Same-name account principle — matching name accepted');
+        final resp = await dio.post<Map<String, dynamic>>(
+          '/api/v1/bank-accounts',
+          data: {
+            'account_name': 'JOHN SMITH', // case-insensitive match
+            'account_number': '987654321',
+            'routing_number': '021000021',
+            'bank_name': 'Test Bank',
+          },
+          options: Options(
+            headers: {
+              'Idempotency-Key': 'fb16-name-match-${DateTime.now().millisecondsSinceEpoch}',
+            },
+            validateStatus: (s) => s! < 500,
+          ),
+        );
+        expect(resp.statusCode, 201,
+            reason: 'Matching name (case-insensitive) must be accepted');
+        expect(resp.data!['bank_account_id'], isNotNull);
+        debugPrint('    ✅ Matching name accepted: id=${resp.data!['bank_account_id']}');
+      },
+    );
+
+    // ── P0-07: Full biometric withdrawal flow ─────────────────────────────────
+
+    testWidgets(
+      'FB17: Full bio-auth withdrawal flow: fetchChallenge → computeBioToken → submit (PRD-05 §4.3; security-compliance bio-auth)',
+      (tester) async {
+        debugPrint('\n🔐 FB17: Full bio-auth withdrawal flow');
+
+        // Step 1: fetchChallenge
+        debugPrint('  Step 1: Fetching bio challenge...');
+        final challengeResp = await dio
+            .post<Map<String, dynamic>>('/api/v1/funding/bio-challenge');
+        expect(challengeResp.statusCode, 200);
+        final challenge = challengeResp.data!['challenge'] as String;
+        expect(challenge.length, greaterThanOrEqualTo(32),
+            reason: 'Challenge must be at least 32 chars for entropy');
+        debugPrint('    ✅ Challenge fetched: ${challenge.substring(0, 16)}...');
+
+        // Step 2: computeBioToken (simulates on-device biometric auth)
+        debugPrint('  Step 2: Computing bio token...');
+        const sessionSecret = 'test-session-secret-abc123';
+        final timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+        const deviceId = 'dev-test-fb17';
+        const amount = '500.00';
+        const bankAccountId = 'ba-001';
+        const accountId = 'acc-demo-001';
+
+        final actionHash = FundWithdrawalBioService.computeActionHash(
+          amount: amount,
+          bankAccountId: bankAccountId,
+          accountId: accountId,
+        );
+        // Use a test instance that only exercises pure computation (no real Dio)
+        final bioService = _PureBioService();
+        final bioToken = bioService.computeBioToken(
+          sessionSecret: sessionSecret,
+          challenge: challenge,
+          timestamp: timestamp,
+          deviceId: deviceId,
+          actionHash: actionHash,
+        );
+        expect(bioToken, isNotEmpty,
+            reason: 'bioToken must be non-empty to be included in header');
+        debugPrint('    ✅ Bio token computed: ${bioToken.substring(0, 16)}...');
+
+        // Step 3: Submit withdrawal with X-Biometric-Token header
+        debugPrint('  Step 3: Submitting withdrawal...');
+        final withdrawalResp = await dio.post<Map<String, dynamic>>(
+          '/api/v1/withdrawal',
+          data: {
+            'amount': amount,
+            'bank_account_id': bankAccountId,
+            'channel': 'ACH',
+          },
+          options: Options(
+            headers: {
+              'Idempotency-Key': 'fb17-bio-flow-${DateTime.now().millisecondsSinceEpoch}',
+              'X-Biometric-Token': bioToken,
+              'X-Challenge': challenge,
+              'X-Timestamp': timestamp,
+              'X-Device-Id': deviceId,
+            },
+            validateStatus: (s) => s! < 500,
+          ),
+        );
+        expect(withdrawalResp.statusCode, 201);
+        expect(withdrawalResp.data!['transfer_id'], isNotNull);
+        expect(withdrawalResp.data!['status'], 'PENDING');
+        debugPrint('    ✅ Withdrawal submitted: id=${withdrawalResp.data!['transfer_id']}');
+
+        debugPrint('✅ FB17 PASSED: Full bio-auth withdrawal flow (challenge → token → submit)');
+      },
+    );
   });
+}
+
+/// Test-only subclass that skips Dio construction — used solely for
+/// exercising pure computeBioToken / computeActionHash methods.
+class _PureBioService extends FundWithdrawalBioService {
+  _PureBioService() : super(dio: Dio());
 }

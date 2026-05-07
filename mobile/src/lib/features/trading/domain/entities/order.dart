@@ -30,6 +30,13 @@ abstract class OrderFees with _$OrderFees {
     required Decimal finraFee,
     required Decimal total,
   }) = _OrderFees;
+
+  const OrderFees._();
+
+  /// Verifies the API-returned total equals the sum of fee components.
+  /// A mismatch indicates a mapper or backend serialization bug.
+  bool get isTotalConsistent =>
+      total == commission + exchangeFee + secFee + finraFee;
 }
 
 @freezed

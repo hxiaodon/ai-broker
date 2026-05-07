@@ -215,8 +215,8 @@ return $default(_that.accountId,_that.currency,_that.totalBalance,_that.availabl
 /// @nodoc
 
 
-class _AccountBalance implements AccountBalance {
-  const _AccountBalance({required this.accountId, required this.currency, required this.totalBalance, required this.availableBalance, required this.unsettledAmount, required this.withdrawableBalance, required this.updatedAt});
+class _AccountBalance extends AccountBalance {
+  const _AccountBalance({required this.accountId, required this.currency, required this.totalBalance, required this.availableBalance, required this.unsettledAmount, required this.withdrawableBalance, required this.updatedAt}): super._();
   
 
 @override final  String accountId;

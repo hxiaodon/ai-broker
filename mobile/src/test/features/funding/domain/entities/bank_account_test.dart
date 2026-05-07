@@ -101,4 +101,60 @@ void main() {
       expect(_makeAccount().createdAt.isUtc, isTrue);
     });
   });
+
+  group('BankAccount.canAttemptVerification (PRD-05 §4.1; fund-transfer-compliance Rule 8)', () {
+    test('true when unverified with attempts remaining', () {
+      expect(
+        _makeAccount(
+          isVerified: false,
+          microDepositStatus: MicroDepositStatus.pending,
+          remainingVerifyAttempts: 5,
+        ).canAttemptVerification,
+        isTrue,
+      );
+    });
+
+    test('false when remainingVerifyAttempts is 0 — terminal state, must re-bind', () {
+      expect(
+        _makeAccount(
+          isVerified: false,
+          microDepositStatus: MicroDepositStatus.failed,
+          remainingVerifyAttempts: 0,
+        ).canAttemptVerification,
+        isFalse,
+      );
+    });
+
+    test('false when already verified (no need to verify again)', () {
+      expect(
+        _makeAccount(
+          isVerified: true,
+          microDepositStatus: MicroDepositStatus.verified,
+          remainingVerifyAttempts: 5,
+        ).canAttemptVerification,
+        isFalse,
+      );
+    });
+
+    test('true with 1 remaining attempt (last chance)', () {
+      expect(
+        _makeAccount(
+          isVerified: false,
+          microDepositStatus: MicroDepositStatus.verifying,
+          remainingVerifyAttempts: 1,
+        ).canAttemptVerification,
+        isTrue,
+      );
+    });
+
+    test('isUsable is false when remainingVerifyAttempts is 0 (not verified, exhausted)', () {
+      final account = _makeAccount(
+        isVerified: false,
+        microDepositStatus: MicroDepositStatus.failed,
+        remainingVerifyAttempts: 0,
+      );
+      expect(account.canAttemptVerification, isFalse);
+      expect(account.isUsable, isFalse);
+    });
+  });
 }

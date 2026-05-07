@@ -1,3 +1,4 @@
+import 'package:decimal/decimal.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,8 +11,21 @@ import 'package:trading_app/core/security/bio_challenge_service.dart';
 import 'package:trading_app/core/security/nonce_service.dart';
 import 'package:trading_app/core/security/session_key_service.dart';
 import 'package:trading_app/core/storage/secure_storage_service.dart';
+import 'package:trading_app/features/trading/application/portfolio_summary_provider.dart';
+import 'package:trading_app/features/trading/application/positions_provider.dart';
+import 'package:trading_app/features/trading/domain/entities/order.dart';
+import 'package:trading_app/features/trading/domain/entities/portfolio_summary.dart';
+import 'package:trading_app/features/trading/domain/entities/position.dart';
 import 'package:trading_app/features/trading/presentation/screens/order_entry_screen.dart';
 import 'package:trading_app/features/trading/presentation/screens/order_list_screen.dart';
+import 'package:trading_app/features/trading/presentation/widgets/slide_to_confirm_widget.dart';
+import 'package:trading_app/features/trading/data/trading_repository_impl.dart';
+import 'package:trading_app/features/trading/data/remote/trading_remote_data_source.dart';
+import 'package:trading_app/core/network/connectivity_service.dart';
+import 'package:trading_app/core/security/hmac_signer.dart';
+import 'package:trading_app/core/auth/device_info_service.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
 import '../helpers/test_app.dart';
 
@@ -180,14 +194,130 @@ void main() {
       debugPrint('✅ Journey 5: OrderListScreen rebuilt without data loss');
     },
   );
+
+  // ── Journey 6: Sell qty cap — submit disabled when qty > availableQty ─────
+  // P0-04: PRD-04 §6.3 + PRD-06 §6.2 unsettled shares must not be sellable.
+
+  testWidgets(
+    'Journey 6: Sell submit disabled when qty exceeds availableQty (P0-04)',
+    (tester) async {
+      // Render OrderEntryScreen in SELL mode with stubbed providers:
+      //   positionsProvider: AAPL qty=100, availableQty=50 (50 shares T+1 unsettled)
+      //   portfolioSummaryProvider: stub to avoid HTTP/SSL calls
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            ..._securityOverrides,
+            positionsProvider.overrideWith(_StubPositionsNotifier.new),
+            portfolioSummaryProvider.overrideWith(_StubPortfolioSummaryNotifier.new),
+          ],
+          child: MaterialApp(
+            home: const OrderEntryScreen(
+              symbol: 'AAPL',
+              market: 'US',
+              initialSide: OrderSide.sell,
+            ),
+          ),
+        ),
+      );
+      // Pump enough for positions to load and postFrameCallback to fire
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pumpAndSettle();
+      await tester.pump(); // extra frame for addPostFrameCallback setState
+
+      // Enter qty = 100 (> availableQty = 50) AND a valid limit price
+      final textFields = find.byType(TextField);
+      expect(textFields, findsWidgets);
+      await tester.enterText(textFields.at(0), '100'); // qty
+      await tester.enterText(textFields.at(1), '160.00'); // limit price
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      // SlideToConfirmWidget opacity must be ≈0.4 (disabled) when qty > availableQty
+      final slideWidget = find.byType(SlideToConfirmWidget);
+      expect(slideWidget, findsOneWidget,
+          reason: 'SlideToConfirmWidget must be present on sell order entry screen');
+      final opacityWidget = tester.widget<Opacity>(
+        find.ancestor(of: slideWidget, matching: find.byType(Opacity)).first,
+      );
+      expect(opacityWidget.opacity, closeTo(0.4, 0.05),
+          reason: 'Submit must be visually disabled (opacity≈0.4) when sell qty(100) > availableQty(50)');
+      debugPrint('✅ Journey 6: Sell qty=100 > availableQty=50 → submit disabled (opacity=${opacityWidget.opacity})');
+
+      // Enter qty = 50 (== availableQty) with same valid price → submit should enable
+      await tester.enterText(textFields.at(0), '50');
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      final opacityEnabled = tester.widget<Opacity>(
+        find.ancestor(of: find.byType(SlideToConfirmWidget), matching: find.byType(Opacity)).first,
+      );
+      expect(opacityEnabled.opacity, closeTo(1.0, 0.05),
+          reason: 'Submit must be enabled when sell qty(50) == availableQty(50)');
+      debugPrint('✅ Journey 6: Sell qty=50 == availableQty=50 → submit enabled (opacity=${opacityEnabled.opacity})');
+    },
+  );
+}
+
+// ─── Stub positions notifier — AAPL 100 qty / 50 availableQty ────────────────
+
+class _StubPositionsNotifier extends PositionsNotifier {
+  @override
+  Future<List<Position>> build() async => [
+        Position(
+          symbol: 'AAPL',
+          market: 'US',
+          qty: 100,
+          availableQty: 50, // 50 shares unsettled (T+1 pending) — not sellable
+          avgCost: Decimal.parse('150.00'),
+          currentPrice: Decimal.parse('160.00'),
+          marketValue: Decimal.parse('16000.00'),
+          unrealizedPnl: Decimal.parse('1000.00'),
+          unrealizedPnlPct: Decimal.parse('6.67'),
+          todayPnl: Decimal.parse('500.00'),
+          todayPnlPct: Decimal.parse('3.23'),
+        ),
+      ];
+}
+
+// ─── Stub portfolio summary notifier — avoids HTTP/SSL calls in E2E ──────────
+
+class _StubPortfolioSummaryNotifier extends PortfolioSummaryNotifier {
+  @override
+  Future<PortfolioSummary> build() async => PortfolioSummary(
+        totalEquity: Decimal.parse('16000.00'),
+        cashBalance: Decimal.parse('0.00'),
+        marketValue: Decimal.parse('16000.00'),
+        dayPnl: Decimal.parse('500.00'),
+        dayPnlPct: Decimal.parse('3.23'),
+        totalPnl: Decimal.parse('1000.00'),
+        totalPnlPct: Decimal.parse('6.67'),
+        buyingPower: Decimal.parse('0.00'),
+        unsettledCash: Decimal.parse('0.00'),
+      );
 }
 
 // ─── Security service overrides (real HTTP to Mock Server) ───────────────────
-
 final _securityOverrides = [
   sessionKeyServiceProvider.overrideWith((ref) => _HttpSessionKeyService()),
   nonceServiceProvider.overrideWith((ref) => _HttpNonceService()),
   bioChallengeServiceProvider.overrideWith((ref) => _HttpBioChallengeService()),
+  // Override tradingRepositoryProvider to use non-pinned Dio → avoids the
+  // PLACEHOLDER SSL pin assertion that fires when DioClient.create() is called
+  // in the normal provider setup. Journey 4/5 need real HTTP to mock server.
+  tradingRepositoryProvider.overrideWith((ref) => TradingRepositoryImpl(
+        remote: TradingRemoteDataSource(
+          dio: _createDio(),
+          signer: const HmacSigner(),
+          connectivity: ConnectivityService(Connectivity()),
+          sessionKeyService: ref.read(sessionKeyServiceProvider),
+          nonceService: ref.read(nonceServiceProvider),
+          deviceInfoService: DeviceInfoService(
+            DeviceInfoPlugin(),
+            const FlutterSecureStorage(),
+          ),
+        ),
+      )),
 ];
 
 Dio _createDio() => Dio(BaseOptions(

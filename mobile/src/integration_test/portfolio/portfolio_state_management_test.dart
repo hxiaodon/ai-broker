@@ -97,14 +97,22 @@ void main() {
     });
 
     test(
-      'TP3: portfolioSummaryProvider returns totalEquity = 96282.20',
+      'TP3: portfolioSummaryProvider — totalEquity == cashBalance + marketValue',
       () async {
         final summary = await container.read(portfolioSummaryProvider.future);
         expect(summary, isA<PortfolioSummary>());
-        expect(summary.totalEquity, Decimal.parse('96282.20'));
+        // Verify the assembly invariant, not the stub's raw value (QI-02 fix).
+        expect(
+          summary.isEquityConsistent,
+          isTrue,
+          reason:
+              'totalEquity (${summary.totalEquity}) must equal '
+              'cashBalance (${summary.cashBalance}) + marketValue (${summary.marketValue})',
+        );
         expect(summary.cashBalance, greaterThan(Decimal.zero));
         printOnFailure(
-          '✅ TP3: portfolioSummaryProvider totalEquity = ${summary.totalEquity}',
+          '✅ TP3: equity consistent — '
+          '${summary.cashBalance} + ${summary.marketValue} = ${summary.totalEquity}',
         );
       },
     );

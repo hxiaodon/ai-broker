@@ -31,4 +31,10 @@ abstract class BankAccount with _$BankAccount {
   }
 
   bool get isUsable => isVerified && !isInCooldown;
+
+  /// Whether micro-deposit verification can still be attempted.
+  /// False when remainingVerifyAttempts == 0 — account must be deleted and
+  /// re-bound per PRD-05 §4.1 and fund-transfer-compliance Rule 8.
+  bool get canAttemptVerification =>
+      !isVerified && remainingVerifyAttempts > 0;
 }

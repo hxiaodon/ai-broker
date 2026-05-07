@@ -81,6 +81,46 @@ void main() {
     });
   });
 
+  group('OrderFees.isTotalConsistent', () {
+    test('consistent when total equals sum of components', () {
+      // 0.99 + 0.03 + 0.01 + 0.005 = 1.035
+      final fees = OrderFees(
+        commission: Decimal.parse('0.99'),
+        exchangeFee: Decimal.parse('0.03'),
+        secFee: Decimal.parse('0.01'),
+        finraFee: Decimal.parse('0.005'),
+        total: Decimal.parse('1.035'),
+      );
+      expect(fees.isTotalConsistent, isTrue);
+    });
+
+    test('inconsistent when total does not match sum of components', () {
+      final fees = OrderFees(
+        commission: Decimal.parse('0.99'),
+        exchangeFee: Decimal.parse('0.03'),
+        secFee: Decimal.parse('0.01'),
+        finraFee: Decimal.parse('0.005'),
+        total: Decimal.parse('2.00'), // wrong
+      );
+      expect(fees.isTotalConsistent, isFalse);
+    });
+
+    test('consistent when all fees are zero', () {
+      final fees = OrderFees(
+        commission: Decimal.zero,
+        exchangeFee: Decimal.zero,
+        secFee: Decimal.zero,
+        finraFee: Decimal.zero,
+        total: Decimal.zero,
+      );
+      expect(fees.isTotalConsistent, isTrue);
+    });
+
+    test('default order fees from _makeOrder are consistent', () {
+      expect(_makeOrder().fees.isTotalConsistent, isTrue);
+    });
+  });
+
   group('Order timestamps are UTC', () {
     test('createdAt and updatedAt are UTC', () {
       final order = _makeOrder();

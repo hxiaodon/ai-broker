@@ -41,6 +41,8 @@ class _OrderEntryScreenState extends ConsumerState<OrderEntryScreen>
   final _qtyController = TextEditingController();
   final _priceController = TextEditingController();
   bool _showExtHoursWarning = false;
+  // Cached from positionsProvider; null = positions not yet loaded.
+  int? _availableQtyForSymbol;
 
   static const _colors = ColorTokens.greenUp;
 
@@ -73,6 +75,11 @@ class _OrderEntryScreenState extends ConsumerState<OrderEntryScreen>
 
   bool get _canSubmit {
     if (_qty <= 0 || _qty > _maxQty) return false;
+    // PRD-04 §6.3 + PRD-06 §6.2: sell qty must not exceed settled availableQty.
+    if (_side == OrderSide.sell) {
+      final avail = _availableQtyForSymbol;
+      if (avail != null && _qty > avail) return false;
+    }
     if (_orderType == OrderType.limit) {
       final p = _limitPrice;
       if (p == null || p < _minLimitPrice) return false;
@@ -104,6 +111,19 @@ class _OrderEntryScreenState extends ConsumerState<OrderEntryScreen>
   Widget build(BuildContext context) {
     final portfolioAsync = ref.watch(portfolioSummaryProvider);
     final positionsAsync = ref.watch(positionsProvider);
+
+    // Keep _availableQtyForSymbol in sync so _canSubmit can enforce sell cap.
+    positionsAsync.whenData((positions) {
+      final avail = positions
+          .where((p) => p.symbol == widget.symbol)
+          .firstOrNull
+          ?.availableQty;
+      if (avail != _availableQtyForSymbol) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() => _availableQtyForSymbol = avail);
+        });
+      }
+    });
 
     // Fixed buy=green, sell=red per PRD §6.7
     final actionColor = _side == OrderSide.buy

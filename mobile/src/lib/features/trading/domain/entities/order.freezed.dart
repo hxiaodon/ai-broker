@@ -209,8 +209,8 @@ return $default(_that.commission,_that.exchangeFee,_that.secFee,_that.finraFee,_
 /// @nodoc
 
 
-class _OrderFees implements OrderFees {
-  const _OrderFees({required this.commission, required this.exchangeFee, required this.secFee, required this.finraFee, required this.total});
+class _OrderFees extends OrderFees {
+  const _OrderFees({required this.commission, required this.exchangeFee, required this.secFee, required this.finraFee, required this.total}): super._();
   
 
 @override final  Decimal commission;

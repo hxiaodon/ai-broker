@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -177,13 +178,31 @@ func handleFundingDeposit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// X-Mock-AML-Status header lets tests simulate AML screening outcomes.
+	// Values: REVIEW → status=UNDER_REVIEW; REJECTED → 422 with AML_REJECTED.
+	mockAMLStatus := r.Header.Get("X-Mock-AML-Status")
+	if mockAMLStatus == "REJECTED" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error_code": "AML_REJECTED",
+			"message":    "存款因 AML 筛查未通过已被拒绝",
+			"reason":     "SANCTIONS_MATCH",
+		})
+		return
+	}
+
 	now := time.Now().UTC()
 	transferID := fmt.Sprintf("dep-%d", now.UnixMilli())
+	status := "PENDING"
+	if mockAMLStatus == "REVIEW" {
+		status = "UNDER_REVIEW"
+	}
 	resp := map[string]interface{}{
 		"transfer_id":     transferID,
 		"account_id":      "acc-demo-001",
 		"type":            "DEPOSIT",
-		"status":          "PENDING",
+		"status":          status,
 		"amount":          body["amount"],
 		"currency":        "USD",
 		"channel":         body["channel"],
@@ -200,7 +219,7 @@ func handleFundingDeposit(w http.ResponseWriter, r *http.Request) {
 	fundingTransfers = append(fundingTransfers, resp)
 	fundingTransferMu.Unlock()
 
-	fmt.Printf("💰 Deposit submitted: id=%s amount=%v\n", transferID, body["amount"])
+	fmt.Printf("💰 Deposit submitted: id=%s amount=%v status=%s\n", transferID, body["amount"], status)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(resp)
@@ -340,6 +359,20 @@ func handleAddBankAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Same-name account principle (fund-transfer-compliance Rule 1):
+	// account_name must match the KYC-verified name for acc-demo-001 (John Smith).
+	const kycVerifiedName = "John Smith"
+	accountName, _ := body["account_name"].(string)
+	if !strings.EqualFold(strings.TrimSpace(accountName), strings.TrimSpace(kycVerifiedName)) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error_code": "NAME_MISMATCH",
+			"message":    "银行账户名称与开户认证姓名不符，仅允许绑定同名账户",
+		})
+		return
+	}
+
 	now := time.Now().UTC()
 	cooldownEnd := now.Add(3 * 24 * time.Hour)
 	accountNum, _ := body["account_number"].(string)
@@ -416,9 +449,24 @@ func handleVerifyMicroDeposit(w http.ResponseWriter, r *http.Request, bankID str
 		return
 	}
 
-	// Mock: accept $0.15 + $0.23 as correct amounts
 	amount1, _ := body["amount_1"].(string)
 	amount2, _ := body["amount_2"].(string)
+
+	// PRD-05 §4.1: micro-deposit amounts must be in [0.01, 0.99] USD.
+	// Reject out-of-range amounts before checking correctness.
+	a1, err1 := strconv.ParseFloat(amount1, 64)
+	a2, err2 := strconv.ParseFloat(amount2, 64)
+	if err1 != nil || err2 != nil || a1 < 0.01 || a1 > 0.99 || a2 < 0.01 || a2 > 0.99 {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnprocessableEntity)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"error_code": "MICRO_DEPOSIT_AMOUNT_OUT_OF_RANGE",
+			"message":    "微存款金额必须在 $0.01–$0.99 之间",
+		})
+		return
+	}
+
+	// Mock correct values: $0.15 + $0.23 (with ±$0.01 tolerance for test convenience)
 	correct := (amount1 == "0.15" || amount1 == "0.14" || amount1 == "0.16") &&
 		(amount2 == "0.23" || amount2 == "0.22" || amount2 == "0.24")
 

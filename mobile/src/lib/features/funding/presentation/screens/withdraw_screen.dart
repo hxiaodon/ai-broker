@@ -12,6 +12,7 @@ import '../../application/account_balance_notifier.dart';
 import '../../application/bank_accounts_notifier.dart';
 import '../../application/withdraw_form_notifier.dart';
 import '../../domain/entities/bank_account.dart';
+import '../../domain/entities/account_balance.dart';
 
 /// 出金流程 — 3-step: 金额 → 生物识别 → 完成
 ///
@@ -143,10 +144,11 @@ class _AmountStep extends StatelessWidget {
 
   bool get _isAmountValid {
     final a = amount;
-    final max = withdrawableBalance;
-    if (a == null || a <= Decimal.zero) return false;
-    if (max != null && a > max) return false;
-    return true;
+    if (a == null) return false;
+    return AccountBalance.isValidWithdrawalAmount(
+      a,
+      withdrawableBalance: withdrawableBalance,
+    );
   }
 
   bool get _canProceed => _isAmountValid && selectedBankAccountId != null;

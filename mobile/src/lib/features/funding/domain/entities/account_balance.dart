@@ -18,4 +18,22 @@ abstract class AccountBalance with _$AccountBalance {
     required Decimal withdrawableBalance,
     required DateTime updatedAt,
   }) = _AccountBalance;
+
+  const AccountBalance._();
+
+  /// Whether [amount] is a valid withdrawal request against this balance.
+  /// Returns false for non-positive amounts or amounts exceeding withdrawableBalance.
+  bool isWithdrawable(Decimal amount) =>
+      isValidWithdrawalAmount(amount, withdrawableBalance: withdrawableBalance);
+
+  /// Pure validation: returns false for non-positive amounts or amounts
+  /// exceeding [withdrawableBalance] (if provided).
+  static bool isValidWithdrawalAmount(
+    Decimal amount, {
+    Decimal? withdrawableBalance,
+  }) {
+    if (amount <= Decimal.zero) return false;
+    if (withdrawableBalance != null && amount > withdrawableBalance) return false;
+    return true;
+  }
 }

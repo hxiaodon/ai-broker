@@ -213,8 +213,8 @@ return $default(_that.totalEquity,_that.cashBalance,_that.marketValue,_that.dayP
 /// @nodoc
 
 
-class _PortfolioSummary implements PortfolioSummary {
-  const _PortfolioSummary({required this.totalEquity, required this.cashBalance, required this.marketValue, required this.dayPnl, required this.dayPnlPct, required this.totalPnl, required this.totalPnlPct, required this.buyingPower, required this.unsettledCash});
+class _PortfolioSummary extends PortfolioSummary {
+  const _PortfolioSummary({required this.totalEquity, required this.cashBalance, required this.marketValue, required this.dayPnl, required this.dayPnlPct, required this.totalPnl, required this.totalPnlPct, required this.buyingPower, required this.unsettledCash}): super._();
   
 
 @override final  Decimal totalEquity;

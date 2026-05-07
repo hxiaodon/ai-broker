@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:trading_app/features/auth/application/auth_notifier.dart';
+import 'package:trading_app/features/market/presentation/screens/market_home_screen.dart';
+import 'package:trading_app/features/market/presentation/widgets/delayed_quote_banner.dart';
+import 'package:trading_app/shared/theme/app_theme.dart';
+import 'package:trading_app/shared/theme/trading_color_scheme.dart';
 import '../helpers/test_app.dart';
 
 /// Cross-Module Integration Tests
@@ -81,11 +87,28 @@ void main() {
     });
 
     testWidgets('C7: Guest sees delayed quotes', (tester) async {
-      await tester.pumpWidget(TestAppConfig.createAppAsGuest());
+      // Directly render MarketHomeScreen with guest auth state — bypasses splash
+      // routing so the DelayedQuoteBanner is immediately in the widget tree.
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWithValue(const AuthState.guest()),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.build(
+              colorScheme: TradingColorScheme.greenUp,
+              brightness: Brightness.dark,
+            ),
+            home: const MarketHomeScreen(),
+          ),
+        ),
+      );
       await tester.pump(const Duration(seconds: 2));
-      // Guest should see 15-min delayed data indicator
-      expect(find.byType(Scaffold), findsWidgets);
-      debugPrint('✅ C7: Guest sees delayed data');
+      // SEC Regulation NMS + PRD-03 §6.1 + PRD-01 §11:
+      // Guest users MUST see a 15-minute delayed data indicator.
+      expect(find.byType(DelayedQuoteBanner), findsOneWidget);
+      expect(find.textContaining('延迟行情'), findsOneWidget);
+      debugPrint('✅ C7: Guest sees delayed data indicator (SEC Regulation NMS)');
     });
   });
 

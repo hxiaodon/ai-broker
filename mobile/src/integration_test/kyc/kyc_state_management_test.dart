@@ -2,6 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
+import 'package:trading_app/features/kyc/application/agreement_notifier.dart';
+import 'package:trading_app/features/kyc/application/financial_profile_notifier.dart';
+import 'package:trading_app/features/kyc/application/personal_info_notifier.dart';
+import 'package:trading_app/features/kyc/domain/entities/kyc_enums.dart';
+import 'package:trading_app/features/kyc/domain/entities/document_upload.dart';
+import 'package:trading_app/features/kyc/domain/entities/financial_profile.dart';
+import 'package:trading_app/features/kyc/domain/entities/kyc_session.dart';
+import 'package:trading_app/features/kyc/domain/entities/personal_info.dart';
 
 import '../helpers/test_app.dart';
 
@@ -81,128 +89,245 @@ void main() {
     );
 
     testWidgets(
-      'K5: FinancialProfile — liquid net worth cannot exceed total',
+      'K3: PersonalInfo.isAdult — under-18 is rejected by notifier',
+      (tester) async {
+        debugPrint('\n🧪 K3: PersonalInfo under-18 rejection');
+        final underAgeDob = DateTime.now().subtract(const Duration(days: 365 * 17));
+        final info = PersonalInfo(
+          firstName: 'Jane',
+          lastName: 'Doe',
+          dateOfBirth: underAgeDob,
+          nationality: 'CN',
+          idType: IdType.passport,
+          employmentStatus: EmploymentStatus.employed,
+        );
+        expect(info.isAdult, isFalse);
+
+        final container = ProviderContainer();
+        addTearDown(container.dispose);
+        await container.read(personalInfoProvider.notifier).submit(info);
+        final state = container.read(personalInfoProvider);
+        expect(
+          state,
+          isA<PersonalInfoState>().having(
+            (s) => s.maybeWhen(error: (msg) => msg, orElse: () => null),
+            'error message',
+            contains('18 岁'),
+          ),
+        );
+        debugPrint('    ✅ Under-18 rejected with correct error message');
+      },
+    );
+
+    testWidgets(
+      'K4: PersonalInfo.isAdult — 18+ is accepted by domain entity',
+      (tester) async {
+        debugPrint('\n🧪 K4: PersonalInfo 18+ acceptance');
+        final adultDob = DateTime.now().subtract(const Duration(days: 365 * 20));
+        final info = PersonalInfo(
+          firstName: 'John',
+          lastName: 'Doe',
+          dateOfBirth: adultDob,
+          nationality: 'CN',
+          idType: IdType.passport,
+          employmentStatus: EmploymentStatus.employed,
+        );
+        expect(info.isAdult, isTrue);
+        debugPrint('    ✅ 18+ accepted by PersonalInfo.isAdult');
+      },
+    );
+
+    testWidgets(
+      'K5: FinancialProfile.isLiquidNetWorthValid — liquid > total is rejected by notifier',
       (tester) async {
         debugPrint('\n🧪 K5: FinancialProfile liquid > total validation');
-        // NetWorthRange ordinal values: 0=under25k, 1=25-100k, ... 5=over5m
-        // liquid > total should be invalid.
-        const liquidOrdinal = 3; // 500K–1M
-        const totalOrdinal = 2; // 100K–500K
-        expect(liquidOrdinal > totalOrdinal, isTrue,
-            reason: 'liquid exceeds total — should be flagged');
-        debugPrint('    ✅ Validation logic correct');
+        // NetWorthRange ordinal values: 0=under25k, 1=25-100k, 2=100-500k, 3=500k-1m, ...
+        // liquid=k500To1m (3) > total=k100To500k (2) → invalid
+        final profile = FinancialProfile(
+          annualIncomeRange: IncomeRange.k100To250k,
+          liquidNetWorthRange: NetWorthRange.k500To1m,
+          totalNetWorthRange: NetWorthRange.k100To500k,
+          fundsSources: [FundsSource.salary],
+          employmentStatus: EmploymentStatus.employed,
+        );
+        expect(profile.isLiquidNetWorthValid, isFalse);
+
+        final container = ProviderContainer();
+        addTearDown(container.dispose);
+        await container.read(financialProfileProvider.notifier).submit(profile);
+        final state = container.read(financialProfileProvider);
+        expect(
+          state,
+          isA<FinancialProfileState>().having(
+            (s) => s.maybeWhen(error: (msg) => msg, orElse: () => null),
+            'error message',
+            contains('流动净资产'),
+          ),
+        );
+        debugPrint('    ✅ liquid > total rejected with correct error message');
       },
     );
 
     testWidgets(
-      'K6: AgreementNotifier — name mismatch rejects submission',
+      'K5b: FinancialProfile.isLiquidNetWorthValid — liquid <= total is valid',
+      (tester) async {
+        debugPrint('\n🧪 K5b: FinancialProfile liquid <= total is valid');
+        final profile = FinancialProfile(
+          annualIncomeRange: IncomeRange.k100To250k,
+          liquidNetWorthRange: NetWorthRange.k100To500k,
+          totalNetWorthRange: NetWorthRange.k500To1m,
+          fundsSources: [FundsSource.salary],
+          employmentStatus: EmploymentStatus.employed,
+        );
+        expect(profile.isLiquidNetWorthValid, isTrue);
+        debugPrint('    ✅ liquid <= total accepted');
+      },
+    );
+
+    testWidgets(
+      'K6: AgreementNotifier — name mismatch → error state',
       (tester) async {
         debugPrint('\n🧪 K6: Agreement name mismatch detection');
-        // Simulate the comparison logic used in AgreementNotifier.submit
-        const expectedName = 'John Doe';
-        const signatureInput = 'John Smith';
-        final match = signatureInput.trim().toLowerCase() ==
-            expectedName.trim().toLowerCase();
-        expect(match, isFalse);
-        debugPrint('    ✅ Name mismatch detected');
+        final container = ProviderContainer();
+        addTearDown(container.dispose);
+        final notifier = container.read(agreementProvider.notifier);
+
+        notifier.onRiskDisclosureRead();
+        notifier.onAgreementsRead();
+
+        await notifier.submit(
+          signatureInput: 'John Smith',
+          expectedName: 'John Doe',
+        );
+        final state = container.read(agreementProvider);
+        expect(
+          state,
+          isA<AgreementState>().having(
+            (s) => s.maybeWhen(error: (msg) => msg, orElse: () => null),
+            'error message',
+            contains('签名'),
+          ),
+        );
+        debugPrint('    ✅ Name mismatch detected by AgreementNotifier');
       },
     );
 
     testWidgets(
-      'K7: AgreementNotifier — case-insensitive name match succeeds',
+      'K7: AgreementNotifier — agreements not read → error before name check',
       (tester) async {
-        debugPrint('\n🧪 K7: Agreement case-insensitive name match');
-        const expectedName = 'John Doe';
-        const signatureInput = 'JOHN DOE';
-        final match = signatureInput.trim().toLowerCase() ==
-            expectedName.trim().toLowerCase();
-        expect(match, isTrue);
-        debugPrint('    ✅ Case-insensitive match succeeds');
+        debugPrint('\n🧪 K7: Agreement must-read enforcement');
+        final container = ProviderContainer();
+        addTearDown(container.dispose);
+        final notifier = container.read(agreementProvider.notifier);
+
+        // Do NOT call onRiskDisclosureRead / onAgreementsRead
+        await notifier.submit(
+          signatureInput: 'JOHN DOE',
+          expectedName: 'John Doe',
+        );
+        final state = container.read(agreementProvider);
+        expect(
+          state,
+          isA<AgreementState>().having(
+            (s) => s.maybeWhen(error: (msg) => msg, orElse: () => null),
+            'error message',
+            contains('阅读'),
+          ),
+        );
+        debugPrint('    ✅ Agreements-not-read error returned before name check');
       },
     );
 
     testWidgets(
-      'K8: TaxFormType — US resident routes to W-9, non-US to W-8BEN',
+      'K8: TaxFormType — IdType.toApi() maps correctly',
       (tester) async {
-        debugPrint('\n🧪 K8: TaxForm branch determination');
-        // Verify W-9 for US resident, W-8BEN for non-US resident.
-        String taxFormType(bool isUsResident) => isUsResident ? 'W9' : 'W8BEN';
-        expect(taxFormType(false), equals('W8BEN'));
-        expect(taxFormType(true), equals('W9'));
-        debugPrint('    ✅ Branch selection correct');
+        debugPrint('\n🧪 K8: IdType API mapping');
+        expect(IdType.chinaResidentId.toApi(), 'CHINA_RESIDENT_ID');
+        expect(IdType.hkid.toApi(), 'HKID');
+        expect(IdType.passport.toApi(), 'INTL_PASSPORT');
+        expect(IdType.mainlandPermit.toApi(), 'MAINLAND_PERMIT');
+        debugPrint('    ✅ IdType.toApi() maps correctly');
       },
     );
 
     testWidgets(
-      'K9: KycStatus isPolling only for submitted/pendingReview',
+      'K9: KycStatus.isPolling — only submitted and pendingReview',
       (tester) async {
-        debugPrint('\n🧪 K9: KycStatus polling flags');
-        // Verify isPolling logic via fromApi mapping
-        final statuses = ['SUBMITTED', 'PENDING', 'APPROVED', 'REJECTED', 'EXPIRED'];
-        final expectedPolling = [true, true, false, false, false];
-        for (var i = 0; i < statuses.length; i++) {
-          // isPolling = submitted || pendingReview
-          final isPolling = statuses[i] == 'SUBMITTED' ||
-              statuses[i] == 'PENDING';
-          expect(isPolling, equals(expectedPolling[i]),
-              reason: '${statuses[i]} polling mismatch');
-        }
-        debugPrint('    ✅ Polling flags correct for all statuses');
+        debugPrint('\n🧪 K9: KycStatus.isPolling');
+        expect(KycStatus.submitted.isPolling, isTrue);
+        expect(KycStatus.pendingReview.isPolling, isTrue);
+        expect(KycStatus.approved.isPolling, isFalse);
+        expect(KycStatus.rejected.isPolling, isFalse);
+        expect(KycStatus.expired.isPolling, isFalse);
+        expect(KycStatus.inProgress.isPolling, isFalse);
+        debugPrint('    ✅ isPolling correct for all statuses');
       },
     );
 
     testWidgets(
-      'K10: KycStatus isTerminal only for approved/rejected/expired',
+      'K10: KycStatus.isTerminal — only approved, rejected, expired',
       (tester) async {
-        debugPrint('\n🧪 K10: KycStatus terminal flags');
-        final terminals = {'APPROVED', 'REJECTED', 'EXPIRED'};
-        final nonTerminals = {'SUBMITTED', 'PENDING', 'IN_PROGRESS'};
-        for (final s in terminals) {
-          final isTerminal = terminals.contains(s);
-          expect(isTerminal, isTrue, reason: '$s should be terminal');
-        }
-        for (final s in nonTerminals) {
-          final isTerminal = terminals.contains(s);
-          expect(isTerminal, isFalse, reason: '$s should not be terminal');
-        }
-        debugPrint('    ✅ Terminal status flags correct');
+        debugPrint('\n🧪 K10: KycStatus.isTerminal');
+        expect(KycStatus.approved.isTerminal, isTrue);
+        expect(KycStatus.rejected.isTerminal, isTrue);
+        expect(KycStatus.expired.isTerminal, isTrue);
+        expect(KycStatus.submitted.isTerminal, isFalse);
+        expect(KycStatus.pendingReview.isTerminal, isFalse);
+        expect(KycStatus.inProgress.isTerminal, isFalse);
+        debugPrint('    ✅ isTerminal correct for all statuses');
       },
     );
 
     testWidgets(
-      'K11: DocumentType requiresBackImage — ID card and permit need back',
+      'K11: DocumentType.requiresBackImage — only chinaResidentId and mainlandPermit',
       (tester) async {
-        debugPrint('\n🧪 K11: DocumentType backImage requirement');
-        // chinaResidentId and mainlandPermit need back image
-        // hkid and passport do not
-        const needsBack = {'CHINA_RESIDENT_ID', 'MAINLAND_PERMIT'};
-        const allTypes = {
-          'CHINA_RESIDENT_ID',
-          'HKID',
-          'INTL_PASSPORT',
-          'MAINLAND_PERMIT',
-        };
-        for (final t in allTypes) {
-          final requires = needsBack.contains(t);
-          if (t == 'CHINA_RESIDENT_ID' || t == 'MAINLAND_PERMIT') {
-            expect(requires, isTrue);
-          } else {
-            expect(requires, isFalse);
-          }
-        }
-        debugPrint('    ✅ Back image requirements correct');
+        debugPrint('\n🧪 K11: DocumentType back image requirement');
+        expect(DocumentType.chinaResidentId.requiresBackImage, isTrue);
+        expect(DocumentType.mainlandPermit.requiresBackImage, isTrue);
+        expect(DocumentType.hkid.requiresBackImage, isFalse);
+        expect(DocumentType.passport.requiresBackImage, isFalse);
+        debugPrint('    ✅ requiresBackImage correct for all ID types');
       },
     );
 
     testWidgets(
-      'K12: PersonalInfo.requiresManualReview is true for PEP',
+      'K12: PersonalInfo.requiresManualReview — true for PEP or insider',
       (tester) async {
-        debugPrint('\n🧪 K12: PEP triggers manual review flag');
-        bool requiresManualReview({required bool isPep, required bool isInsider}) =>
-            isPep || isInsider;
-        expect(requiresManualReview(isPep: true, isInsider: false), isTrue);
-        expect(requiresManualReview(isPep: false, isInsider: false), isFalse);
-        debugPrint('    ✅ PEP manual review flag correct');
+        debugPrint('\n🧪 K12: PEP/insider triggers manual review flag');
+        final dob = DateTime.now().subtract(const Duration(days: 365 * 25));
+
+        final pep = PersonalInfo(
+          firstName: 'John',
+          lastName: 'Doe',
+          dateOfBirth: dob,
+          nationality: 'CN',
+          idType: IdType.passport,
+          employmentStatus: EmploymentStatus.employed,
+          isPep: true,
+        );
+        expect(pep.requiresManualReview, isTrue);
+
+        final insider = PersonalInfo(
+          firstName: 'John',
+          lastName: 'Doe',
+          dateOfBirth: dob,
+          nationality: 'CN',
+          idType: IdType.passport,
+          employmentStatus: EmploymentStatus.employed,
+          isInsiderOfBroker: true,
+        );
+        expect(insider.requiresManualReview, isTrue);
+
+        final normal = PersonalInfo(
+          firstName: 'John',
+          lastName: 'Doe',
+          dateOfBirth: dob,
+          nationality: 'CN',
+          idType: IdType.passport,
+          employmentStatus: EmploymentStatus.employed,
+        );
+        expect(normal.requiresManualReview, isFalse);
+        debugPrint('    ✅ PEP/insider manual review flag correct');
       },
     );
   });

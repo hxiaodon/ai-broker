@@ -66,4 +66,66 @@ void main() {
       expect(pos.pendingSettlements.first.settleDate.isUtc, isTrue);
     });
   });
+
+  group('Position.availableQty — unsettled constraint (PRD-06 §6.2)', () {
+    test('availableQty equals qty when fully settled', () {
+      final pos = Position(
+        symbol: 'AAPL',
+        market: 'US',
+        qty: 100,
+        availableQty: 100,
+        avgCost: Decimal.parse('150.25'),
+        currentPrice: Decimal.parse('155.00'),
+        marketValue: Decimal.parse('15500.00'),
+        unrealizedPnl: Decimal.parse('475.00'),
+        unrealizedPnlPct: Decimal.parse('3.16'),
+        todayPnl: Decimal.parse('200.00'),
+        todayPnlPct: Decimal.parse('1.31'),
+      );
+      expect(pos.availableQty, pos.qty);
+    });
+
+    test('availableQty is less than qty when shares are pending settlement', () {
+      // 50 shares bought today (T+1 unsettled) → availableQty = 50, not 100
+      final pos = Position(
+        symbol: 'AAPL',
+        market: 'US',
+        qty: 100,
+        availableQty: 50,
+        avgCost: Decimal.parse('150.25'),
+        currentPrice: Decimal.parse('155.00'),
+        marketValue: Decimal.parse('15500.00'),
+        unrealizedPnl: Decimal.parse('475.00'),
+        unrealizedPnlPct: Decimal.parse('3.16'),
+        todayPnl: Decimal.parse('200.00'),
+        todayPnlPct: Decimal.parse('1.31'),
+        pendingSettlements: [
+          PendingSettlement(qty: 50, settleDate: DateTime.utc(2026, 5, 7)),
+        ],
+      );
+      expect(pos.availableQty, lessThan(pos.qty));
+      expect(pos.availableQty, 50);
+    });
+
+    test('availableQty is zero when all shares are unsettled', () {
+      final pos = Position(
+        symbol: 'TSLA',
+        market: 'US',
+        qty: 200,
+        availableQty: 0,
+        avgCost: Decimal.parse('200.00'),
+        currentPrice: Decimal.parse('210.00'),
+        marketValue: Decimal.parse('42000.00'),
+        unrealizedPnl: Decimal.parse('2000.00'),
+        unrealizedPnlPct: Decimal.parse('5.00'),
+        todayPnl: Decimal.parse('1000.00'),
+        todayPnlPct: Decimal.parse('2.44'),
+        pendingSettlements: [
+          PendingSettlement(qty: 200, settleDate: DateTime.utc(2026, 5, 7)),
+        ],
+      );
+      expect(pos.availableQty, 0);
+      expect(pos.availableQty, lessThanOrEqualTo(pos.qty));
+    });
+  });
 }

@@ -16,4 +16,10 @@ abstract class PortfolioSummary with _$PortfolioSummary {
     required Decimal buyingPower,
     required Decimal unsettledCash,
   }) = _PortfolioSummary;
+
+  const PortfolioSummary._();
+
+  /// Verifies totalEquity == cashBalance + marketValue.
+  /// A mismatch indicates a mapper or backend serialization bug.
+  bool get isEquityConsistent => totalEquity == cashBalance + marketValue;
 }

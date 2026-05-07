@@ -138,27 +138,6 @@ void main() {
 
       container.dispose();
     });
-
-    testWidgets('Error handling: network failure on OTP send', (tester) async {
-      final app = ProviderScope(
-        child: MaterialApp(
-          home: const LoginScreen(),
-        ),
-      );
-
-      await tester.pumpWidget(app);
-      await tester.pumpAndSettle();
-
-      // Enter valid phone
-      await tester.enterText(find.byType(TextField), '13812345678');
-      await tester.pump();
-
-      // Note: In a real test with mocked repository, we would:
-      // 1. Mock sendOtp to throw NetworkException
-      // 2. Tap send button
-      // 3. Verify error message appears
-      // This smoke test verifies the UI structure exists
-    });
   });
 
   group('Auth Flow PRD Compliance', () {

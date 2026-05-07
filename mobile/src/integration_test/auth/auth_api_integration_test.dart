@@ -293,13 +293,13 @@ void main() {
     );
 
     testWidgets(
-      'E7: Account lockout after 5 failed attempts',
+      'E7: Account lockout after 5 failed OTP attempts (PRD-01 §6.1, NIST SP 800-63B)',
       (tester) async {
-        printOnFailure('\n📱 E7: Testing account lockout');
+        printOnFailure('\n📱 E7: Testing account lockout after 5 failed OTP attempts');
 
-        // Use unique phone number to avoid lockout from previous test run
+        // Unique phone to avoid cross-test lockout contamination
         final timestamp = DateTime.now().millisecondsSinceEpoch;
-        final phoneNumber = '+861381234${timestamp.toString().substring(timestamp.toString().length - 4)}'; // +8613812345XXX
+        final phoneNumber = '+861381234${timestamp.toString().substring(timestamp.toString().length - 4)}';
 
         // Send OTP
         final sendResponse = await dio.post<Map<String, dynamic>>(
@@ -309,39 +309,47 @@ void main() {
         );
         expect(sendResponse.statusCode, 200);
 
-        // Try wrong OTP 5 times
-        printOnFailure('  ❌ Attempting 5 wrong OTP codes...');
-        String lastMessage = '';
+        // Submit 5 wrong OTPs — each should fail with INVALID_OTP_CODE (attempts 1-4)
+        // or OTP_MAX_ATTEMPTS_EXCEEDED (attempt 5)
+        printOnFailure('  ❌ Submitting 5 wrong OTP codes...');
+        Map<String, dynamic>? lastData;
+        int? lastStatus;
         for (int i = 1; i <= 5; i++) {
           final response = await dio.post<Map<String, dynamic>>(
             '/v1/auth/otp/verify',
             data: {
               'phone_number': phoneNumber,
-              'otp': '000000',
+              'otp_code': '000000', // always wrong
             },
             options: Options(validateStatus: (status) => status! < 500),
           );
-
-          lastMessage = response.data!['message'] as String;
-          printOnFailure('    Attempt $i: ${response.data!['message']}');
+          lastData = response.data;
+          lastStatus = response.statusCode;
+          printOnFailure('    Attempt $i: ${response.statusCode} ${response.data!['error_code']}');
         }
 
-        // After 5 attempts, account should be locked
-        printOnFailure('  🔒 Verifying account is locked after 5 attempts...');
-        expect(lastMessage, contains('账户已锁定'));
+        // 5th attempt must trigger lockout
+        expect(lastStatus, 401);
+        expect(lastData!['error_code'], 'OTP_MAX_ATTEMPTS_EXCEEDED');
+        expect(lastData['lockout_until'], isNotNull,
+            reason: 'lockout_until must be present so UI can show countdown');
+        printOnFailure('  🔒 Locked: error_code=${lastData['error_code']}, lockout_until=${lastData['lockout_until']}');
 
-        // Verify next OTP send attempt is blocked with 429
-        final nextAttempt = await dio.post<Map<String, dynamic>>(
-          '/v1/auth/otp/send',
-          data: {'phone_number': phoneNumber},
+        // 6th verify attempt must still be rejected with lockout error
+        final sixthAttempt = await dio.post<Map<String, dynamic>>(
+          '/v1/auth/otp/verify',
+          data: {
+            'phone_number': phoneNumber,
+            'otp_code': '000000',
+          },
           options: Options(validateStatus: (status) => status! < 500),
         );
+        expect(sixthAttempt.statusCode, 401);
+        expect(sixthAttempt.data!['error_code'], 'OTP_MAX_ATTEMPTS_EXCEEDED');
+        expect(sixthAttempt.data!['lockout_until'], isNotNull);
+        printOnFailure('  ✅ 6th attempt still locked: ${sixthAttempt.data!['error_code']}');
 
-        expect(nextAttempt.statusCode, 429); // OTP send returns 429 when locked
-        expect(nextAttempt.data!['message'], contains('账户已锁定'));
-        printOnFailure('  ✅ Account locked: ${nextAttempt.data!['message']}');
-
-        printOnFailure('✅ E7 PASSED: Account lockout');
+        printOnFailure('✅ E7 PASSED: Account lockout after 5 failed attempts');
       },
     );
 
