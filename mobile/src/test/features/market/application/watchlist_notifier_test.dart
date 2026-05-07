@@ -506,4 +506,96 @@ void main() {
           .called(1);
     });
   });
+
+  group('WatchlistNotifier — 100-symbol limit (PRD-03 §6.3)', () {
+    test('add() throws ValidationException when watchlist already has 100 symbols', () async {
+      final mockRepo = MockWatchlistRepository();
+      final mockToken = MockTokenService();
+      final mockWsClient = MockQuoteWebSocketClient();
+      final wsStream = StreamController<WsQuoteUpdate>.broadcast();
+      addTearDown(wsStream.close);
+
+      // Seed watchlist with exactly 100 items
+      final hundredItems = List.generate(
+        100,
+        (i) => makeQuote('SYM${i.toString().padLeft(3, '0')}'),
+      );
+      when(() => mockRepo.getWatchlist()).thenAnswer((_) async => hundredItems);
+      when(() => mockToken.getAccessToken()).thenAnswer((_) async => null);
+      when(() => mockWsClient.connect(token: any(named: 'token')))
+          .thenAnswer((_) async => WsUserType.registered);
+      when(() => mockWsClient.quoteStream)
+          .thenAnswer((_) => wsStream.stream);
+      when(() => mockWsClient.subscribe(any())).thenAnswer((_) async {});
+      when(() => mockWsClient.unsubscribe(any())).thenReturn(null);
+      when(() => mockWsClient.close()).thenAnswer((_) async {});
+      when(() => mockWsClient.dispose()).thenAnswer((_) async {});
+
+      final container = buildContainer(
+        mockRepo: mockRepo,
+        mockToken: mockToken,
+        mockWsClient: mockWsClient,
+        wsStream: wsStream,
+      );
+      addTearDown(container.dispose);
+
+      final items = await container.read(watchlistProvider.future);
+      expect(items, hasLength(100));
+
+      await expectLater(
+        container.read(watchlistProvider.notifier).add(
+          symbol: 'NVDA',
+          market: 'US',
+        ),
+        throwsA(
+          isA<ValidationException>().having(
+            (e) => e.message,
+            'message',
+            contains('100'),
+          ),
+        ),
+        reason: 'add() must throw ValidationException when watchlist is full',
+      );
+    });
+
+    test('add() succeeds when watchlist has fewer than 100 symbols', () async {
+      final mockRepo = MockWatchlistRepository();
+      final mockToken = MockTokenService();
+      final mockWsClient = MockQuoteWebSocketClient();
+      final wsStream = StreamController<WsQuoteUpdate>.broadcast();
+      addTearDown(wsStream.close);
+
+      final items = List.generate(
+          99, (i) => makeQuote('SYM${i.toString().padLeft(3, '0')}'));
+      when(() => mockRepo.getWatchlist()).thenAnswer((_) async => items);
+      when(() => mockRepo.addToWatchlist(symbol: 'NVDA', market: 'US'))
+          .thenAnswer((_) async {});
+      when(() => mockToken.getAccessToken()).thenAnswer((_) async => null);
+      when(() => mockWsClient.connect(token: any(named: 'token')))
+          .thenAnswer((_) async => WsUserType.registered);
+      when(() => mockWsClient.quoteStream)
+          .thenAnswer((_) => wsStream.stream);
+      when(() => mockWsClient.subscribe(any())).thenAnswer((_) async {});
+      when(() => mockWsClient.unsubscribe(any())).thenReturn(null);
+      when(() => mockWsClient.close()).thenAnswer((_) async {});
+      when(() => mockWsClient.dispose()).thenAnswer((_) async {});
+
+      final container = buildContainer(
+        mockRepo: mockRepo,
+        mockToken: mockToken,
+        mockWsClient: mockWsClient,
+        wsStream: wsStream,
+      );
+      addTearDown(container.dispose);
+
+      await container.read(watchlistProvider.future);
+
+      await expectLater(
+        container
+            .read(watchlistProvider.notifier)
+            .add(symbol: 'NVDA', market: 'US'),
+        completes,
+      );
+    });
+  });
 }

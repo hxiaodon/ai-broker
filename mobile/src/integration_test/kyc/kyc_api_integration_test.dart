@@ -133,6 +133,11 @@ void main() {
       );
 
       expect(resp.statusCode, anyOf(200, 204));
+      if (resp.statusCode == 200) {
+        final body = jsonDecode(resp.body) as Map<String, dynamic>;
+        expect(body['status'], 'ok',
+            reason: 'K-API-05 response body must contain status=ok');
+      }
     });
 
     test('K-API-06: POST /v1/kyc/investment-assessment returns 200', () async {
@@ -156,6 +161,11 @@ void main() {
       );
 
       expect(resp.statusCode, anyOf(200, 204));
+      if (resp.statusCode == 200) {
+        final body = jsonDecode(resp.body) as Map<String, dynamic>;
+        expect(body['status'], 'ok',
+            reason: 'K-API-06 response body must contain status=ok');
+      }
     });
 
     test('K-API-07: POST /v1/kyc/tax-forms with W-8BEN returns 200', () async {
@@ -177,6 +187,11 @@ void main() {
       );
 
       expect(resp.statusCode, anyOf(200, 204));
+      if (resp.statusCode == 200) {
+        final body = jsonDecode(resp.body) as Map<String, dynamic>;
+        expect(body['status'], 'ok',
+            reason: 'K-API-07 W-8BEN response body must contain status=ok');
+      }
     });
 
     test('K-API-08: POST /v1/kyc/tax-forms with W-9 returns 200', () async {
@@ -196,6 +211,11 @@ void main() {
       );
 
       expect(resp.statusCode, anyOf(200, 204));
+      if (resp.statusCode == 200) {
+        final body = jsonDecode(resp.body) as Map<String, dynamic>;
+        expect(body['status'], 'ok',
+            reason: 'K-API-08 W-9 response body must contain status=ok');
+      }
     });
 
     test('K-API-09: POST /v1/kyc/agreements returns 200', () async {
@@ -214,6 +234,11 @@ void main() {
       );
 
       expect(resp.statusCode, anyOf(200, 204));
+      if (resp.statusCode == 200) {
+        final body = jsonDecode(resp.body) as Map<String, dynamic>;
+        expect(body['status'], 'ok',
+            reason: 'K-API-09 agreements response body must contain status=ok');
+      }
     });
   });
 

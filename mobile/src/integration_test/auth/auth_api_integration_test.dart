@@ -51,7 +51,13 @@ void main() {
         expect(sendResponse.statusCode, 200);
         expect(sendResponse.data!['request_id'], isNotEmpty);
         expect(sendResponse.data!['expires_in_seconds'], isNotNull);
-        printOnFailure('  ✅ OTP sent successfully');
+        // P1-04: PRD-01 §6.1 — OTP send response must include 60s resend cooldown
+        expect(
+          sendResponse.data!['retry_after_seconds'],
+          60,
+          reason: 'OTP send must enforce 60s resend cooldown per PRD-01 §6.1',
+        );
+        printOnFailure('  ✅ OTP sent, retry_after_seconds=60');
 
         // Step 2: Verify OTP (using mock code 123456)
         printOnFailure('  🔐 Step 2: Verifying OTP code 123456...');
