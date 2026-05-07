@@ -401,6 +401,28 @@ func handleBiometricRegister(w http.ResponseWriter, r *http.Request) {
 
 	deviceMutex.Lock()
 	deviceRegistry[req.DeviceID] = deviceInfo
+
+	// PRD-01 §6.3: max 3 devices per account. When a 4th is added,
+	// automatically evict the oldest registered device.
+	const maxDevices = 3
+	if len(deviceRegistry) > maxDevices {
+		var oldestID string
+		var oldestTime time.Time
+		for id, d := range deviceRegistry {
+			if id == req.DeviceID {
+				continue // skip the device we just added
+			}
+			if oldestID == "" || d.RegisteredAt.Before(oldestTime) {
+				oldestID = id
+				oldestTime = d.RegisteredAt
+			}
+		}
+		if oldestID != "" {
+			delete(deviceRegistry, oldestID)
+			delete(biometricRegistry, oldestID)
+			fmt.Printf("📱 Evicted oldest device %s (max %d devices reached)\n", oldestID, maxDevices)
+		}
+	}
 	deviceMutex.Unlock()
 
 	w.Header().Set("Content-Type", "application/json")

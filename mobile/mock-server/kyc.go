@@ -32,6 +32,13 @@ var kycTestSessionOverrides = map[string]map[string]interface{}{
 		"reason_if_rejected":   "Address proof unclear",
 		"needs_more_info_step": 3,
 	},
+	// PRD-02 §6.2: IN_PROGRESS sessions expire after 60 days without submission.
+	"kyc-test-expired-001": {
+		"kyc_status":         "EXPIRED",
+		"current_step":       3,
+		"expired_at":         "2026-03-01T00:00:00Z",
+		"reason_if_rejected": "KYC session expired after 60 days without submission",
+	},
 }
 
 // idempotentPost checks the Idempotency-Key header and returns cached response

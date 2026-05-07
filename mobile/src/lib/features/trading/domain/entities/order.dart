@@ -65,4 +65,30 @@ abstract class Order with _$Order {
 
   bool get isCancellable =>
       status == OrderStatus.pending || status == OrderStatus.partiallyFilled;
+
+  /// GTC orders expire 90 calendar days after creation (PRD-04 §6.4).
+  /// Returns null for DAY orders.
+  DateTime? get gtcExpiresAt => validity == OrderValidity.gtc
+      ? createdAt.add(const Duration(days: 90))
+      : null;
+
+  /// Days remaining until GTC expiry. Null for DAY orders or already-expired orders.
+  int? get daysUntilGtcExpiry {
+    final exp = gtcExpiresAt;
+    if (exp == null) return null;
+    final days = exp.difference(DateTime.now().toUtc()).inDays;
+    return days >= 0 ? days : null;
+  }
+
+  /// True when a GTC order expires within 3 days (triggers pre-expiry notification).
+  bool get isGtcExpiringIn3Days {
+    final days = daysUntilGtcExpiry;
+    return days != null && days <= 3;
+  }
+
+  /// True when a GTC order expires today or tomorrow (urgent notification).
+  bool get isGtcExpiringIn1Day {
+    final days = daysUntilGtcExpiry;
+    return days != null && days <= 1;
+  }
 }

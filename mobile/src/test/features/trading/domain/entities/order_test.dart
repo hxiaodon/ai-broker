@@ -6,6 +6,8 @@ Order _makeOrder({
   OrderStatus status = OrderStatus.pending,
   int qty = 100,
   int filledQty = 0,
+  OrderValidity validity = OrderValidity.day,
+  DateTime? createdAt,
 }) =>
     Order(
       orderId: 'ord-001',
@@ -18,7 +20,7 @@ Order _makeOrder({
       filledQty: filledQty,
       limitPrice: Decimal.parse('150.25'),
       avgFillPrice: null,
-      validity: OrderValidity.day,
+      validity: validity,
       extendedHours: false,
       fees: OrderFees(
         commission: Decimal.parse('0.99'),
@@ -27,7 +29,7 @@ Order _makeOrder({
         finraFee: Decimal.parse('0.005'),
         total: Decimal.parse('1.035'),
       ),
-      createdAt: DateTime.utc(2026, 4, 15, 9, 30),
+      createdAt: createdAt ?? DateTime.utc(2026, 4, 15, 9, 30),
       updatedAt: DateTime.utc(2026, 4, 15, 9, 30),
     );
 
@@ -138,6 +140,49 @@ void main() {
   group('OrderStatus enum', () {
     test('has all 9 statuses per PRD', () {
       expect(OrderStatus.values, hasLength(9));
+    });
+  });
+
+  group('Order.gtcExpiresAt / GTC 90-day expiry (PRD-04 §6.4)', () {
+    test('DAY order has no expiry', () {
+      final order = _makeOrder(validity: OrderValidity.day);
+      expect(order.gtcExpiresAt, isNull);
+      expect(order.daysUntilGtcExpiry, isNull);
+      expect(order.isGtcExpiringIn3Days, isFalse);
+      expect(order.isGtcExpiringIn1Day, isFalse);
+    });
+
+    test('GTC order expires exactly 90 days after createdAt', () {
+      final created = DateTime.utc(2026, 1, 1, 9, 30);
+      final order = _makeOrder(validity: OrderValidity.gtc, createdAt: created);
+      expect(order.gtcExpiresAt, DateTime.utc(2026, 4, 1, 9, 30));
+    });
+
+    test('GTC order with 45 days remaining is NOT expiring soon', () {
+      final created = DateTime.now().toUtc().subtract(const Duration(days: 45));
+      final order = _makeOrder(validity: OrderValidity.gtc, createdAt: created);
+      expect(order.isGtcExpiringIn3Days, isFalse);
+      expect(order.isGtcExpiringIn1Day, isFalse);
+      expect(order.daysUntilGtcExpiry, greaterThan(3));
+    });
+
+    test('GTC order with 2 days remaining triggers 3-day notification', () {
+      final created = DateTime.now().toUtc().subtract(const Duration(days: 88));
+      final order = _makeOrder(validity: OrderValidity.gtc, createdAt: created);
+      expect(order.isGtcExpiringIn3Days, isTrue);
+    });
+
+    test('GTC order with 0 days remaining triggers 1-day notification', () {
+      final created = DateTime.now().toUtc().subtract(const Duration(days: 89, hours: 23));
+      final order = _makeOrder(validity: OrderValidity.gtc, createdAt: created);
+      expect(order.isGtcExpiringIn1Day, isTrue);
+    });
+
+    test('GTC order past 90 days has null daysUntilGtcExpiry', () {
+      final created = DateTime.now().toUtc().subtract(const Duration(days: 91));
+      final order = _makeOrder(validity: OrderValidity.gtc, createdAt: created);
+      expect(order.daysUntilGtcExpiry, isNull);
+      expect(order.isGtcExpiringIn3Days, isFalse);
     });
   });
 }

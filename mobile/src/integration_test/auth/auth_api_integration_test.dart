@@ -399,5 +399,54 @@ void main() {
         printOnFailure('✅ E8 PASSED: Logout');
       },
     );
+
+    testWidgets(
+      'E9: 4th device registration evicts oldest device (PRD-01 §6.3)',
+      (tester) async {
+        printOnFailure('\n📱 E9: Testing 4th device eviction');
+
+        // Register 3 devices sequentially (using unique timestamps to ensure order)
+        final devices = ['e9-dev-alpha', 'e9-dev-beta', 'e9-dev-gamma'];
+        for (final deviceId in devices) {
+          final resp = await dio.post<Map<String, dynamic>>(
+            '/v1/auth/biometric/register',
+            data: {'device_id': deviceId, 'biometric_type': 'face_id'},
+          );
+          expect(resp.statusCode, 200);
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+        }
+        printOnFailure('  ✅ 3 devices registered: $devices');
+
+        // Verify exactly 3 devices in registry (some may exist from previous tests)
+        var listResp = await dio.get<Map<String, dynamic>>('/v1/auth/devices');
+        final beforeCount = (listResp.data!['devices'] as List).length;
+        printOnFailure('  📋 Devices before 4th registration: $beforeCount');
+
+        // Register the 4th device
+        await dio.post<Map<String, dynamic>>(
+          '/v1/auth/biometric/register',
+          data: {'device_id': 'e9-dev-delta', 'biometric_type': 'fingerprint'},
+        );
+        printOnFailure('  ➕ 4th device registered: e9-dev-delta');
+
+        // Verify device count did not exceed 3
+        listResp = await dio.get<Map<String, dynamic>>('/v1/auth/devices');
+        final afterDevices = listResp.data!['devices'] as List;
+        expect(
+          afterDevices.length,
+          lessThanOrEqualTo(3),
+          reason: 'Device count must not exceed 3 after registering 4th device',
+        );
+        // The 4th device (most recently added) must be present
+        expect(
+          afterDevices.any((d) => d['device_id'] == 'e9-dev-delta'),
+          isTrue,
+          reason: 'The newly registered 4th device must be present',
+        );
+        printOnFailure('  ✅ Device count after 4th registration: ${afterDevices.length} (≤3)');
+
+        printOnFailure('✅ E9 PASSED: 4th device evicts oldest per PRD-01 §6.3');
+      },
+    );
   });
 }

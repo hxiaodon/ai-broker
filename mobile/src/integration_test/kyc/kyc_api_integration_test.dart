@@ -318,4 +318,52 @@ void main() {
       expect(resp2.statusCode, anyOf(200, 202, 409));
     });
   });
+
+  group('KYC API — Session Expiry & Recovery (PRD-02 §6.2)', () {
+    test(
+      'K-API-14: IN_PROGRESS session returns EXPIRED after 60 days (deterministic override)',
+      () async {
+        // "kyc-test-expired-001" is a test session hardcoded in the mock server
+        // to return EXPIRED status, simulating the 60-day timeout per PRD-02 §6.2.
+        const expiredSessionId = 'kyc-test-expired-001';
+        final resp = await http.get(
+          Uri.parse('$baseUrl/v1/kyc/status?kyc_session_id=$expiredSessionId'),
+          headers: headers,
+        );
+
+        expect(resp.statusCode, 200);
+        final body = jsonDecode(resp.body) as Map<String, dynamic>;
+        expect(body['kyc_status'], 'EXPIRED',
+            reason: 'IN_PROGRESS session must transition to EXPIRED after 60 days');
+        expect(body['kyc_session_id'], expiredSessionId);
+      },
+    );
+
+    test(
+      'K-API-15: Recovery flow — new KYC session can be started after expiry',
+      () async {
+        // After a session expires, user must be able to start fresh.
+        // This verifies POST /v1/kyc/start still works (no permanent block).
+        final resp = await http.post(
+          Uri.parse('$baseUrl/v1/kyc/start'),
+          headers: headers,
+          body: jsonEncode({
+            'first_name': 'John',
+            'last_name': 'Recovery',
+            'date_of_birth': '1990-06-15',
+            'nationality': 'US',
+            'id_type': 'INTL_PASSPORT',
+            'employment_status': 'EMPLOYED',
+          }),
+        );
+
+        expect(resp.statusCode, 200);
+        final body = jsonDecode(resp.body) as Map<String, dynamic>;
+        expect(body['kyc_session_id'], isNotEmpty,
+            reason: 'Recovery must issue a new session ID');
+        expect(body['kyc_status'], anyOf('IN_PROGRESS', 'NOT_STARTED'),
+            reason: 'New session starts fresh (not EXPIRED)');
+      },
+    );
+  });
 }
