@@ -43,14 +43,15 @@ created: 2026-03-31
 
 | HTTP 状态码 | 含义 | 常见错误码 |
 |-----------|------|--------|
-| **400** | Bad Request — 请求参数错误 | INVALID_*, MISSING_*, MALFORMED_* |
-| **401** | Unauthorized — 认证失败 | INVALID_TOKEN, TOKEN_EXPIRED, UNAUTHORIZED |
-| **403** | Forbidden — 风控拒绝 | INSUFFICIENT_*, ACCOUNT_*, PDT_*, POSITION_* |
+| **400** | Bad Request — 请求参数错误 | INVALID_*, MISSING_*, MALFORMED_*, AMEND_INVALID_FIELD, AMEND_QTY_BELOW_FILLED, AMEND_PRICE_VIOLATION, PRICE_OUTSIDE_LULD_BAND, PRICE_OUTSIDE_VCM_BAND, SESSION_NOT_OPEN_FOR_TIF |
+| **401** | Unauthorized — 认证失败 | INVALID_TOKEN, TOKEN_EXPIRED, UNAUTHORIZED, INVALID_BIO_TOKEN |
+| **403** | Forbidden — 风控拒绝 | INSUFFICIENT_*, ACCOUNT_*, PDT_*, POSITION_*, EXTENDED_HOURS_NOT_ENABLED |
 | **404** | Not Found — 资源不存在 | ORDER_NOT_FOUND, POSITION_NOT_FOUND |
-| **409** | Conflict — 冲突（幂等性错误） | IDEMPOTENCY_KEY_MISMATCH |
+| **409** | Conflict — 冲突/状态不兼容 | IDEMPOTENCY_KEY_MISMATCH, STP_TRIGGERED, AMEND_ORDER_NOT_AMENDABLE, AMEND_IN_PROGRESS, SYMBOL_HALTED, SYMBOL_SUSPENDED |
+| **410** | Gone — 资源已永久失效 | SYMBOL_DELISTED |
 | **422** | Unprocessable Entity — 业务逻辑错误 | ORDER_*, STATUS_INVALID |
-| **429** | Too Many Requests — 频率超限 | RATE_LIMIT_EXCEEDED |
-| **503** | Service Unavailable — 服务不可用 | SERVICE_UNAVAILABLE, FIX_CONNECTION_LOST |
+| **429** | Too Many Requests — 频率超限 | RATE_LIMIT_EXCEEDED, QUEUE_FULL |
+| **503** | Service Unavailable — 服务不可用 | SERVICE_UNAVAILABLE, FIX_CONNECTION_LOST, MARKET_CLOSED, MARKET_HOLIDAY, MWCB_LEVEL3_ACTIVE, EMERGENCY_HALT_ACTIVE |
 
 ---
 
@@ -474,5 +475,190 @@ async function submitOrder(orderData) {
 **后端日志格式**：
 ```
 timestamp=2026-03-31T09:30:00.000Z request_id=req-550e8400-e29b error_code=INSUFFICIENT_BALANCE user_id=user-123 order_id=ord-abc123 symbol=AAPL required=2500.00 available=1500.00
+```
+
+---
+
+## 8. 改单错误 (POST /orders/:id/amend)
+
+### 8.1 字段不合法 (400)
+
+```json
+{
+  "error": {
+    "code": "AMEND_INVALID_FIELD",
+    "message": "改单只能修改 price/quantity/stop_price/trail_amount/time_in_force",
+    "details": { "invalid_fields": ["side"] }
+  }
+}
+```
+
+```json
+{
+  "error": {
+    "code": "AMEND_QTY_BELOW_FILLED",
+    "message": "新数量不能小于已成交数量",
+    "details": { "new_quantity": 50, "filled_qty": 70 }
+  }
+}
+```
+
+```json
+{
+  "error": {
+    "code": "AMEND_PRICE_VIOLATION",
+    "message": "新价格超出当前 LULD band",
+    "details": { "new_price": "165.00", "luld_upper": "160.50", "luld_lower": "144.00" }
+  }
+}
+```
+
+### 8.2 订单状态冲突 (409)
+
+```json
+{
+  "error": {
+    "code": "AMEND_ORDER_NOT_AMENDABLE",
+    "message": "订单当前状态不允许改单",
+    "details": { "order_id": "ord-abc", "current_status": "FILLED" }
+  }
+}
+```
+
+```json
+{
+  "error": {
+    "code": "AMEND_IN_PROGRESS",
+    "message": "该订单已有改单在途，请等待结果或先撤销改单",
+    "details": { "order_id": "ord-abc" }
+  }
+}
+```
+
+---
+
+## 9. 自成交防止错误 (POST /orders)
+
+### 9.1 STP 触发 (409)
+
+```json
+{
+  "error": {
+    "code": "STP_TRIGGERED",
+    "message": "您在同一账户下已有反向订单，可能触发自成交",
+    "details": {
+      "stp_mode": "CANCEL_NEWEST",
+      "contra_order_ids": ["ord-aaa", "ord-bbb"]
+    }
+  }
+}
+```
+
+如 `stp_mode = CANCEL_OLDEST`，新订单接受，响应附带 `cancelled_contra_orders`。
+
+---
+
+## 10. 市场状态错误 (POST /orders)
+
+### 10.1 停牌 / 退市 (409 / 410)
+
+```json
+{ "error": { "code": "SYMBOL_HALTED",     "message": "标的当前停牌（暂停原因：News Pending）", "details": { "symbol": "AAPL", "halt_reason": "NEWS_PENDING" } } }
+{ "error": { "code": "SYMBOL_SUSPENDED",  "message": "标的已被监管暂停交易",                  "details": { "symbol": "XYZ" } } }
+{ "error": { "code": "SYMBOL_DELISTED",   "message": "标的已退市，不可交易",                  "details": { "symbol": "OLDCO", "delisted_at": "2026-04-30" } } }
+```
+
+### 10.2 价格超出 band (400)
+
+```json
+{
+  "error": {
+    "code": "PRICE_OUTSIDE_LULD_BAND",
+    "message": "限价超出 LULD 价格区间",
+    "details": { "symbol": "AAPL", "side": "BUY", "price": "180.00",
+                 "luld_upper": "175.50", "luld_lower": "164.00", "reference_price": "169.75" }
+  }
+}
+```
+
+```json
+{
+  "error": {
+    "code": "PRICE_OUTSIDE_VCM_BAND",
+    "message": "限价超出港股 VCM 价格区间",
+    "details": { "symbol": "0700", "price": "350.00", "vcm_upper": "342.00", "vcm_lower": "292.50" }
+  }
+}
+```
+
+### 10.3 熔断 / 紧急停市 (503)
+
+```json
+{ "error": { "code": "MWCB_LEVEL3_ACTIVE",   "message": "美股触发 Level 3 熔断，今日交易已停止", "details": { "triggered_at": "2026-05-14T18:23:00Z" } } }
+{ "error": { "code": "EMERGENCY_HALT_ACTIVE","message": "市场临时停市",                       "details": { "market": "HK", "reason": "TYPHOON_SIGNAL_8" } } }
+```
+
+---
+
+## 11. 市场时段与排队错误 (POST /orders)
+
+### 11.1 市场未开（IOC/FOK 不可排队）(503)
+
+```json
+{
+  "error": {
+    "code": "MARKET_CLOSED",
+    "message": "市场已收盘，IOC/FOK 单不支持排队",
+    "details": { "market": "US", "current_state": "CLOSED", "next_open": "2026-05-15T13:30:00Z" }
+  }
+}
+```
+
+### 11.2 节假日 (503)
+
+```json
+{
+  "error": {
+    "code": "MARKET_HOLIDAY",
+    "message": "市场休市（Memorial Day）",
+    "details": { "market": "US", "holiday_name": "Memorial Day", "next_open": "2026-05-26T13:30:00Z" }
+  }
+}
+```
+
+### 11.3 TIF 在当前时段不支持 (400)
+
+```json
+{
+  "error": {
+    "code": "SESSION_NOT_OPEN_FOR_TIF",
+    "message": "OPG 单已超过开盘集合竞价提交截止时间",
+    "details": { "tif": "OPG", "current_session": "OPEN", "cutoff_time": "2026-05-14T13:28:00Z" }
+  }
+}
+```
+
+### 11.4 扩展时段权限未开通 (403)
+
+```json
+{
+  "error": {
+    "code": "EXTENDED_HOURS_NOT_ENABLED",
+    "message": "您的账户未开通盘前/盘后交易权限",
+    "details": { "enable_url": "/settings/trading-permissions" }
+  }
+}
+```
+
+### 11.5 排队队列已满 (429)
+
+```json
+{
+  "error": {
+    "code": "QUEUE_FULL",
+    "message": "该标的排队订单过多，请稍后再试",
+    "details": { "symbol": "AAPL", "queue_size": 10000, "queue_limit": 10000 }
+  }
+}
 ```
 

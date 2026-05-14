@@ -569,6 +569,180 @@ func (c *AccountCheck) Execute(ctx context.Context, ord *order.Order, account *A
 
 **数据来源**：`Account` 结构体从 AMS 服务获取，应缓存在 Redis 中（TTL 5 分钟，账户状态变更时主动失效）。
 
+#### 4.3.1a Gate 1b: Symbol Status & Market Session Check (新增, 紧随 AccountCheck)
+
+由于停牌 / 熔断 / 节假日的判定不需要任何资金计算，应在 AccountCheck 之后、所有金额相关检查之前执行，避免无谓的算力开销。
+
+```go
+type SymbolStatusCheck struct {
+    symbolStatusCache  StatusCache       // Redis hash: symbol_status:{market}:{symbol}
+    marketStateCache   SessionStateCache // Redis: market_state:{market}
+    luldRefPriceClient LULDReferenceProvider
+    calendar           MarketCalendarService
+}
+
+func (c *SymbolStatusCheck) Name() string { return "SymbolStatusCheck" }
+
+func (c *SymbolStatusCheck) Execute(ctx context.Context, ord *order.Order, _ *Account) *Result {
+    // ---- (1) Symbol 状态 ----
+    sym, err := c.symbolStatusCache.Get(ctx, ord.Market, ord.Symbol)
+    if err != nil {
+        // 缓存失效 → 保守拒单，避免空窗期放行
+        return Reject("symbol status unavailable, conservative reject")
+    }
+    switch sym.Status {
+    case order.SymbolHaltedNews, order.SymbolHaltedVolatility, order.SymbolHaltedRegulatory:
+        if !isAuctionOrder(ord) { // 部分 closing auction 单允许进入暂停期
+            return RejectCode("SYMBOL_HALTED", "symbol %s halted (%s)", ord.Symbol, sym.HaltReason)
+        }
+    case order.SymbolSuspended:
+        return RejectCode("SYMBOL_SUSPENDED", "symbol %s suspended", ord.Symbol)
+    case order.SymbolDelisted:
+        return RejectCode("SYMBOL_DELISTED", "symbol %s delisted", ord.Symbol)
+    }
+
+    // ---- (2) 市场时段 ----
+    state, _ := c.marketStateCache.Get(ctx, ord.Market)
+    switch state {
+    case order.SessionEmergencyHalt:
+        return RejectCode("EMERGENCY_HALT_ACTIVE", "market %s halted", ord.Market)
+    case order.SessionMWCBPause:
+        return Queue("market in MWCB pause, queueing", state) // 接收并 QUEUED
+    case order.SessionHoliday:
+        if isHoldableTIF(ord.TimeInForce) {
+            return Queue("market holiday", state)
+        }
+        return RejectCode("MARKET_HOLIDAY", "market %s closed for holiday", ord.Market)
+    case order.SessionClosed, order.SessionPreOpenAuction, order.SessionLunch:
+        if !isAcceptableInSession(ord.TimeInForce, state, ord.ExtendedHours) {
+            if isHoldableTIF(ord.TimeInForce) {
+                return Queue("market not yet open for this TIF", state)
+            }
+            return RejectCode("SESSION_NOT_OPEN_FOR_TIF",
+                "TIF %s not supported in %s", ord.TimeInForce, state)
+        }
+    case order.SessionPostClose:
+        if ord.TimeInForce == order.TIFDay && !ord.ExtendedHours {
+            return RejectCode("EXTENDED_HOURS_NOT_ENABLED",
+                "regular DAY order not allowed in after-hours; use DAY_EXT")
+        }
+    }
+
+    // ---- (3) LULD band（美股限价单）----
+    if ord.Market == "US" && ord.Type == order.TypeLimit {
+        band, err := c.luldRefPriceClient.GetBand(ctx, ord.Symbol, time.Now())
+        if err != nil {
+            return Approve() // 数据缺失时不强制拦截，依赖交易所兜底
+        }
+        if ord.Side == order.SideBuy && ord.Price.GreaterThan(band.UpperLimit) {
+            return RejectCode("PRICE_OUTSIDE_LULD_BAND",
+                "buy price %s > LULD upper %s", ord.Price, band.UpperLimit)
+        }
+        if ord.Side == order.SideSell && ord.Price.LessThan(band.LowerLimit) {
+            return RejectCode("PRICE_OUTSIDE_LULD_BAND",
+                "sell price %s < LULD lower %s", ord.Price, band.LowerLimit)
+        }
+    }
+
+    // ---- (4) 港股 VCM band ----
+    if ord.Market == "HK" && ord.Type == order.TypeLimit {
+        if violates, vcm := c.checkVCM(ctx, ord); violates {
+            return RejectCode("PRICE_OUTSIDE_VCM_BAND",
+                "price outside VCM band [%s, %s]", vcm.Lower, vcm.Upper)
+        }
+    }
+
+    return Approve()
+}
+```
+
+**LULD Band 计算**：
+```
+band_upper = referencePrice * (1 + bandPct)
+band_lower = referencePrice * (1 - bandPct)
+
+referencePrice = 过去 5 分钟该 symbol 的成交均价（无成交则用前一日 close）
+
+bandPct =
+  Tier1 (S&P500/Russell1000/部分ETF):
+    09:30-15:35, 15:50-16:00 → 5%
+    15:35-15:50 (close)        → 10%
+    若 price < $3.00 → 翻倍 (10% / 20%)
+  Tier2 (其他 NMS):
+    09:30-15:35 → 10%
+    15:35-16:00 → 20%
+```
+
+**SLA 与缓存**：
+- Symbol status 读取 < 200μs（Redis hot path）
+- LULD reference price 缓存 1s，过期则 fallback 到上一秒数据并打 warning metric
+- 整道检查 P99 < 1ms
+
+**输入维度**：`symbol_status` (Redis hash) + `market_state` (Redis) + `luld_reference_price` (Redis) + `account.extended_hours_enabled`（来自 AccountCheck 返回的数据）。
+
+#### 4.3.1b Gate 1c: Self-Trade Prevention (STP) Check (新增, 在 BuyingPower 之后, PositionLimit 之前)
+
+> **执行顺序变化**：原 pipeline 是 1→2→3→4→5→6→7→8。引入两道新检查后顺序为：1 (Account) → 1a (SymbolStatus) → 2 (Symbol) → 3 (BuyingPower) → 3b (STP) → 4 (PositionLimit) → 5 (OrderRate) → 6 (PDT) → 7 (Margin) → 8 (Post-Trade)。
+
+```go
+type STPCheck struct {
+    redis      *redis.Client
+    repo       order.Repository
+    accountSvc AccountService
+}
+
+func (c *STPCheck) Name() string { return "STPCheck" }
+
+func (c *STPCheck) Execute(ctx context.Context, ord *order.Order, account *Account) *Result {
+    customerID := account.CustomerID
+    contra := opposite(ord.Side)
+    key := fmt.Sprintf("open_orders:%d:%s:%s:%s",
+        customerID, ord.Market, ord.Symbol, contra)
+
+    var contraIDs []string
+    if ord.Type == order.TypeMarket {
+        contraIDs, _ = c.redis.ZRange(ctx, key, 0, -1).Result()
+    } else if ord.Side == order.SideBuy {
+        contraIDs, _ = c.redis.ZRangeByScore(ctx, key, &redis.ZRangeBy{
+            Min: "-inf", Max: ord.Price.String(),
+        }).Result()
+    } else {
+        contraIDs, _ = c.redis.ZRangeByScore(ctx, key, &redis.ZRangeBy{
+            Min: ord.Price.String(), Max: "+inf",
+        }).Result()
+    }
+
+    if len(contraIDs) == 0 {
+        return Approve()
+    }
+
+    switch account.STPMode {
+    case order.STPCancelNewest:
+        return RejectCode("STP_TRIGGERED",
+            "self-trade with contra orders %v; new order cancelled", contraIDs)
+    case order.STPCancelOldest:
+        // 异步取消对手单；主路径放行
+        go c.cancelContras(context.Background(), contraIDs, "STP_CANCEL_OLDEST")
+        return ApproveWithMeta(map[string]interface{}{
+            "stp_cancelled_contras": contraIDs,
+        })
+    case order.STPCancelBoth:
+        go c.cancelContras(context.Background(), contraIDs, "STP_CANCEL_BOTH")
+        return RejectCode("STP_TRIGGERED",
+            "self-trade prevented (cancel-both); contras %v also cancelled", contraIDs)
+    case order.STPDecrementAndCancel:
+        return c.decrementAndCancel(ctx, ord, contraIDs)
+    }
+    return Approve()
+}
+```
+
+**ZSET 维护**：每次订单 OPEN/PARTIAL_FILL → `ZADD`；订单进入终态或 CANCEL_SENT → `ZREM`。由 ExecutionReport 处理器统一维护，幂等（用 order_id 作为 member）。
+
+**港股差异**：HKEX 端不做 STP 兜底，broker 端必须 100% pre-trade 拦截。Tag 7928 仅美股部分 venue 支持。
+
+**SLA**：Redis ZSET 查询 P99 < 500μs；本道检查 P99 < 1ms。
+
 #### 4.3.2 Gate 2: Symbol Check (标的校验)
 
 ```go
@@ -1522,38 +1696,166 @@ func NewRiskEngine(deps Dependencies) risk.Engine {
 }
 ```
 
-### 9.2 购买力并发扣减
+### 9.2 购买力的原子冻结 / 释放
 
-当同一账户并发提交多笔买入订单时，购买力可能被重复使用。解决方案：
+#### 9.2.1 问题模型
 
-```go
-// 方案1: Redis 原子扣减 (推荐)
-func (c *BuyingPowerCheck) atomicDeduction(
-    ctx context.Context, accountID int64, amount decimal.Decimal,
-) (bool, error) {
-    key := fmt.Sprintf("buying_power_lock:%d", accountID)
+同一账户的购买力会被以下 4 类并发操作竞争：
 
-    // 使用 Lua Script 确保原子性
-    script := redis.NewScript(`
-        local current = tonumber(redis.call('GET', KEYS[1]) or '0')
-        local deduction = tonumber(ARGV[1])
-        if current >= deduction then
-            redis.call('DECRBY', KEYS[1], ARGV[1])
-            return 1
-        end
-        return 0
-    `)
+| 场景 | 操作 | 风险 |
+|------|------|------|
+| 多端并发下单 | 移动端 + Web + API 同时下买单 | 重复扣减 / 超买 |
+| 改单 | 先释放旧冻结再冻结新差额 | 中间窗口被其他请求挤入 |
+| 撤单 / 拒单 | 释放冻结 | 漏释放 → 资金永久占用 |
+| 部分成交 | 按 fill 比例释放冻结 | 释放金额误差累积 |
 
-    result, err := script.Run(ctx, c.redis, []string{key}, amount.String()).Int()
-    if err != nil {
-        return false, err
-    }
-    return result == 1, nil
-}
+任何一处缺乏原子性 → 监管事故（超买可能违反 Reg-T 或 SFC 客户资金规则）。
 
-// 方案2: 数据库行级锁 (更安全但更慢)
-// SELECT ... FOR UPDATE 锁定余额行，确保串行化
+#### 9.2.2 方案对比与决策
+
+| 方案 | 一致性 | P99 延迟 | 故障容忍 | 实施复杂度 |
+|------|--------|---------|---------|----------|
+| A. Redis SET + Lua | 单实例强一致 | < 0.2ms | Redis 故障 → 风控失效 | 低 |
+| B. DB `SELECT FOR UPDATE` | 强一致 | 2-5ms | DB 故障 → 整体失效 | 中 |
+| C. Redis 主路径 + DB 异步对账 | 最终一致 | < 0.5ms | 任一故障可降级 | 高 |
+
+**决策**：采用 **方案 C 混合模式**。
+- **主路径**：Redis Lua（< 0.2ms），满足风控 5ms 总预算
+- **强一致兜底**：每 5 分钟 DB 对账 job，发现 Redis 与 orders 表不一致 → 告警 + 自愈
+- **Redis 故障降级**：当连续 N 秒 Redis 不可用 → 自动切换到 DB SELECT FOR UPDATE 模式（延迟增至 ~5ms，但不超扣）
+
+理由：风控延迟预算 5ms（详 §5.1），热路径必须 < 1ms；同时金融严肃性要求双重保护。
+
+#### 9.2.3 Redis Lua 脚本（4 个原子操作）
+
+所有操作都基于 2 个 key：
+- `bp:{account_id}` — 当前可用购买力（decimal string）
+- `bp:{account_id}:pending:{order_id}` — 该订单的冻结明细（金额 + side + 入库时间）
+
+```lua
+-- ===== FreezeBP =====
+-- KEYS[1] = "bp:{account_id}"
+-- KEYS[2] = "bp:{account_id}:pending:{order_id}"
+-- ARGV[1] = amount (decimal string)
+-- ARGV[2] = ttl seconds
+-- 返回: 1 成功 / 0 余额不足 / -1 重复冻结
+local current = tonumber(redis.call('GET', KEYS[1]) or '0')
+local amount  = tonumber(ARGV[1])
+
+if redis.call('EXISTS', KEYS[2]) == 1 then
+    return -1  -- 同 order_id 重复冻结（幂等）
+end
+if current < amount then
+    return 0
+end
+redis.call('DECRBY', KEYS[1], ARGV[1])
+redis.call('SET', KEYS[2], ARGV[1], 'EX', ARGV[2])
+return 1
+
+-- ===== ReleaseBP（撤单 / 拒单全额释放）=====
+-- KEYS[1] = "bp:{account_id}"
+-- KEYS[2] = "bp:{account_id}:pending:{order_id}"
+-- 返回: 释放的金额 / -1 无此冻结记录
+local frozen = redis.call('GET', KEYS[2])
+if not frozen then return -1 end
+redis.call('INCRBY', KEYS[1], frozen)
+redis.call('DEL', KEYS[2])
+return tonumber(frozen)
+
+-- ===== PartialReleaseBP（部分成交后释放对应比例）=====
+-- KEYS[1] = "bp:{account_id}"
+-- KEYS[2] = "bp:{account_id}:pending:{order_id}"
+-- ARGV[1] = release_amount
+local frozen = tonumber(redis.call('GET', KEYS[2]) or '0')
+local release = tonumber(ARGV[1])
+if release > frozen then return -1 end  -- 不允许超额释放
+redis.call('INCRBY', KEYS[1], release)
+redis.call('SET', KEYS[2], tostring(frozen - release), 'KEEPTTL')
+return release
+
+-- ===== AmendBP（改单差额冻结，原子完成 release + freeze）=====
+-- KEYS[1] = "bp:{account_id}"
+-- KEYS[2] = "bp:{account_id}:pending:{order_id}"   -- 原冻结
+-- KEYS[3] = "bp:{account_id}:pending:{new_order_id}" -- 新冻结
+-- ARGV[1] = new_amount
+local old = tonumber(redis.call('GET', KEYS[2]) or '0')
+local new = tonumber(ARGV[1])
+local diff = new - old
+local current = tonumber(redis.call('GET', KEYS[1]) or '0')
+if diff > 0 and current < diff then return 0 end  -- 余额不足
+redis.call('DECRBY', KEYS[1], diff)
+redis.call('SET', KEYS[3], ARGV[1], 'KEEPTTL')
+redis.call('DEL', KEYS[2])
+return 1
 ```
+
+TTL：默认 GTC 最大有效期 90 天 + 1 天 buffer = `91 * 86400`。订单进入终态时 ReleaseBP 主动清理；TTL 是兜底防内存泄漏。
+
+#### 9.2.4 故障补偿矩阵
+
+| 失败时机 | 检测 | 补偿 |
+|---------|------|------|
+| Lua FreezeBP 成功，DB INSERT orders 失败 | 事务回滚捕获 | 同步调用 ReleaseBP；若 ReleaseBP 失败 → 加入 `bp_reconcile_queue` |
+| 订单 REJECTED / EXCHANGE_REJECT 后忘释放 | 后台 reconcile job 每 5min 扫 `bp:*:pending:*` | 对账 orders 表，发现终态订单仍有 pending → 释放 |
+| 部分成交比例释放错误 | 日终对账 `sum(bp.pending) = sum(orders.notional_remaining)` | 不一致 → P1 告警 + 手工 SOP |
+| Redis cluster failover | 用 `pending:{order_id}` 唯一性（FreezeBP 返回 -1）防重复扣 | 幂等设计 |
+| Redis 不可用 | 健康检查连续 3 次失败 | 切换到 DB SELECT FOR UPDATE 模式（feature flag `bp.fallback_to_db`）|
+
+#### 9.2.5 改单期间的购买力流转
+
+参见 `01-order-management.md §4.6.2.4`。要点：
+- 改单提交时：调用 AmendBP 脚本原子完成"释放旧 + 冻结新差额"
+- 改单失败（AMEND_REJECTED）→ 调用反向 AmendBP（new=old）恢复原冻结
+- 改单期间发生部分成交：partial release 必须基于"已成交的实际比例 × 当前冻结金额"，不能用原冻结金额
+
+#### 9.2.6 DB 兜底（强一致模式）
+
+```sql
+-- 启用 fallback 时的实现
+BEGIN;
+SELECT available_buying_power
+  FROM account_balances
+  WHERE account_id = ?
+  FOR UPDATE;            -- 行锁，并发请求串行化
+
+UPDATE account_balances
+   SET available_buying_power = available_buying_power - ?
+ WHERE account_id = ?
+   AND available_buying_power >= ?;
+
+-- affected rows = 0 → 余额不足，回滚
+INSERT INTO bp_freezes (account_id, order_id, amount, frozen_at)
+VALUES (?, ?, ?, NOW());
+COMMIT;
+```
+
+性能：单账户串行化，并发吞吐 ≤ 1000 QPS（DB 锁等待平均 1-3ms）。仅在 Redis 故障时启用。
+
+#### 9.2.7 并发测试用例（必须覆盖）
+
+| 测试 | 期望 |
+|------|------|
+| 同账户 100 笔并发买单，每笔 = 99% 可用购买力 | 恰好 1 笔成功，99 笔 `INSUFFICIENT_BUYING_POWER` |
+| 同账户 1 笔买单 + 1 笔撤单并发 | 最终购买力 = 初始购买力（无论顺序）|
+| 改单时另一端并发下新单 | 改单和新单的金额不会相互覆盖 |
+| 部分成交 + 撤单 + 改单 串行 100 次 | 终态购买力差异 = 已成交净额 |
+| Redis 故障切换期间 50 笔并发 | 全部走 DB 模式，无超扣；切换耗时 < 2s |
+
+#### 9.2.8 Prometheus 指标
+
+| 指标 | 类型 | 用途 |
+|------|------|------|
+| `bp_freeze_total{result}` | counter | result ∈ {success, insufficient, duplicate, redis_error} |
+| `bp_release_total{reason}` | counter | reason ∈ {full_cancel, partial_fill, fill_complete, reject, reconcile} |
+| `bp_amend_total{result}` | counter | |
+| `bp_reconcile_diff_dollars` | gauge | 每次 reconcile 发现的总差异（绝对值美元） — 关键 SLO，> $0.01 告警 |
+| `bp_fallback_active` | gauge | 1 = 当前在 DB 模式 |
+| `bp_lua_duration_seconds` | histogram | Lua 脚本耗时分布 |
+
+告警：
+- `bp_freeze_total{result="redis_error"} > 0` 持续 1min → P1
+- `bp_reconcile_diff_dollars > 0.01` → P1
+- `bp_fallback_active == 1` 持续 5min → P0（系统降级状态过久）
 
 ### 9.3 保证金率配置
 

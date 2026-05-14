@@ -1590,3 +1590,952 @@ alerts:
            │ • 交易权限    │      │ • 风险告警    │
            └──────────────┘      └──────────────┘
 ```
+
+---
+
+## 17. 分布式事务与 Saga 模式
+
+trading-engine 与 AMS / market-data / fund-transfer / position-engine / settlement-engine 协作完成的多数业务流程，跨越多个服务边界且无法用单一数据库事务覆盖。本章定义跨服务事务的统一处理范式（Saga + Outbox + Idempotency），消除"靠 SOP 人工回滚"的隐性技术债。
+
+所有时间戳为 UTC，所有金额使用 `shopspring/decimal.Decimal`。Saga 状态机参考 [`domains/01-order-management.md#状态机`](domains/01-order-management.md#状态机) 的设计原则（事件溯源 + 不可变历史）。
+
+### 17.1 跨服务事务边界与失败场景
+
+以下 5 个核心业务流程都涉及多服务协作，必须建立明确的事务边界与补偿规则：
+
+#### Saga A: 下单 Saga（Order Placement Saga）
+
+```
+[Mobile/API Gateway]
+       │  POST /orders (Idempotency-Key)
+       ▼
+[trading-engine: 风控引擎]
+       │  本地风控 8 项检查
+       ▼
+[trading-engine → AMS: gRPC GetAccountStatus]
+       │  账户活跃 + KYC 通过 + 交易权限
+       ▼
+[trading-engine: 冻结购买力 (Redis Lua)]
+       ▼
+[trading-engine: 写入 orders + order_events]
+       ▼
+[trading-engine → SOR → FIX → Exchange]
+       │  NewOrderSingle (35=D)
+       ▼
+[Exchange: ExecutionReport (ACK)]
+```
+
+| 失败点 | 已发生副作用 | 补偿动作 | 兜底 |
+|---|---|---|---|
+| AMS 校验失败 | 无 | 无（saga 直接 ABORTED） | 返回 4xx 给客户端 |
+| 购买力冻结失败 | 无 | 无 | 返回 INSUFFICIENT_FUNDS |
+| orders 写入失败 | 购买力已冻结 | Redis Lua 释放冻结 | 补偿失败 → saga_dead_letter + P0 |
+| FIX 发送失败 | 购买力冻结 + orders.status=RISK_APPROVED | 释放冻结 + orders.status=REJECTED + order_events 追加 | 补偿失败 → saga_dead_letter + P0 |
+| Exchange ACK 超时（30s） | FIX 已发出但未确认 | **不补偿**，转入 PENDING 监控；走 reconciliation 流程查询 OrderStatusRequest (35=H) | 1h 未对账 → P1 告警 |
+
+#### Saga B: 成交 Saga（Execution Saga）
+
+```
+FIX ExecutionReport (35=8, ExecType=F)
+       │
+       ▼
+[trading-engine] 写入 executions + 更新 orders + outbox 事件 "order.filled"
+       │ Kafka publish
+       ├──────────────────┬──────────────────────┬─────────────────────┐
+       ▼                  ▼                      ▼                     ▼
+[position-engine]   [settlement-engine]   [fund-transfer-engine]  [mobile-push]
+更新持仓 +          记录待结算           （延迟到结算日才扣款）    推送成交通知
+publish             publish              schedule cash.settle.due
+"position.updated"  "settlement.recorded"
+```
+
+| 失败点 | 已发生副作用 | 补偿动作 | 兜底 |
+|---|---|---|---|
+| trading-engine 写入 executions 失败 | FIX 已收到成交 | 重试事务（exec_id 幂等） | 重试 5 次失败 → P0 + 人工对账 |
+| position-engine consumer 失败 | order.filled 已发出 | DLQ + 重试 | DLQ 累积 → P0（持仓数据滞后会引发 margin 计算错误） |
+| settlement-engine consumer 失败 | order.filled 已发出 | DLQ + 重试 | T+1 日终对账兜底 |
+| fund-transfer 结算日扣款失败 | 已记录待结算 | 标记 settlement.status=ERROR | 进入人工 unsettled 队列 |
+
+**注**：成交是已发生的事实（交易所记录），下游服务最终一致即可，**不需要补偿**（即不能撤销成交），失败必须告警 + 人工对账。
+
+#### Saga C: 撤单 Saga（Cancel Saga - Choreography）
+
+```
+[trading-engine] OrderCancelRequest (35=F) → Exchange
+       ↓
+[Exchange] ExecutionReport (ExecType=4 Cancelled) → trading-engine
+       ↓
+[trading-engine] orders.status=CANCELLED + 释放剩余购买力 + outbox "order.cancelled"
+       ↓ Kafka
+[mobile-push] 推送撤单成功
+```
+
+| 失败点 | 已发生副作用 | 补偿动作 | 兜底 |
+|---|---|---|---|
+| Exchange 拒绝撤单 (35=9 Cancel Reject) | 无 | 无（订单仍存活，状态不变） | 通知用户撤单失败 |
+| Exchange 撤单时订单已成交 | 成交先于撤单到达 | 撤单 ACK 忽略，以成交为准 | order_events 记录 RACE_CONDITION |
+| 释放购买力失败 | orders.status=CANCELLED | Redis Lua 重试 | 5 次失败 → saga_dead_letter |
+
+#### Saga D: 改单 Saga（Replace Saga - Choreography）
+
+```
+[trading-engine] OrderCancelReplaceRequest (35=G, new qty/price) → Exchange
+       ↓
+[Exchange] ExecutionReport (ExecType=5 Replaced)
+       ↓
+[trading-engine] 计算购买力差额（新冻结 - 老冻结）
+       ↓
+   差额 > 0 → 再冻结  |  差额 < 0 → 部分释放
+       ↓
+[trading-engine] orders 更新 + outbox "order.replaced"
+```
+
+| 失败点 | 已发生副作用 | 补偿动作 | 兜底 |
+|---|---|---|---|
+| Exchange 拒绝改单 (35=9) | 无 | 无 | 通知用户 |
+| 差额冻结失败（资金不足） | Exchange 已 ACK 改单 | **撤单**该订单（trading-engine 主动发 35=F） | 撤单失败 → P0 + 强制平仓预警 |
+
+#### Saga E: 结算 Saga（Settlement Saga - Orchestration）
+
+```
+[settlement-engine: 日终批 (T+1 16:30 ET / T+2 16:30 HKT)]
+       ↓
+扫描 executions WHERE trade_date+cycle = today AND settled=false
+       ↓
+[settlement-engine: SettlementSagaOrchestrator]
+  Step 1: 计算每笔结算金额（含费用、税）
+  Step 2: gRPC fund-transfer.SettleCash(batch)  → 资金划转
+  Step 3: position-engine: unsettled_qty → settled_qty
+  Step 4: executions.settled = true
+  Step 5: 推送结算完成通知
+  Step 6: 生成 NSCC/CCASS 对账文件
+```
+
+| 失败点 | 已发生副作用 | 补偿动作 | 兜底 |
+|---|---|---|---|
+| fund-transfer 划转失败 | 无 | 标记本笔 settlement.status=ERROR，跳过 | 人工 unsettled 队列 + 次日补结算 |
+| position-engine 更新失败 | 资金已划转 | 重试（幂等键 = execution_id + 'SETTLE'） | 5 次失败 → P0 + 人工持仓修正 |
+| 对账文件生成失败 | 资金/持仓已结算 | 重试 | 4h 内未生成 → P0（监管报送时限） |
+
+---
+
+### 17.2 Saga 模式选型决策
+
+| 模式 | 优点 | 缺点 | 适用场景 |
+|---|---|---|---|
+| **Choreography**（事件驱动） | 解耦、易扩展、无中心瓶颈 | 难追踪、补偿逻辑分散、跨服务依赖隐式 | 简单 saga（成交、撤单、改单） |
+| **Orchestration**（编排） | 流程清晰、易监控、补偿集中、可视化 | 中心节点单点风险、编排器与业务强耦合 | 复杂 saga（下单、结算） |
+
+**本系统采用混合模式**：
+
+| Saga | 模式 | 协调器 | 原因 |
+|---|---|---|---|
+| Saga A: 下单 | Orchestration | `OrderSagaOrchestrator`（trading-engine 内） | 步骤多、跨 3 个服务、补偿链复杂、需 SLA 监控 |
+| Saga B: 成交 | Choreography | 无（Kafka 事件驱动） | 单向扩散、各下游独立处理、不需要补偿 |
+| Saga C: 撤单 | Choreography | 无 | 步骤简单、补偿少 |
+| Saga D: 改单 | Choreography | 无 | 同上 |
+| Saga E: 结算 | Orchestration | `SettlementSagaOrchestrator`（settlement-engine 内） | 监管时限严格、需事务级一致性、跨 fund-transfer + position-engine |
+
+---
+
+### 17.3 下单 Saga 详细设计（Orchestration）
+
+#### 17.3.1 完整流程图
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ [API Gateway] POST /orders                                                   │
+│   Headers: Authorization, Idempotency-Key, X-Correlation-Id                  │
+└──────────────────────────────────┬──────────────────────────────────────────┘
+                                   │
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ trading-engine: OrderSagaOrchestrator.Execute(ctx, req)                      │
+│                                                                              │
+│  ╔════════════════════════════════════════════════════════════════════════╗ │
+│  ║ Step 0: 幂等检查                                                        ║ │
+│  ║   - SELECT * FROM saga_instances WHERE idempotency_key = ?              ║ │
+│  ║   - 存在 → 返回缓存响应                                                 ║ │
+│  ║   - 不存在 → INSERT saga_instances (status=STARTED, current_step=0)     ║ │
+│  ╚════════════════════════════════════════════════════════════════════════╝ │
+│                                   │                                          │
+│                                   ▼                                          │
+│  ╔════════════════════════════════════════════════════════════════════════╗ │
+│  ║ Step 1: 本地风控（8 项检查）                                            ║ │
+│  ║   - 失败 → saga.status=ABORTED, failed_step=1, reject                   ║ │
+│  ║   - 成功 → current_step=1                                               ║ │
+│  ╚════════════════════════════════════════════════════════════════════════╝ │
+│                                   │                                          │
+│                                   ▼                                          │
+│  ╔════════════════════════════════════════════════════════════════════════╗ │
+│  ║ Step 2: gRPC AMS.GetAccountStatus (timeout 200ms, retry 3)              ║ │
+│  ║   - 账户非 ACTIVE → ABORTED, failed_step=2                              ║ │
+│  ║   - 重试 3 次仍失败 → ABORTED + P1 告警（AMS 不可用）                   ║ │
+│  ╚════════════════════════════════════════════════════════════════════════╝ │
+│                                   │                                          │
+│                                   ▼                                          │
+│  ╔════════════════════════════════════════════════════════════════════════╗ │
+│  ║ Step 3: 冻结购买力（Redis Lua 原子操作）                                ║ │
+│  ║   - 不足 → ABORTED, failed_step=3, reject(INSUFFICIENT_FUNDS)           ║ │
+│  ║   - 成功 → compensation_log += {step:3, action:"unfreeze", amount:X}    ║ │
+│  ╚════════════════════════════════════════════════════════════════════════╝ │
+│                                   │                                          │
+│                                   ▼                                          │
+│  ╔════════════════════════════════════════════════════════════════════════╗ │
+│  ║ Step 4: 写入 orders + order_events + outbox (单事务)                    ║ │
+│  ║   BEGIN                                                                  ║ │
+│  ║     INSERT orders (status=RISK_APPROVED)                                ║ │
+│  ║     INSERT order_events (event_type=ORDER_RISK_APPROVED)                ║ │
+│  ║     INSERT outbox (event_type=order.risk_approved, status=PENDING)      ║ │
+│  ║     UPDATE saga_instances SET current_step=4                            ║ │
+│  ║   COMMIT                                                                 ║ │
+│  ║   - 失败 → 补偿 Step 3（释放购买力）                                    ║ │
+│  ║   - 补偿失败 → saga_dead_letter + P0                                    ║ │
+│  ╚════════════════════════════════════════════════════════════════════════╝ │
+│                                   │                                          │
+│                                   ▼                                          │
+│  ╔════════════════════════════════════════════════════════════════════════╗ │
+│  ║ Step 5: SOR + FIX 发送（35=D NewOrderSingle）                           ║ │
+│  ║   - venue 不可达 → 补偿 Step 3 + Step 4 (orders.status=REJECTED)        ║ │
+│  ║   - 发送成功 → current_step=5                                           ║ │
+│  ╚════════════════════════════════════════════════════════════════════════╝ │
+│                                   │                                          │
+│                                   ▼                                          │
+│  ╔════════════════════════════════════════════════════════════════════════╗ │
+│  ║ Step 6: 异步等待 Exchange ACK（30s 超时）                               ║ │
+│  ║   - 收到 ACK → saga.status=COMPLETED                                    ║ │
+│  ║   - 30s 未 ACK → orders.status=PENDING_RECONCILE，saga 状态 IN_DOUBT    ║ │
+│  ║     启动后台 OrderStatusRequest (35=H) 轮询，不触发补偿                 ║ │
+│  ╚════════════════════════════════════════════════════════════════════════╝ │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 17.3.2 saga_instances 表 Schema
+
+```sql
+CREATE TABLE saga_instances (
+  saga_id          CHAR(36)    NOT NULL,           -- UUID v4
+  saga_type        VARCHAR(32) NOT NULL,           -- 'ORDER_PLACEMENT' | 'SETTLEMENT' ...
+  idempotency_key  CHAR(36)    NOT NULL,           -- 客户端幂等键
+  correlation_id   CHAR(36)    NOT NULL,           -- 链路追踪
+  user_id          BIGINT      NOT NULL,
+  status           VARCHAR(16) NOT NULL,           -- STARTED | IN_PROGRESS | COMPLETED | ABORTED | IN_DOUBT | DEAD
+  current_step     SMALLINT    NOT NULL DEFAULT 0,
+  failed_step      SMALLINT    DEFAULT NULL,
+  failure_reason   VARCHAR(256) DEFAULT NULL,
+  payload          JSON        NOT NULL,           -- 原始请求快照
+  compensation_log JSON        NOT NULL,           -- [{step:3, action:"unfreeze", amount:"1500.00", status:"DONE"}]
+  response_cache   JSON        DEFAULT NULL,       -- 终态响应（幂等返回用）
+  created_at       TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  updated_at       TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+  completed_at     TIMESTAMP(6) DEFAULT NULL,
+  PRIMARY KEY (saga_id),
+  UNIQUE KEY uk_idempotency (idempotency_key),
+  KEY idx_user_status (user_id, status),
+  KEY idx_status_updated (status, updated_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE saga_dead_letter (
+  id               BIGINT AUTO_INCREMENT,
+  saga_id          CHAR(36) NOT NULL,
+  saga_type        VARCHAR(32) NOT NULL,
+  failed_step      SMALLINT NOT NULL,
+  compensation_attempts INT NOT NULL,
+  last_error       TEXT NOT NULL,
+  payload_snapshot JSON NOT NULL,
+  created_at       TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  resolved_at      TIMESTAMP(6) DEFAULT NULL,
+  resolved_by      VARCHAR(64) DEFAULT NULL,       -- 处理人工号
+  resolution_note  TEXT DEFAULT NULL,
+  PRIMARY KEY (id),
+  KEY idx_saga_id (saga_id),
+  KEY idx_resolved (resolved_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+#### 17.3.3 OrderSagaOrchestrator Go 接口与关键实现
+
+```go
+package saga
+
+import (
+    "context"
+    "time"
+
+    "github.com/shopspring/decimal"
+    "go.uber.org/zap"
+)
+
+// SagaStep 描述 saga 中的一个步骤
+type SagaStep struct {
+    Name          string
+    Execute       func(ctx context.Context, state *SagaState) error
+    Compensate    func(ctx context.Context, state *SagaState) error // 可空：纯校验步骤无副作用
+}
+
+// SagaState 在 step 间传递的运行时上下文（持久化到 saga_instances.payload）
+type SagaState struct {
+    SagaID         string
+    CorrelationID  string
+    UserID         int64
+    OrderRequest   *OrderRequest
+    FrozenAmount   decimal.Decimal   // Step 3 冻结金额（供补偿使用）
+    OrderID        string            // Step 4 写入后的订单 ID
+    ClOrdID        string            // Step 5 FIX ClOrdID
+}
+
+// OrderSagaOrchestrator 编排下单 saga 全流程
+type OrderSagaOrchestrator interface {
+    // Execute 同步执行 saga。返回终态（COMPLETED / ABORTED / IN_DOUBT）。
+    // 幂等：相同 idempotencyKey 返回缓存响应。
+    Execute(ctx context.Context, req *OrderRequest, idempotencyKey string) (*OrderResponse, error)
+
+    // Resume 服务重启后续跑未完成的 saga（IN_PROGRESS 状态）
+    Resume(ctx context.Context, sagaID string) error
+}
+
+type orderSagaOrchestrator struct {
+    repo        SagaRepo
+    risk        RiskEngine
+    ams         AMSClient
+    buyingPower BuyingPowerService
+    orderRepo   OrderRepo
+    sor         SORClient
+    log         *zap.Logger
+    steps       []SagaStep
+}
+
+func (o *orderSagaOrchestrator) Execute(ctx context.Context, req *OrderRequest, idemKey string) (*OrderResponse, error) {
+    // Step 0: 幂等检查
+    if existing, err := o.repo.FindByIdempotencyKey(ctx, idemKey); err == nil && existing != nil {
+        if existing.ResponseCache != nil {
+            return existing.ResponseCache, nil
+        }
+        // 历史 saga 未完成 → 续跑
+        return nil, o.Resume(ctx, existing.SagaID)
+    }
+
+    state := &SagaState{
+        SagaID:        newUUID(),
+        CorrelationID: ctxCorrelationID(ctx),
+        UserID:        req.UserID,
+        OrderRequest:  req,
+    }
+    if err := o.repo.Create(ctx, state, idemKey); err != nil {
+        return nil, err
+    }
+
+    // 顺序执行 steps，记录 current_step
+    for idx, step := range o.steps {
+        if err := o.repo.UpdateStep(ctx, state.SagaID, idx, "IN_PROGRESS"); err != nil {
+            return nil, err
+        }
+
+        stepCtx, cancel := context.WithTimeout(ctx, stepTimeout(step.Name))
+        err := step.Execute(stepCtx, state)
+        cancel()
+
+        if err != nil {
+            o.log.Warn("saga step failed",
+                zap.String("saga_id", state.SagaID),
+                zap.String("step", step.Name),
+                zap.Int("step_idx", idx),
+                zap.Error(err))
+
+            // 反向补偿前面已完成的 steps
+            if compErr := o.compensate(ctx, state, idx-1); compErr != nil {
+                o.repo.MoveToDeadLetter(ctx, state.SagaID, compErr)
+                return nil, ErrSagaCompensationFailed
+            }
+            o.repo.MarkAborted(ctx, state.SagaID, idx, err.Error())
+            return nil, err
+        }
+    }
+
+    resp := &OrderResponse{OrderID: state.OrderID, ClOrdID: state.ClOrdID, Status: "RISK_APPROVED"}
+    o.repo.MarkCompleted(ctx, state.SagaID, resp)
+    return resp, nil
+}
+
+// compensate 反向执行已完成 step 的补偿动作。
+// 任意补偿失败 → 重试 5 次 → 仍失败转 dead letter。
+func (o *orderSagaOrchestrator) compensate(ctx context.Context, state *SagaState, lastDoneStep int) error {
+    for i := lastDoneStep; i >= 0; i-- {
+        step := o.steps[i]
+        if step.Compensate == nil {
+            continue
+        }
+        var err error
+        for attempt := 1; attempt <= 5; attempt++ {
+            err = step.Compensate(ctx, state)
+            if err == nil {
+                o.repo.AppendCompensationLog(ctx, state.SagaID, i, "DONE", "")
+                break
+            }
+            time.Sleep(time.Duration(attempt*attempt) * 100 * time.Millisecond) // 指数退避
+        }
+        if err != nil {
+            o.repo.AppendCompensationLog(ctx, state.SagaID, i, "FAILED", err.Error())
+            return err
+        }
+    }
+    return nil
+}
+
+// Resume 服务重启时续跑：从 current_step 继续执行。
+func (o *orderSagaOrchestrator) Resume(ctx context.Context, sagaID string) error {
+    inst, err := o.repo.Load(ctx, sagaID)
+    if err != nil {
+        return err
+    }
+    if inst.Status == "COMPLETED" || inst.Status == "ABORTED" {
+        return nil
+    }
+    // 已完成的 step 跳过，从 current_step+1 继续
+    state := inst.RestoreState()
+    for idx := inst.CurrentStep + 1; idx < len(o.steps); idx++ {
+        // ... 同 Execute 主循环
+    }
+    return nil
+}
+```
+
+**关键设计点**：
+- 每个 step 调用前检查 `saga_instances.current_step`，已完成的 step 跳过（保证重启续跑幂等）
+- 补偿动作必须幂等（如释放购买力 Lua 脚本检查 `frozen >= amount` 才释放）
+- 补偿失败 5 次 → 写入 `saga_dead_letter` + 触发 P0 告警 + Slack/PagerDuty
+
+---
+
+### 17.4 成交 Saga 详细设计（Choreography）
+
+#### 17.4.1 事件时序图
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Exchange → FIX → trading-engine: ExecutionReport (35=8, ExecType=F Fill)     │
+└──────────────────────────────────┬──────────────────────────────────────────┘
+                                   │
+                                   ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ trading-engine 事务：                                                         │
+│   BEGIN                                                                       │
+│     INSERT executions (exec_id, order_id, qty, price, ...)                   │
+│     UPDATE orders SET filled_qty=filled_qty+qty, status=...                  │
+│     INSERT order_events (event_type=ORDER_FILLED)                            │
+│     INSERT outbox (event_id=exec_id, event_type=order.filled,                │
+│                    payload={...}, status=PENDING)                            │
+│   COMMIT                                                                      │
+└──────────────────────────────────┬──────────────────────────────────────────┘
+                                   │
+                                   ▼ OutboxRelay
+                          ┌─────────────────┐
+                          │   Kafka Topic   │
+                          │  order.filled   │
+                          └────────┬────────┘
+                                   │
+            ┌──────────────────────┼──────────────────────┬─────────────┐
+            ▼                      ▼                      ▼             ▼
+   [position-engine]      [settlement-engine]    [fund-transfer]  [notification]
+   consume + idemp.       consume + idemp.       consume + idemp. consume
+        │                      │                      │              │
+        ▼                      ▼                      ▼              ▼
+   更新 positions         INSERT settlement_     SCHEDULE          推送给用户
+   FIFO 计算成本           queue (status=        cash.settle.due
+   publish                 SCHEDULED,             (run_at=
+   "position.updated"      due_date=T+1/T+2)       settle_date)
+```
+
+#### 17.4.2 Consumer 幂等性保证
+
+每个 consumer 使用 `executions.execution_id`（交易所唯一）作为幂等键，通过 `processed_events` 表实现端到端 exactly-once 处理。
+
+**processed_events 表 Schema**：
+
+```sql
+CREATE TABLE processed_events (
+  consumer_group VARCHAR(64) NOT NULL,
+  event_id       CHAR(36)    NOT NULL,    -- 即 execution_id
+  event_type     VARCHAR(64) NOT NULL,
+  processed_at   TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  PRIMARY KEY (consumer_group, event_id),
+  KEY idx_processed_at (processed_at)     -- 用于 TTL 清理（30 天前的）
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+**Consumer 幂等模板**（以 position-engine 为例）：
+
+```go
+func (c *PositionConsumer) HandleOrderFilled(ctx context.Context, evt *OrderFilledEvent) error {
+    log := c.log.With(
+        zap.String("correlation_id", evt.CorrelationID),
+        zap.String("execution_id", evt.ExecutionID),
+        zap.String("order_id", evt.OrderID),
+    )
+
+    tx, err := c.db.BeginTx(ctx, nil)
+    if err != nil {
+        return err
+    }
+    defer tx.Rollback()
+
+    // 幂等检查：尝试插入 processed_events
+    _, err = tx.ExecContext(ctx,
+        `INSERT INTO processed_events (consumer_group, event_id, event_type)
+         VALUES (?, ?, ?)`,
+        "position-engine", evt.ExecutionID, "order.filled")
+    if err != nil {
+        if isDuplicateKey(err) {
+            log.Info("event already processed, skipping")
+            return nil // 静默成功
+        }
+        return err
+    }
+
+    // 业务逻辑：FIFO 更新持仓（参考 domains/05-position-pnl.md）
+    if err := c.updatePosition(ctx, tx, evt); err != nil {
+        return err
+    }
+
+    // outbox 发布 position.updated 给下游
+    if err := c.outbox.Publish(ctx, tx, "position.updated", evt.UserID, evt); err != nil {
+        return err
+    }
+
+    return tx.Commit()
+}
+```
+
+#### 17.4.3 失败处理与 DLQ
+
+```
+Kafka Consumer
+   │
+   ├── 业务成功 → commit offset
+   │
+   └── 业务失败
+         │
+         ├── 重试 3 次（指数退避：100ms, 400ms, 1.6s）
+         │     └── 成功 → commit offset
+         │
+         └── 重试耗尽 → publish to DLQ topic (order.filled.DLQ)
+                       + DO NOT commit offset (允许后续重新消费)
+                       + P0 告警 (成交事件丢失 = 资金/持仓不一致)
+```
+
+**铁律**：成交事件**绝不能丢**。DLQ 必须有人工监控 + 4h 内必须处理。
+
+---
+
+### 17.5 Outbox Pattern 实现
+
+事务性 outbox 确保"DB 写入 + Kafka 发布"原子性：业务事务一旦提交，事件最终一定会发布（at-least-once + consumer 幂等 = exactly-once 语义）。
+
+#### 17.5.1 流程图
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│ Business Service (e.g., trading-engine)                          │
+│                                                                  │
+│   BEGIN TRANSACTION                                              │
+│     INSERT orders (...)                                          │
+│     INSERT order_events (...)                                    │
+│     INSERT outbox (event_id, event_type, payload, status='PENDING')│
+│   COMMIT                                                         │
+└────────────────────────────┬─────────────────────────────────────┘
+                             │
+                             ▼
+┌──────────────────────────────────────────────────────────────────┐
+│ OutboxRelay (background goroutine, 每 100ms 轮询)                │
+│                                                                  │
+│   Loop:                                                          │
+│     rows = SELECT * FROM outbox                                  │
+│              WHERE status='PENDING' AND next_retry_at <= NOW()   │
+│              ORDER BY created_at LIMIT 100                       │
+│              FOR UPDATE SKIP LOCKED                              │
+│                                                                  │
+│     for r in rows:                                               │
+│       try:                                                       │
+│         kafka.Produce(r.event_type, r.event_id, r.payload,       │
+│                       headers={correlation_id, event_id})        │
+│         UPDATE outbox SET status='SENT', sent_at=NOW() WHERE id=?│
+│       except err:                                                │
+│         UPDATE outbox SET attempts=attempts+1,                   │
+│           next_retry_at=NOW()+backoff(attempts)                  │
+│           WHERE id=?                                             │
+│         if attempts >= 5:                                        │
+│           UPDATE outbox SET status='FAILED'                      │
+│           ALERT P0                                               │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+#### 17.5.2 outbox 表 Schema
+
+```sql
+CREATE TABLE outbox (
+  id              BIGINT AUTO_INCREMENT,
+  event_id        CHAR(36)    NOT NULL,            -- 全局唯一（consumer 端去重）
+  event_type      VARCHAR(64) NOT NULL,            -- order.filled / position.updated ...
+  aggregate_id    VARCHAR(64) NOT NULL,            -- 即 order_id / position_id (Kafka partitioning key)
+  payload         JSON        NOT NULL,
+  headers         JSON        NOT NULL,            -- {correlation_id, request_id, user_id}
+  status          VARCHAR(16) NOT NULL DEFAULT 'PENDING',  -- PENDING | SENT | FAILED
+  attempts        INT         NOT NULL DEFAULT 0,
+  next_retry_at   TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  created_at      TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+  sent_at         TIMESTAMP(6) DEFAULT NULL,
+  last_error      TEXT DEFAULT NULL,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_event_id (event_id),
+  KEY idx_status_retry (status, next_retry_at),
+  KEY idx_created (created_at)                     -- 用于清理已 SENT 的旧记录（保留 7 天）
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+#### 17.5.3 OutboxRelay Go 实现
+
+```go
+package outbox
+
+import (
+    "context"
+    "encoding/json"
+    "time"
+
+    "github.com/segmentio/kafka-go"
+    "go.uber.org/zap"
+)
+
+type OutboxRelay struct {
+    db        *sqlx.DB
+    producer  *kafka.Writer
+    log       *zap.Logger
+    pollInterval time.Duration
+    batchSize int
+}
+
+// Run 后台循环，捕获 context cancel 优雅退出
+func (r *OutboxRelay) Run(ctx context.Context) error {
+    ticker := time.NewTicker(r.pollInterval) // 默认 100ms
+    defer ticker.Stop()
+
+    for {
+        select {
+        case <-ctx.Done():
+            return ctx.Err()
+        case <-ticker.C:
+            if err := r.processOnce(ctx); err != nil {
+                r.log.Error("outbox relay tick failed", zap.Error(err))
+            }
+        }
+    }
+}
+
+func (r *OutboxRelay) processOnce(ctx context.Context) error {
+    tx, err := r.db.BeginTxx(ctx, nil)
+    if err != nil {
+        return err
+    }
+    defer tx.Rollback()
+
+    // SKIP LOCKED 允许多实例并行拉取，无锁竞争
+    var rows []OutboxRow
+    err = tx.SelectContext(ctx, &rows, `
+        SELECT id, event_id, event_type, aggregate_id, payload, headers, attempts
+        FROM outbox
+        WHERE status='PENDING' AND next_retry_at <= NOW(6)
+        ORDER BY created_at
+        LIMIT ?
+        FOR UPDATE SKIP LOCKED`, r.batchSize)
+    if err != nil {
+        return err
+    }
+
+    for _, row := range rows {
+        msg := kafka.Message{
+            Topic: row.EventType,
+            Key:   []byte(row.AggregateID),
+            Value: []byte(row.Payload),
+            Headers: buildHeaders(row.Headers, row.EventID),
+            Time:  time.Now().UTC(),
+        }
+
+        if err := r.producer.WriteMessages(ctx, msg); err != nil {
+            r.markRetry(ctx, tx, row, err)
+            continue
+        }
+        r.markSent(ctx, tx, row.ID)
+    }
+
+    return tx.Commit()
+}
+
+func (r *OutboxRelay) markRetry(ctx context.Context, tx *sqlx.Tx, row OutboxRow, err error) {
+    backoff := time.Duration(1<<row.Attempts) * time.Second // 1s, 2s, 4s, 8s, 16s
+    nextStatus := "PENDING"
+    if row.Attempts+1 >= 5 {
+        nextStatus = "FAILED"
+        r.alertP0(row, err)
+    }
+    tx.ExecContext(ctx, `
+        UPDATE outbox SET attempts=attempts+1,
+                          next_retry_at=DATE_ADD(NOW(6), INTERVAL ? SECOND),
+                          last_error=?,
+                          status=?
+        WHERE id=?`, int(backoff.Seconds()), err.Error(), nextStatus, row.ID)
+}
+```
+
+**关键设计点**：
+- `FOR UPDATE SKIP LOCKED`：多实例可水平扩展，无并发冲突
+- consumer 端用 `event_id` 在 `processed_events` 表做幂等检查 —— 不依赖 Kafka transactional producer（避免 EOS 性能开销）
+- 已 SENT 记录由独立的 cleanup job 删除（保留 7 天，便于审计）
+- `outbox_pending_count > 1000` → 告警（说明 Kafka 写入瓶颈或 Kafka 集群故障）
+
+---
+
+### 17.6 跨服务 correlation_id 透传
+
+#### 17.6.1 透传链路
+
+```
+[Mobile App]
+   │  生成 request_id (UUID v4)
+   ▼
+[API Gateway]
+   │  生成 correlation_id (UUID v4)
+   │  HTTP header: X-Correlation-Id, X-Request-Id
+   ▼
+[trading-engine]
+   │  ctx.WithValue(correlationIDKey, ...)
+   │
+   ├──► gRPC AMS (metadata: correlation-id, request-id)
+   │
+   ├──► Kafka Producer (headers: correlation_id, request_id, event_id)
+   │
+   └──► FIX Outbound (Tag 11 ClOrdID 内嵌前 8 字符 或 通过本地映射表)
+            ▼
+        client_order_id ← correlation_id 本地映射 (Redis, TTL 7 天)
+            ▼
+        Exchange ExecutionReport 回来时，通过 ClOrdID 反查 correlation_id
+```
+
+**FIX 透传策略**：
+- FIX 4.4 自定义 tag (50000+ 用户自定义区) 需对手方协议支持，多数交易所不接受 → 不可依赖
+- **本系统采用本地映射**：在发送 35=D 前，将 `correlation_id` 存入 Redis：`Map ClOrdID → correlation_id`（TTL 7 天）
+- 收到 ExecutionReport 时反查映射，注入回 ctx，确保下游链路一致
+
+#### 17.6.2 Go 中间件实现
+
+**HTTP Middleware**：
+
+```go
+const (
+    HeaderCorrelationID = "X-Correlation-Id"
+    HeaderRequestID     = "X-Request-Id"
+    ctxKeyCorrelationID = ctxKey("correlation_id")
+    ctxKeyRequestID     = ctxKey("request_id")
+)
+
+func CorrelationMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        cid := r.Header.Get(HeaderCorrelationID)
+        if cid == "" {
+            cid = uuid.NewString() // 入口生成
+        }
+        rid := r.Header.Get(HeaderRequestID)
+        if rid == "" {
+            rid = uuid.NewString()
+        }
+
+        ctx := context.WithValue(r.Context(), ctxKeyCorrelationID, cid)
+        ctx = context.WithValue(ctx, ctxKeyRequestID, rid)
+
+        w.Header().Set(HeaderCorrelationID, cid)
+        next.ServeHTTP(w, r.WithContext(ctx))
+    })
+}
+```
+
+**gRPC Client Interceptor**：
+
+```go
+func CorrelationClientInterceptor() grpc.UnaryClientInterceptor {
+    return func(ctx context.Context, method string, req, reply interface{},
+        cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
+
+        cid, _ := ctx.Value(ctxKeyCorrelationID).(string)
+        rid, _ := ctx.Value(ctxKeyRequestID).(string)
+        md := metadata.Pairs("correlation-id", cid, "request-id", rid)
+        ctx = metadata.NewOutgoingContext(ctx, md)
+        return invoker(ctx, method, req, reply, cc, opts...)
+    }
+}
+
+// Server 端
+func CorrelationServerInterceptor() grpc.UnaryServerInterceptor {
+    return func(ctx context.Context, req interface{},
+        info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+
+        md, _ := metadata.FromIncomingContext(ctx)
+        cid := firstOrEmpty(md.Get("correlation-id"))
+        rid := firstOrEmpty(md.Get("request-id"))
+        if cid == "" { cid = uuid.NewString() }
+        if rid == "" { rid = uuid.NewString() }
+
+        ctx = context.WithValue(ctx, ctxKeyCorrelationID, cid)
+        ctx = context.WithValue(ctx, ctxKeyRequestID, rid)
+        return handler(ctx, req)
+    }
+}
+```
+
+**Kafka Header Injector**（搭配 outbox）：
+
+```go
+func buildHeaders(business map[string]string, eventID string) []kafka.Header {
+    return []kafka.Header{
+        {Key: "event_id",       Value: []byte(eventID)},
+        {Key: "correlation_id", Value: []byte(business["correlation_id"])},
+        {Key: "request_id",     Value: []byte(business["request_id"])},
+        {Key: "user_id",        Value: []byte(business["user_id"])},
+        {Key: "produced_at",    Value: []byte(time.Now().UTC().Format(time.RFC3339Nano))},
+    }
+}
+```
+
+**Zap Logger Field Helper**：
+
+```go
+func ctxLogFields(ctx context.Context) []zap.Field {
+    cid, _ := ctx.Value(ctxKeyCorrelationID).(string)
+    rid, _ := ctx.Value(ctxKeyRequestID).(string)
+    return []zap.Field{
+        zap.String("correlation_id", cid),
+        zap.String("request_id", rid),
+    }
+}
+
+// 使用示例
+log.Info("order accepted", append(ctxLogFields(ctx),
+    zap.String("order_id", orderID),
+    zap.String("symbol", req.Symbol),
+)...)
+```
+
+**强制规则**：所有 log / audit_events / saga_instances / outbox 记录必须包含 `correlation_id`，缺失视为 bug。
+
+---
+
+### 17.7 Saga 监控与告警
+
+#### 17.7.1 Prometheus Metrics
+
+```go
+var (
+    sagaStartedTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+        Name: "saga_started_total",
+        Help: "Total number of sagas started",
+    }, []string{"saga_type"})
+
+    sagaCompletedTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+        Name: "saga_completed_total",
+        Help: "Total number of sagas completed successfully",
+    }, []string{"saga_type"})
+
+    sagaAbortedTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+        Name: "saga_aborted_total",
+        Help: "Total number of sagas aborted (compensation succeeded)",
+    }, []string{"saga_type", "failed_step"})
+
+    sagaCompensationFailedTotal = promauto.NewCounterVec(prometheus.CounterOpts{
+        Name: "saga_compensation_failed_total",
+        Help: "Total number of compensation failures (sagas moved to dead letter)",
+    }, []string{"saga_type", "step"})
+
+    sagaDurationSeconds = promauto.NewHistogramVec(prometheus.HistogramOpts{
+        Name:    "saga_duration_seconds",
+        Help:    "Saga end-to-end duration",
+        Buckets: []float64{0.01, 0.05, 0.1, 0.5, 1, 5, 30, 60},
+    }, []string{"saga_type", "status"})
+
+    outboxPendingCount = promauto.NewGauge(prometheus.GaugeOpts{
+        Name: "outbox_pending_count",
+        Help: "Number of outbox events pending dispatch",
+    })
+
+    outboxRelayLagSeconds = promauto.NewGauge(prometheus.GaugeOpts{
+        Name: "outbox_relay_lag_seconds",
+        Help: "Age (seconds) of oldest PENDING outbox event",
+    })
+)
+```
+
+#### 17.7.2 告警规则（Prometheus Alertmanager）
+
+```yaml
+groups:
+- name: saga
+  rules:
+  - alert: SagaCompletionRateLow
+    expr: |
+      (
+        rate(saga_completed_total[5m])
+        /
+        (rate(saga_started_total[5m]) > 0)
+      ) < 0.99
+    for: 5m
+    labels: {severity: P1}
+    annotations:
+      summary: "Saga completion rate < 99% for {{ $labels.saga_type }}"
+      runbook: "https://runbook/saga-failure"
+
+  - alert: SagaCompensationFailureHigh
+    expr: |
+      rate(saga_compensation_failed_total[5m]) /
+        rate(saga_started_total[5m]) > 0.001
+    for: 2m
+    labels: {severity: P0}
+    annotations:
+      summary: "Saga compensation failure rate > 0.1%"
+      action: "Inspect saga_dead_letter table immediately"
+
+  - alert: OutboxRelayLagHigh
+    expr: outbox_relay_lag_seconds > 30
+    for: 1m
+    labels: {severity: P1}
+    annotations:
+      summary: "Outbox relay lag {{ $value }}s > 30s"
+
+  - alert: OutboxPendingBacklog
+    expr: outbox_pending_count > 1000
+    for: 2m
+    labels: {severity: P1}
+    annotations:
+      summary: "Outbox backlog {{ $value }} events pending"
+```
+
+#### 17.7.3 Grafana 面板（最小集）
+
+| 面板 | Query | 用途 |
+|---|---|---|
+| Saga 完成率 | `sum(rate(saga_completed_total[5m])) by (saga_type) / sum(rate(saga_started_total[5m])) by (saga_type)` | SLO 跟踪 |
+| Saga p99 时延 | `histogram_quantile(0.99, sum(rate(saga_duration_seconds_bucket[5m])) by (le, saga_type))` | 性能跟踪 |
+| 死信队列堆积 | `count(saga_dead_letter WHERE resolved_at IS NULL)` (via mysql_exporter) | 待人工处理 |
+| Outbox lag | `outbox_relay_lag_seconds` | Kafka 健康 |
+| Outbox pending | `outbox_pending_count` | 积压检测 |
+| 按 failed_step 分布 | `sum(rate(saga_aborted_total[1h])) by (saga_type, failed_step)` | 定位常见失败点 |
+
+---
+
+### 17.8 跨服务事务铁律（章节小结）
+
+1. **任何跨服务操作必须有 saga_id 串联** —— 无 saga_id 的多步操作 = 不可观测 = 不可补偿
+2. **任何资金/持仓变更必须通过 outbox 发布事件** —— 双写 DB + Kafka = 永远不一致，禁止
+3. **任何 consumer 必须幂等** —— 至少一次投递 + 幂等 = 恰好一次语义，没有第三条路
+4. **补偿失败必须告警，绝不静默** —— 死信队列必须有人值守，4h 内必须处理
+5. **correlation_id 必须从入口贯穿到终点** —— 含 FIX、Kafka、gRPC、DB 审计、日志，缺一不可
+6. **saga 状态机必须可观测** —— Grafana 面板 + Alertmanager 规则齐备，否则视为未完工
+
+> 这些铁律的违反等同于交易系统在监管审计中"暴露未对账头寸"——零容忍。
+

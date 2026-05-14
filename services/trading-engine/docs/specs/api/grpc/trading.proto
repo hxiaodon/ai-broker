@@ -41,6 +41,21 @@ message Order {
   int64 created_at = 23;      // Unix nanos
   int64 submitted_at = 24;
   int64 completed_at = 25;
+
+  // 改单链 / CAT 必填字段
+  string orig_cl_ord_id    = 26;  // 改单链：当前 ClOrdID 的前一版（首版为空）
+  string originating_imid  = 27;  // CAT: 订单首次进入 NMS 的 IMID（自营=本券商）
+  string handling_instructions = 28; // CAT: MANUAL/ALGO/DIRECT
+  string trading_session   = 29;  // CAT: PRE/REG/POST
+  string routed_order_id   = 30;  // CAT: 路由后给 venue 的 ID
+  string destination       = 31;  // CAT: 目标 venue MIC (XNYS, XNAS, ...)
+  int32  clock_offset_us   = 32;  // 创建时刻本节点 NTP 漂移 (μs)
+
+  // 排队 / 改单 / STP 元数据
+  int64  queued_at         = 33;  // Unix nanos, 仅 QUEUED 状态
+  int64  target_release_at = 34;  // Unix nanos, 预计批量释放时刻
+  string queue_reason      = 35;  // PRE_MARKET / LUNCH / HOLIDAY / MWCB_PAUSE
+  bool   extended_hours    = 36;  // 是否启用 ext-hours（DAY_EXT/GTC_EXT）
 }
 
 message Execution {
@@ -60,6 +75,10 @@ message Execution {
   bool   settled = 14;
   string venue = 15;
   int64  executed_at = 16;      // Unix nanos
+  // CAT / 审计字段
+  string trade_id = 17;          // 交易所 ExecID (= CAT tradeID)
+  string contra_side_imid = 18;  // 对手方 IMID（若 venue 提供）
+  int32  clock_offset_us = 19;   // 写入时刻本节点 NTP 漂移 (μs)
 }
 
 message Position {
@@ -118,10 +137,15 @@ enum OrderType {
 
 enum TimeInForce {
   TIF_UNKNOWN = 0;
-  TIF_DAY = 1;
-  TIF_GTC = 2;
-  TIF_IOC = 3;
-  TIF_AON = 4;
+  TIF_DAY     = 1;
+  TIF_GTC     = 2;
+  TIF_IOC     = 3;
+  TIF_AON     = 4;
+  TIF_DAY_EXT = 5;  // DAY + 美股扩展时段 (04:00-20:00 ET)
+  TIF_GTC_EXT = 6;  // GTC + 美股扩展时段
+  TIF_FOK     = 7;  // Fill or Kill
+  TIF_OPG     = 8;  // Market on Open / Opening Auction
+  TIF_CLS     = 9;  // Market on Close / Closing Auction
 }
 
 enum OrderStatus {
@@ -137,6 +161,44 @@ enum OrderStatus {
   STATUS_CANCELLED = 9;
   STATUS_REJECTED = 10;
   STATUS_EXCHANGE_REJECT = 11;
+  STATUS_AMENDING = 12;            // 改单待交易所确认
+  STATUS_AMEND_REJECTED = 13;      // 改单被拒，原订单保持
+  STATUS_QUEUED = 14;              // 风控通过，等待市场开盘后批量发送
+}
+
+// 标的可交易性状态
+enum SymbolStatus {
+  SYMBOL_STATUS_UNKNOWN     = 0;
+  SYMBOL_TRADING            = 1;
+  SYMBOL_HALTED_NEWS        = 2;
+  SYMBOL_HALTED_VOLATILITY  = 3;
+  SYMBOL_HALTED_REGULATORY  = 4;
+  SYMBOL_SUSPENDED          = 5;
+  SYMBOL_DELISTED           = 6;
+}
+
+// 市场会话状态
+enum MarketSessionState {
+  SESSION_UNKNOWN          = 0;
+  SESSION_CLOSED           = 1;
+  SESSION_PRE_OPEN_AUCTION = 2;
+  SESSION_OPEN             = 3;
+  SESSION_LUNCH            = 4;
+  SESSION_CLOSING_AUCTION  = 5;
+  SESSION_POST_CLOSE       = 6;
+  SESSION_HOLIDAY          = 7;
+  SESSION_EARLY_CLOSE      = 8;
+  SESSION_EMERGENCY_HALT   = 9;
+  SESSION_MWCB_PAUSE       = 10;
+}
+
+// STP 模式
+enum STPMode {
+  STP_MODE_UNKNOWN              = 0;
+  STP_CANCEL_NEWEST             = 1;  // 默认
+  STP_CANCEL_OLDEST             = 2;
+  STP_CANCEL_BOTH               = 3;
+  STP_DECREMENT_AND_CANCEL      = 4;
 }
 
 // ============================================================
@@ -146,6 +208,7 @@ enum OrderStatus {
 service OrderService {
   rpc SubmitOrder(SubmitOrderRequest) returns (SubmitOrderResponse);
   rpc CancelOrder(CancelOrderRequest) returns (CancelOrderResponse);
+  rpc AmendOrder(AmendOrderRequest) returns (AmendOrderResponse);
   rpc GetOrder(GetOrderRequest) returns (GetOrderResponse);
   rpc ListOrders(ListOrdersRequest) returns (ListOrdersResponse);
   rpc StreamOrderUpdates(StreamOrderUpdatesRequest) returns (stream OrderUpdate);
@@ -196,6 +259,34 @@ message CancelOrderRequest {
 message CancelOrderResponse {
   bool   accepted = 1;
   string reason = 2;
+}
+
+// 改单 (Cancel-Replace) — 任一可选字段空值表示不修改
+message AmendOrderRequest {
+  string order_id        = 1;
+  int64  account_id      = 2;
+  string idempotency_key = 3;
+  // 价格 / 数量 (decimal string for precision)，空 = 不修改
+  string new_price        = 4;
+  int64  new_quantity     = 5;   // 0 = 不修改；必须 >= filled_qty
+  string new_stop_price   = 6;
+  string new_trail_amount = 7;
+  TimeInForce new_time_in_force = 8;  // TIF_UNKNOWN = 不修改
+  string source          = 9;    // IOS/ANDROID/WEB/API
+  string device_id       = 10;
+  // 改单需要重新生物认证（金额相关变更）
+  string biometric_token = 11;
+  string bio_challenge   = 12;
+  int64  bio_timestamp   = 13;
+}
+
+message AmendOrderResponse {
+  string      order_id       = 1;
+  string      new_cl_ord_id  = 2;
+  string      orig_cl_ord_id = 3;
+  OrderStatus status         = 4;   // 通常为 STATUS_AMENDING
+  int64       accepted_at    = 5;   // Unix nanos
+  string      reject_reason  = 6;   // 仅同步失败时填充
 }
 
 message GetOrderRequest {

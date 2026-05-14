@@ -201,13 +201,18 @@ final json = {
 
 | 枚举类型 | 允许值 | 说明 |
 |---------|--------|------|
-| `side` | "BUY", "SELL" | 订单方向 |
-| `order_type` | "LIMIT", "MARKET" | 订单类型 |
-| `status` | 见 order-lifecycle.md §1 | 订单内部状态 |
-| `display_status` | 见 order-lifecycle.md §4 | 用户可见状态 |
-| `time_in_force` | "DAY", "GTC" | 有效期 |
+| `side` | "BUY", "SELL", "SHORT_SELL" | 订单方向；SHORT_SELL 仅美股 |
+| `order_type` | "MARKET", "LIMIT", "STOP", "STOP_LIMIT", "TRAILING_STOP", "MOO", "MOC" | 订单类型 |
+| `status` | 见 order-lifecycle.md §1（含 QUEUED, AMENDING, AMEND_REJECTED） | 订单内部状态 |
+| `display_status` | 见 order-lifecycle.md §5 | 用户可见状态 |
+| `time_in_force` | "DAY", "DAY_EXT", "GTC", "GTC_EXT", "IOC", "FOK", "AON", "OPG", "CLS" | 有效期 |
 | `market` | "US", "HK" | 市场 |
-| `orde_type` | "LIMIT", "MARKET" | 订单类型 |
+| `market_session` | "OPEN", "PRE_OPEN_AUCTION", "PRE_MARKET", "LUNCH", "AFTER_HOURS", "CLOSING_AUCTION", "CLOSED", "HOLIDAY", "EARLY_CLOSE", "EMERGENCY_HALT", "MWCB_PAUSE" | 市场状态 |
+| `symbol_status` | "TRADING", "HALTED_NEWS", "HALTED_VOLATILITY", "HALTED_REGULATORY", "SUSPENDED", "DELISTED" | 标的可交易状态 |
+| `stp_mode` | "CANCEL_NEWEST", "CANCEL_OLDEST", "CANCEL_BOTH", "DECREMENT_AND_CANCEL" | 自成交防止模式 |
+| `queue_reason` | "PRE_MARKET", "LUNCH", "HOLIDAY", "MWCB_PAUSE", "EXTENDED_HOURS_OFF" | QUEUED 单的入队原因 |
+| `handling_instructions` | "MANUAL", "ALGO", "DIRECT" | CAT 必填，由 order.source 推导 |
+| `trading_session` | "PRE", "REG", "POST" | CAT 必填，由下单时间推导 |
 
 ### 4.2 示例
 
