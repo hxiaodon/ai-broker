@@ -60,7 +60,7 @@ final class ChangePhoneNotifierProvider
 }
 
 String _$changePhoneNotifierHash() =>
-    r'7bc043a19181000fb6b612b0c56ab24e0db1283a';
+    r'215f8afd0d4337deff9eac22acd3a43c98c2bcfb';
 
 /// State machine for the 3-step change-phone flow.
 ///

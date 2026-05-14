@@ -8,15 +8,21 @@ part of 'trade_settings_notifier.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Manages trading preferences stored locally in SharedPreferences.
+/// Manages trading preferences.
+/// Non-sensitive fields stored in SharedPreferences; [confirmationMethod]
+/// stored in flutter_secure_storage to prevent tampering on rooted devices.
 
 @ProviderFor(TradeSettingsNotifier)
 final tradeSettingsProvider = TradeSettingsNotifierProvider._();
 
-/// Manages trading preferences stored locally in SharedPreferences.
+/// Manages trading preferences.
+/// Non-sensitive fields stored in SharedPreferences; [confirmationMethod]
+/// stored in flutter_secure_storage to prevent tampering on rooted devices.
 final class TradeSettingsNotifierProvider
     extends $AsyncNotifierProvider<TradeSettingsNotifier, TradeSettings> {
-  /// Manages trading preferences stored locally in SharedPreferences.
+  /// Manages trading preferences.
+  /// Non-sensitive fields stored in SharedPreferences; [confirmationMethod]
+  /// stored in flutter_secure_storage to prevent tampering on rooted devices.
   TradeSettingsNotifierProvider._()
     : super(
         from: null,
@@ -37,9 +43,11 @@ final class TradeSettingsNotifierProvider
 }
 
 String _$tradeSettingsNotifierHash() =>
-    r'd72aa408e0e96d002805d523ae07fa4fbb481fff';
+    r'e418d0af1037b8f9718d0a6119cba4d075151ab0';
 
-/// Manages trading preferences stored locally in SharedPreferences.
+/// Manages trading preferences.
+/// Non-sensitive fields stored in SharedPreferences; [confirmationMethod]
+/// stored in flutter_secure_storage to prevent tampering on rooted devices.
 
 abstract class _$TradeSettingsNotifier extends $AsyncNotifier<TradeSettings> {
   FutureOr<TradeSettings> build();

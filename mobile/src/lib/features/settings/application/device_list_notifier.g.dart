@@ -37,7 +37,7 @@ final class DeviceListNotifierProvider
 }
 
 String _$deviceListNotifierHash() =>
-    r'65975e09e6dd284c04568885c19e7b26bddfcd38';
+    r'0ab397e0fd4ac8e358078b69189d428f392b490e';
 
 /// Manages the list of bound devices and supports remote device revocation.
 

@@ -42,7 +42,7 @@ final class NotificationPreferencesNotifierProvider
 }
 
 String _$notificationPreferencesNotifierHash() =>
-    r'98b3b4f83c1fb1017e59e6335d4b369f2a7f5111';
+    r'21ec94e17ce7d53bcf9378babd0f57b680f02982';
 
 /// Manages user notification preferences (remote read/write).
 
