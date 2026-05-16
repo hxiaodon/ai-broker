@@ -28,8 +28,8 @@ status: ACTIVE
 
 # 出入金系统（Fund Transfer System）— Domain PRD
 
-> **版本**：v1.0
-> **日期**：2026-03-29
+> **版本**：v2.0（frontmatter rev: 2 对应本版本）
+> **日期**：2026-03-29（最后大版本），2026-05-16（审计修订，见 revisions）
 > **对应 Surface PRD**：[Mobile PRD-05：出入金模块](../../../mobile/docs/prd/05-funding.md)
 > **关联规则**：[`.claude/rules/fund-transfer-compliance.md`](../../.claude/rules/fund-transfer-compliance.md)
 

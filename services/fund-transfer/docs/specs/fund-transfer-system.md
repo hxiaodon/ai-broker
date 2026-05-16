@@ -377,7 +377,7 @@ Deployment:
 Resources:
   - CPU: 2 cores
   - Memory: 4Gi
-  - Storage: 100Gi (PostgreSQL)
+  - Storage: 100Gi (MySQL 8.0+)  # was mistakenly written as PostgreSQL; full stack uses MySQL
 
 Autoscaling:
   - Min: 3 replicas
