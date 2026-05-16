@@ -241,22 +241,24 @@ type AuthorizationReturnAction struct {
 
 ### 3.2 用户分层定义
 
+> ⚠️ **命名说明**:本节的"分层(Tier)"指 **ACH Instant Credit Tier (ICT)**,与 KYC tier 的 Basic/Standard/Enhanced/VIP **是两个独立维度**。ICT 是基于"账户历史 + 行为信用"的即时入金垫资风险层级,KYC tier 是基于"身份核验深度"的限额层级。两者交叉使用:`实际即时额度 = min(ICT_instant_limit, KYC_daily_limit)`。
+
 ```
-Tier 0: 新用户 (New User)
+ICT-0: 新用户 (New User)
   条件: 账户开立 < 30 天 OR 首次入金
   风险特征: 信息最少，Return 概率最高，欺诈风险最高
 
-Tier 1: 普通已验证用户 (Standard Verified)
-  条件: 账户开立 ≥ 30 天，完成 KYC Standard，银行账户通过微存款验证
+ICT-1: 普通已验证用户 (Standard Verified)
+  条件: 账户开立 ≥ 30 天，KYC ≥ Standard，银行账户通过微存款验证
   风险特征: 基础验证完成，历史短，需保守对待
 
-Tier 2: 信用良好老用户 (Established Good Standing)
+ICT-2: 信用良好老用户 (Established Good Standing)
   条件: 账户开立 ≥ 180 天，完成 ≥ 5 次成功入金，历史 0 次 Return，
         银行账户绑定 ≥ 90 天
   风险特征: 行为历史充分，违约概率低
 
-Tier 3: VIP 用户
-  条件: Enhanced KYC + 关系经理维护，或资产 AUM ≥ $100,000
+ICT-3: VIP 用户
+  条件: KYC = Enhanced/VIP + 关系经理维护，或资产 AUM ≥ $100,000
   风险特征: 经过深度 KYC，长期客户，信用最好
 ```
 
@@ -264,32 +266,33 @@ Tier 3: VIP 用户
 
 ```
 ┌─────────────────┬──────────────┬─────────────────┬───────────────┬────────────────────┐
-│ Tier             │ Instant Limit│ Wait Requirement│ Risk Window   │ Conditions         │
+│ ICT              │ Instant Limit│ Wait Requirement│ Risk Window   │ Conditions         │
 ├─────────────────┼──────────────┼─────────────────┼───────────────┼────────────────────┤
-│ Tier 0 (New)     │ $0           │ T+2 confirmed   │ N/A           │ 无即时额度         │
+│ ICT-0 (New)      │ $0           │ T+2 confirmed   │ N/A           │ 无即时额度         │
 │                  │              │ (保守策略)       │               │                    │
 ├─────────────────┼──────────────┼─────────────────┼───────────────┼────────────────────┤
-│ Tier 0 (New)     │ $500         │ T+0 即时        │ 60 日历日     │ Plaid Instant 验证 │
+│ ICT-0 (New)      │ $500         │ T+0 即时        │ 60 日历日     │ Plaid Instant 验证 │
 │ + Plaid Instant  │              │                 │               │ 通过后解锁         │
 ├─────────────────┼──────────────┼─────────────────┼───────────────┼────────────────────┤
-│ Tier 1 (Standard)│ $1,000       │ T+0 即时        │ T+2 标准窗口  │ 微存款验证通过     │
+│ ICT-1 (Standard) │ $1,000       │ T+0 即时        │ T+2 标准窗口  │ 微存款验证通过     │
 │                  │              │                 │               │ KYC Standard 完成  │
 ├─────────────────┼──────────────┼─────────────────┼───────────────┼────────────────────┤
-│ Tier 1           │ $2,500       │ T+0 即时        │ T+2 标准窗口  │ Plaid Instant 验证 │
+│ ICT-1            │ $2,500       │ T+0 即时        │ T+2 标准窗口  │ Plaid Instant 验证 │
 │ + Plaid Instant  │              │                 │               │                    │
 ├─────────────────┼──────────────┼─────────────────┼───────────────┼────────────────────┤
-│ Tier 2           │ $5,000       │ T+0 即时        │ T+2 标准窗口  │ 自动解锁（满足     │
-│ (Established)    │              │ (超额部分 T+2)  │               │ Tier 2 条件）      │
+│ ICT-2            │ $5,000       │ T+0 即时        │ T+2 标准窗口  │ 自动解锁（满足     │
+│ (Established)    │              │ (超额部分 T+2)  │               │ ICT-2 条件）       │
 ├─────────────────┼──────────────┼─────────────────┼───────────────┼────────────────────┤
-│ Tier 2           │ $10,000      │ T+0 即时        │ T+2 标准窗口  │ Plaid Instant 验证 │
+│ ICT-2            │ $10,000      │ T+0 即时        │ T+2 标准窗口  │ Plaid Instant 验证 │
 │ + Plaid Instant  │              │ (超额部分 T+1)  │               │                    │
 ├─────────────────┼──────────────┼─────────────────┼───────────────┼────────────────────┤
-│ Tier 3 (VIP)     │ Custom       │ T+0 即时        │ T+2 标准窗口  │ 关系经理审批       │
+│ ICT-3 (VIP)      │ Custom       │ T+0 即时        │ T+2 标准窗口  │ 关系经理审批       │
 │                  │ (≤ $50,000)  │ (全额)          │               │ 或资产门槛自动解锁 │
 └─────────────────┴──────────────┴─────────────────┴───────────────┴────────────────────┘
 ```
 
 **超额部分处理：** 入金金额超出即时额度的部分，进入标准等待流程，T+2 确认后再记账。
+**最终即时额度计算**:`actual_instant = min(ICT_instant_limit, AMS.KYC.deposit_daily_max - 当日已用)`。
 
 ### 3.4 即时额度动态调整规则
 
@@ -395,6 +398,14 @@ var adjustmentRules = []InstantLimitAdjustmentEvent{
 - Plaid 返回的 account/routing number 必须加密存储（AES-256-GCM）
 - access_token 视同银行凭证，独立加密列存储
 - Plaid OAuth 必须在券商自己的 OAuth 重定向域内完成（不可跨域转发）
+
+> **合规审批说明（免冷却期例外）**：Plaid Instant 验证通过后免除标准 3 天冷却期，此为**经合规团队审批的例外**，原因如下：
+> 1. Plaid Instant 通过 OAuth 直连银行系统，实时验证账户所有权（等效于 3 天微存款验证的风险控制目标）
+> 2. Plaid 提供实时余额 + 账户历史数据，风险识别能力优于微存款验证
+> 3. **仅豁免出金冷却期**；提现额度仍受 ICT 分层限制（ICT-0 上限 $500，ICT-1 上限 $2,500 等，见 §3.3）
+> 4. 如 Plaid 连接后 7 天内该账户发生 ACH Return，立即撤销 Instant 资格并回退到标准冷却期
+>
+> 合规团队需在年度合规审查中重新确认此例外是否继续适用。
 
 ### 4.3 微存款验证（Micro-deposit）标准流程
 
@@ -615,10 +626,12 @@ const (
 
 **宽限期政策（Grace Period）：**
 
+> ⚠️ **资金安全铁律**：一旦账户进入负余额(无论金额大小),**出金立即禁止**(`withdrawal_locked = true`)。此规则与 `failure-handling-matrix.md` §6.1 对齐,任何"小额放行"的例外都已废止——避免用户在 Return 后把剩余资金转出,加剧坏账损失。
+
 ```
 负余额金额 ≤ $500（小额负余额）:
   宽限期: 3 个营业日
-  期间: 限制开仓，允许平仓，不中断出金（以避免资金更进一步流失）
+  期间: 限制开仓，允许平仓，**禁止出金**
   到期处理: 若未恢复，强制从最流动仓位开始平仓
 
 $500 < 负余额 ≤ $5,000（中额）:
@@ -760,6 +773,49 @@ func CalcBuyingPower(b BalanceInfo) decimal.Decimal {
 
 // 注意: CalcBuyingPower > CalcWithdrawableBalance
 // 用户可以用即时额度买股票，但不能提现
+```
+
+**风险窗口期内出金套利防护（P1-12）**：
+
+风险窗口 `OPEN` 期间，`InstantCreditPending` 始终从可提现余额中扣除，不论用户账户总余额有多少。这防止了以下攻击路径：
+
+```
+攻击场景:
+  用户已结算余额 $20,000（真实资产）
+  通过 ACH Instant 入金 $1,000（即时额度，尚在风险窗口）
+  立即申请出金 $21,000
+
+CalcWithdrawableBalance:
+  SettledCash = $21,000（$20,000 原有 + $1,000 已入账）
+  InstantCreditPending = $1,000（风险窗口 OPEN）
+  可提现 = $21,000 - $1,000 = $20,000  ← 保护成功
+
+如果 ACH 在 T+60 前 Return:
+  系统扣回 $1,000 → 净余额仍为 $20,000（已出金的 $20,000 已走）
+  账户余额 = 0，无负余额风险
+```
+
+**多笔 ACH 并发的聚合计算**：
+
+同一账户可能有多笔 ACH 同时处于不同风险窗口状态；`InstantCreditPending` 为所有 OPEN 风险窗口的 `instant_amount_granted` 之和：
+
+```go
+func CalcInstantCreditPending(userID int64) decimal.Decimal {
+    // 查询该用户所有 ach_metadata.risk_window_status = 'OPEN' 的入金
+    rows := db.Query(`
+        SELECT JSON_UNQUOTE(JSON_EXTRACT(ach_metadata, '$.instant_amount_granted')) AS instant
+        FROM fund_transfers
+        WHERE user_id = ? AND type = 'DEPOSIT'
+          AND JSON_UNQUOTE(JSON_EXTRACT(ach_metadata, '$.risk_window_status')) = 'OPEN'
+    `, userID)
+    total := decimal.Zero
+    for rows.Next() {
+        var amt decimal.Decimal
+        rows.Scan(&amt)
+        total = total.Add(amt)
+    }
+    return total
+}
 ```
 
 **UI 层展示建议：**

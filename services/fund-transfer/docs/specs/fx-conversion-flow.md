@@ -26,7 +26,7 @@
 | 费用 | Spread 0.1%~0.3%，无出入金手续费 | 银行换汇 Spread 通常 0.3%~1%，叠加出入金手续费 |
 | 用户体验 | 无缝，直接在 App 内完成 | 操作繁琐，需要跨 App 操作 |
 | 资金安全 | 资金始终在平台托管账户内，无出金风险 | 出金过程存在银行通道风险 |
-| 监管处理 | 仅需记录换汇事件，无 AML 重新触发 | 出入金各需独立的 AML 筛查 |
+| 监管处理 | 仍需每笔重新做 AML 筛查(OFAC SDN/50% Rule/HK 指定人员,详见 §6.5);只是不触达银行渠道 | 出入金各需独立的 AML 筛查,叠加银行端合规 |
 
 结论：券商内部换汇对用户更优，对平台也节省了出入金通道成本，是首选路径。
 
@@ -311,7 +311,8 @@ CREATE TABLE fx_rate_snapshots (
     ├── 余额不足                  → 返回错误，事务回滚，无需补偿
     ├── MySQL 事务中途失败（回滚） → Redis Quote 重置为未使用，允许重试
     ├── MySQL 超时（状态未知）     → 见 §5.3
-    └── 系统崩溃（写 Ledger 后）  → Recovery Job 检测 PROCESSING 超时订单并修复
+    ├── 系统崩溃（写 Ledger 后）  → Recovery Job 检测 PROCESSING 超时订单并修复
+    └── 换汇成功但后续买单取消    → 见 §5.4（新增）
 ```
 
 ### 5.2 Saga 补偿操作
@@ -343,26 +344,60 @@ FX Service 发出 COMMIT → 网络超时 → 不知道是否成功
   4. 确认后推送最终通知
 ```
 
+### 5.4 换汇成功但后续买单取消（新场景）
+
+**场景描述**：用户换汇成功（USD → HKD）→ 下港股买单 → 买单因市场熔断/订单拒绝/用户撤单而取消。此时用户余额为 HKD，但原始意图是 USD，且换汇期间汇率可能已变动。
+
+**处理规则**：
+
+| 情况 | 系统行为 | 汇差归属 |
+|------|---------|---------|
+| 用户主动撤单 | **不自动反向换汇**；HKD 余额保留在账户 | 用户自行决定是否换回 USD；汇差由用户承担 |
+| 市场熔断/交易所拒绝 | **不自动反向换汇**；HKD 余额保留 | 用户可在 App 内手动发起反向换汇；汇差由用户承担 |
+| 平台系统错误导致买单失败 | **提供一次免费反向换汇通道**，有效期 24h，锁定原换汇汇率（损失由平台垫付） | 平台承担汇差；用户无损失 |
+
+**关键原则**：
+
+1. 换汇和证券交易是**两个独立合同**。换汇一旦执行完成，FX 合同已履行，不因买单结果自动撤销。
+2. 用户需在 App 换汇确认页看到明确风险提示："换汇后余额为 HKD，买单取消不自动换回，汇率风险由您承担。"
+3. 平台错误赔付需由 Risk 团队逐案审批，写入 `fx_compensation_records` 表，记录原 FX 订单、补偿汇率、差额金额，保留 7 年（SEC 17a-4）。
+
+**实现**：
+
+```go
+// 买单取消事件消费（来自 Trading Engine）
+func (s *FXService) OnOrderCancelled(ctx context.Context, event OrderCancelledEvent) error {
+    // 1. 查询该订单关联的 FX 换汇（通过 fx_order_id 关联字段）
+    // 2. 判断取消原因：PLATFORM_ERROR vs USER_ACTION/MARKET_HALT
+    // 3. 如为 PLATFORM_ERROR：创建补偿 FX 订单，以原汇率 + 当前即时报价的较优者执行
+    // 4. 非平台错误：写通知 + 推送用户"您的买单已取消，HKD 余额保留，如需换回请在 App 内操作"
+    return nil
+}
+```
+
 ---
 
-## 6. 风控规则
 
-### 6.1 单次换汇金额限制
+
+### 6.1 单次换汇金额限制(示例,SSOT = AMS)
 
 | KYC 等级 | 单次最大（USD 等值） |
 |----------|-------------------|
-| Basic | $5,000 |
-| Standard | $100,000 |
-| Enhanced | $1,000,000 |
-| VIP | 无上限（RM 确认） |
+| Basic | $2,000 |
+| Standard | $50,000 |
+| Enhanced | $500,000 |
+| VIP | 人工审核(合规专员) |
 
-### 6.2 单日累计换汇限额
+> 数值为参考,**实际限额以 AMS `GetAccountKYCTier(user_id)` 返回为准**。AMS 是 KYC 与限额的唯一权威来源,fund-transfer 不本地硬编码生产数值。
+
+### 6.2 单日累计换汇限额(示例)
 
 | KYC 等级 | 单日上限（USD 等值） | 重置时间 |
 |----------|-------------------|---------|
-| Basic | $5,000 | 00:00 UTC |
-| Standard | $200,000 | 00:00 UTC |
-| Enhanced | $2,000,000 | 00:00 UTC |
+| Basic | $2,000 | 00:00 UTC |
+| Standard | $50,000 | 00:00 UTC |
+| Enhanced | $500,000 | 00:00 UTC |
+| VIP | 人工审核 | — |
 
 ### 6.3 异常汇率检测
 
@@ -382,6 +417,57 @@ const (
 ### 6.4 新账户限制
 
 注册 < 7 天的账户：单笔上限 $2,000 USD 等值，日累计 $5,000 USD 等值。
+
+### 6.5 AML 筛查(强制,每次换汇都必须执行)
+
+> **修正说明**:此前版本曾标注"FX 不做 AML(入金时已筛查)",**已废止**。OFAC SDN 名单每周多次更新,Sectoral / Non-SDN / FSE / 50% Rule 命中可能在用户入金后才发生;且换汇本身是独立资金移动事件,符合 `.claude/rules/fund-transfer-compliance.md` Rule 2 "every fund movement event must pass AML screening" 强制范围。
+
+**执行时点**:`ExecuteConversion` 进入数据库事务**之前**,SLA = 3 秒同步阻塞。
+
+**筛查内容**:
+
+| 检查项 | 触发动作 |
+|--------|---------|
+| OFAC SDN / Sectoral / Non-SDN / FSE 实时查询 | 命中 BLOCK → 拒绝换汇,冻结账户,通知合规 |
+| OFAC 50% Rule UBO 追溯(法人账户) | 命中 BLOCK → 同上 |
+| HK 指定人员(港股账户) | 命中 BLOCK → 同上 |
+| Structuring 双窗口检测(同方向 USD→HKD 或 HKD→USD,跨渠道含入金、提现、换汇) | 命中 → SAR 候选,标记 REVIEW,不阻断(除非风险评分 HIGH);严禁通知用户 |
+| 频率异常(24h 内 ≥ 5 笔换汇 / 7d 内 ≥ 15 笔)| 标记 REVIEW,合规人工复核 |
+| Round-tripping 模式检测(入金 → 换汇 → 出金,无交易,24h 内闭环)| 高度可疑,生成 SAR 草稿 |
+
+**实现**:
+
+```go
+func (s *FXService) ExecuteConversion(ctx context.Context, order *FXOrder) error {
+    // Step 1: AML 同步筛查(在 DB 事务之外,失败直接返回不锁表)
+    amlResult, err := s.aml.ScreenFXOrder(ctx, AMLRequest{
+        UserID:        order.UserID,
+        FromCurrency:  order.FromCurrency,
+        ToCurrency:    order.ToCurrency,
+        AmountUSD:     order.NormalizedUSD,
+        Direction:     "FX_CONVERSION",
+        AggregateWith: []string{"DEPOSIT", "WITHDRAWAL", "FX_CONVERSION"},
+    })
+    if err != nil {
+        return fmt.Errorf("aml screen fx order %s: %w", order.FXOrderID, err)
+    }
+    switch amlResult.Status {
+    case AMLBlock:
+        // 写 AML_BLOCK 审计 + 冻结账户(异步)
+        return ErrAMLBlocked
+    case AMLReview:
+        // 不阻断,但记录 SAR 候选;继续执行
+        s.events.Emit(SARCandidateEvent{...})
+    case AMLError:
+        // 系统异常,不放行
+        return ErrAMLSystemUnavailable
+    }
+    // Step 2: 正常 DB 事务(原文逻辑)
+    return s.db.WithTx(ctx, func(tx *sqlx.Tx) error { /* ... */ })
+}
+```
+
+**审计要求**:每次换汇必须在 `aml_screening_log` 表留痕,字段包含 `fx_order_id`,保留 7 年(SEC 17a-4 / BSA)。
 
 ---
 
@@ -425,7 +511,7 @@ CREATE TABLE fx_orders (
 |------|---------------|-----------|
 | 资金流向 | 平台内外（银行 ↔ 托管账户） | 平台内（USD子账户 ↔ HKD子账户） |
 | 是否触达银行 | 是 | 否 |
-| AML 筛查 | 每笔必须 | 否（入金时已筛查） |
+| AML 筛查 | 每笔必须 | **每笔必须**(详见 §6.5) |
 | 结算周期 | T+1～T+3 | 实时 |
 | 锁价机制 | 无 | 是（30秒 TTL） |
 

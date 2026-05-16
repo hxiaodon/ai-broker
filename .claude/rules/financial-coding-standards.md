@@ -74,9 +74,11 @@ try {
 
 All state-changing API endpoints must be idempotent:
 - Accept an `Idempotency-Key` header (UUID v4)
-- Store the key + response for 24 hours
+- Store the key + response for **24 hours** (default minimum)
 - Return the cached response for duplicate requests
 - This prevents double-orders from network retries
+
+> **Domain override — Fund Transfer**: The fund-transfer service uses a **72-hour** idempotency cache (see `.claude/rules/fund-transfer-compliance.md` Rule 8). This is stricter than the 24-hour default due to ACH settlement windows and bank callback delays. When in doubt, prefer the longer window for money-movement operations.
 
 ## Rule 5: Audit Logging
 

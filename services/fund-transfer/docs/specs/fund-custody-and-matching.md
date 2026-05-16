@@ -229,6 +229,123 @@ CREATE TABLE suspense_funds (
 | 退款中 | 5 个工作日完成 | 升级到合规团队 |
 | 长期未处理（>30天） | 上报合规 | 可能需要 SAR 申报 |
 
+### 3.4 Wire / SWIFT 入金金额容忍策略
+
+> **问题背景（P1-5）**：跨境 Wire（SWIFT MT103）经过代理行时，中间行手续费从本金中扣取（Shared / OUR 费用模式差异），实际到账金额可能小于用户申请金额。若系统以 $0.01 为告警门槛，每笔 SWIFT 都将触发金额不匹配悬挂，导致运营量爆炸。
+
+**分渠道匹配策略**：
+
+| 渠道 | 金额容忍区间 | 处理方式 |
+|------|------------|---------|
+| **ACH**（美国） | 零容忍（ACH 金额精确，不扣手续费） | 差异 ≥ $0.01 → 悬挂，人工处理 |
+| **Wire**（美国 Fedwire） | 零容忍（Fedwire 金额精确传递） | 差异 ≥ $0.01 → 悬挂 |
+| **FPS / CHATS**（香港） | 零容忍 | 同上 |
+| **SWIFT**（国际，含跨境 Wire） | **容忍 `min($50, 申请金额×0.5%)`** | 在容忍区间内 → 按**实际到账金额**入账，差额记入 `wire_fee_absorbed` 字段，不触发悬挂；超出容忍 → 人工审核 |
+
+**SWIFT 容忍入账的账本处理**：
+
+```
+用户申请入金 $10,000（SWIFT，OUR 费用模式，但代理行额外扣 $25）
+实际到账 $9,975
+
+匹配策略:
+  差额 = $25 ≤ $50 → 在容忍范围内
+
+账本分录:
+  借：券商银行账户 (ASSET)          $9,975.00   ← 实际到账
+  借：wire_fee_absorbed (FEE 负项)  $25.00      ← 吸收的代理行手续费
+    贷：用户券商账户 (LIABILITY)      $9,975.00   ← 用户实际到账
+
+用户余额: $9,975（用户看到实际到账金额）
+通知: "您的 $10,000 入金已到账 $9,975，差额 $25 为中间行手续费，已自动处理。"
+```
+
+**运维要求**：
+- 每日汇总 `wire_fee_absorbed` 总金额，生成报表供财务审查
+- 月累计代理行费用 > $10,000 时触发告警，考虑切换费用模式（BEN → SHA/OUR）或银行对账谈判
+- 如实际到账金额 > 申请金额（用户多汇），差额作为临时 suspense 暂挂，运营确认后退回
+
+### 3.5 入金归属错误纠错流程（P1-15）
+
+**场景**：入金已被系统（自动）或运营（人工）匹配到用户 A，但事后发现应归属用户 B（常见原因：银行附言乱码、虚拟账号映射错误、运营人工误判）。
+
+**关键约束**：
+- 账本 append-only，不能修改或删除已有分录，**只能写冲销分录**
+- 若用户 A 已动用部分资金（买入/出金），追偿路径不同
+- 需完整审计追踪（SEC 17a-4 合规）
+
+**纠错流程**：
+
+```
+发现归属错误
+        │
+        ▼
+Step 1: 核实（合规官 + 运营双重确认）
+        - 确认原始银行对账单（MT940 / ACH 回单）
+        - 确认真实归属（用户 B 的身份 + 汇款证明）
+        - 记录错误原因：system_auto_mismatch / human_error / bank_memo_corruption
+        │
+        ▼
+Step 2: 查询用户 A 的当前余额 vs 错误入金金额
+        ├── 用户 A 余额 ≥ 错误金额（资金完整）→ Step 3a（全额冲销）
+        └── 用户 A 余额 < 错误金额（已动用部分）→ Step 3b（部分冲销 + 追偿）
+        │
+        ▼
+Step 3a（全额冲销）:
+        1. 写冲销分录：
+           借：用户A账户 (LIABILITY)    $X   ← 追回
+             贷：suspense_account      $X
+        2. 写重新入账分录：
+           借：suspense_account        $X
+             贷：用户B账户 (LIABILITY)  $X   ← 正确到账
+        3. 通知用户 A（"您账户中的 $X 已更正归属"）+ 用户 B（"您的入金 $X 已到账"）
+        4. 写 audit_log（event_type: DEPOSIT_REATTRIBUTION）
+        │
+        ▼
+Step 3b（部分冲销 + 追偿）:
+        1. 先冲销用户 A 剩余可用余额部分（同 Step 3a）
+        2. 对已动用部分：
+           - 如已用于买入（持仓中）→ 写 HOLD_PENDING_RECOVERY 分录冻结等值持仓
+             联系用户 A 补充资金或清算对应持仓
+           - 如已出金至银行 → 标记为 DEBT_RECOVERY_PENDING
+             合规 + 法务介入，必要时走司法追偿
+        3. 先行向用户 B 入账正确金额（平台临时垫付差额，记为 platform:receivables）
+        4. 追偿成功后还原 platform:receivables
+        5. 写完整 audit_log，保留 7 年
+
+**关键规则**：
+- 整个流程由合规官审批，Finance Ops 执行，不允许任何人单独操作
+- 用户 B 不应等待追偿结果，应尽快收到正确入账（平台垫付）
+- 若误匹配是系统 Bug 导致，触发严重事故处理流程，评估是否需要 SEC 报告
+```go
+// 归属纠错事务（伪代码）
+func ReattributeDeposit(ctx context.Context, transferID string, fromUserID, toUserID int64,
+    amount decimal.Decimal, reason string, approverID string) error {
+    return db.WithTx(ctx, func(tx *sqlx.Tx) error {
+        // 1. 冲销 fromUser 余额
+        if err := ledger.WriteEntry(tx, LedgerEntry{
+            EntryType:     "DEPOSIT_CLAWBACK",
+            DebitAccount:  fmt.Sprintf("user:%d:available", fromUserID),
+            CreditAccount: "platform:suspense:reattribution",
+            Amount:        amount, ApproverID: approverID,
+        }); err != nil { return err }
+        // 2. 重新入账 toUser
+        if err := ledger.WriteEntry(tx, LedgerEntry{
+            EntryType:     "DEPOSIT_REATTRIBUTED",
+            DebitAccount:  "platform:suspense:reattribution",
+            CreditAccount: fmt.Sprintf("user:%d:available", toUserID),
+            Amount:        amount, ApproverID: approverID,
+            Metadata:      map[string]string{"original_transfer_id": transferID, "reason": reason},
+        }); err != nil { return err }
+        // 3. 写 audit log（append-only）
+        return audit.Write(ctx, AuditEvent{
+            EventType: "DEPOSIT_REATTRIBUTION", ActorID: approverID,
+            Details: map[string]any{"from": fromUserID, "to": toUserID, "amount": amount, "reason": reason},
+        })
+    })
+}
+```
+
 ---
 
 ## 4. 与交易引擎的资金边界
@@ -312,6 +429,70 @@ RPC: FreezeForWithdrawal / UnfreezeForWithdrawal
   用途：提款审批期间冻结/解冻余额
   幂等键：withdrawal_id
 ```
+
+### 4.4 Settlement 事件丢失的自愈机制（P1-6）
+
+**问题**：如果 Kafka `trading.settlement.completed` 事件因分区重平衡、消费者重启、网络分区而丢失，对应的 `unsettled` 金额永远无法转入 `available`，用户资金将永久被锁定。
+
+**解决方案：周期性 Settlement Reconciliation Job**
+
+```go
+// 每小时运行一次（或每 30 分钟）
+func (j *SettlementReconciliationJob) Run(ctx context.Context) error {
+    now := time.Now().UTC()
+
+    // 查询所有 settlement_date 已过期但仍在 unsettled 状态的记录
+    rows, err := j.db.QueryContext(ctx, `
+        SELECT user_id, order_id, amount, currency, settlement_date, market
+        FROM unsettled_positions
+        WHERE status = 'UNSETTLED'
+          AND settlement_date < ?
+          AND created_at < DATE_SUB(?, INTERVAL 2 HOUR)  -- 给 Trading Engine 2h 正常结算窗口
+    `, now, now)
+    if err != nil {
+        return fmt.Errorf("query overdue unsettled: %w", err)
+    }
+    defer rows.Close()
+
+    for rows.Next() {
+        var pos UnsettledPosition
+        rows.Scan(&pos.UserID, &pos.OrderID, &pos.Amount, &pos.Currency,
+            &pos.SettlementDate, &pos.Market)
+
+        // 向 Trading Engine 发起确认查询（RPC: GetSettlementStatus）
+        status, err := j.tradingClient.GetSettlementStatus(ctx, pos.OrderID)
+        if err != nil {
+            // Trading Engine 不可用：跳过，下次重试；不要盲目释放
+            j.metrics.Inc("settlement_reconciliation.trading_engine_unavailable")
+            continue
+        }
+
+        switch status {
+        case SettlementConfirmed:
+            // Trading Engine 确认已结算，但 Kafka 事件丢失
+            j.processSettlement(ctx, pos, "KAFKA_EVENT_RECOVERED")
+        case SettlementPending:
+            // Trading Engine 说还没结算（可能 settlement_date 有延迟）
+            j.metrics.Inc("settlement_reconciliation.still_pending")
+            j.alerts.Warn(ctx, fmt.Sprintf("order %s overdue settlement_date %v", pos.OrderID, pos.SettlementDate))
+        case SettlementFailed:
+            // 结算失败（如对方违约）：走失败补偿流程
+            j.processSettlementFailure(ctx, pos)
+        }
+    }
+    return nil
+}
+```
+
+**对账触发条件**（双保险）：
+
+| 触发器 | 运行时间 | 说明 |
+|--------|---------|------|
+| 周期性 Job | 每 60 分钟 | 扫描所有过期 unsettled |
+| 主动 Kafka Consumer Restart | 重启后 backfill 历史消息 | 消费 committed offset 之前的 segment |
+| EOD 3-way 对账 | 每日 23:00 UTC | 如 unsettled 总额 + available ≠ custodian 余额，触发告警 + 人工核查 |
+
+**风险边界**：Job 仅在 Trading Engine 明确返回 `SettlementConfirmed` 时才自动释放资金；`Pending` 或 RPC 错误时保守等待，不盲目释放，避免提前给用户资金导致坏账。
 
 ---
 
@@ -462,7 +643,117 @@ Fund Transfer Service
 
 ---
 
-## 7. 遗留决策项（需产品/业务确认）
+---
+
+## 8. SEC Rule 15c3-3 — 客户保护规则与储备金计算
+
+> **法规**: SEC Rule 15c3-3(e), 17 CFR § 240.15c3-3  
+> **优先级**: P0 — Phase 1 上线前必须完成。MF Global 事件与 Robinhood 2020 年 $1,300 万罚款均源于此规则的违反。
+
+### 8.1 核心要求
+
+SEC 15c3-3 要求注册经纪商：
+
+1. **隔离客户资金**：客户资金不能混入券商自有资金（本文档 §1.1 已覆盖 Omnibus Account 结构）
+2. **建立 Special Reserve Bank Account (SRBA)**：独立银行账户，只存放"净客户信用余额"
+3. **每周执行储备金计算**：每个工作日结束后（通常周五 COB ET），计算应存入 SRBA 的金额
+4. **不足时立即补足**：如计算结果要求追加存款，必须在下一个工作日开盘前完成；不足超过 12 小时须通知 SEC
+
+### 8.2 储备金计算公式
+
+```
+储备金需求 = Credits - Debits
+
+Credits（应计入）:
+  + 客户自由信用余额（Free Credit Balances）= sum(account_balances.available) for all customers
+  + 客户应收未收的股息/利息
+  + 客户空头仓位产生的应付金额
+  + 其他应付给客户的金额
+
+Debits（可抵扣）:
+  - 客户账户内的应收保证金（Margin Receivables，如融资余额）
+  - 政府证券（Treasury Bills/Notes）：满足 SEC 认可的抵扣资产条件
+  - 银行借款（仅限于直接为客户融资的部分）
+  - 其他 SEC 15c3-3 附则 A 认可的抵扣项
+
+Net Reserve Required = max(0, Credits - Debits)
+```
+
+> **注意**：Credits 大于 Debits 时，差额必须存入 SRBA。Debits 大于 Credits（净借方）时，无需额外存款，但需说明原因。
+
+### 8.3 Fund-Transfer × Trading Engine 契约
+
+15c3-3 计算依赖精确的跨域数据，fund-transfer 和 trading-engine **必须约定以下接口**:
+
+| 数据项 | 提供方 | 接口 / 事件 | 说明 |
+|--------|--------|------------|------|
+| `account_balances.available` | Fund Transfer | DB 直接读 / `GetCustomerCreditBalances` gRPC | 所有用户可提现余额之和，按币种分组 |
+| `customer_margin_receivables` | Trading Engine | `GetMarginReceivables` gRPC | 客户融资余额（16c3-3 Debit 项） |
+| `unsettled_sell_proceeds` | Trading Engine | `GetUnsettledPositions` gRPC | T 日卖出未结算资金（Credits 项，已计算至当日） |
+| `customer_dividends_payable` | Trading Engine | `GetPendingDividends` gRPC | 应发未发的股息 |
+
+**数据查询时间点**：每个计算日（通常周五）COB ET（22:00 UTC），Trading Engine 提供快照；Fund Transfer 运行计算，结果写入 `reserve_computations` 表。
+
+### 8.4 Special Reserve Bank Account (SRBA) 操作流程
+
+```
+每周五 COB ET（22:00 UTC）
+        │
+        ▼
+  运行储备金计算脚本（见 §8.2 公式）
+        │
+        ├── Net ≤ 当前 SRBA 余额 → 无需操作
+        │
+        └── Net > 当前 SRBA 余额（差额 = D）
+                │
+                ▼
+        在下一工作日开盘前（09:00 ET = 13:00 UTC）
+        从公司运营账户 → SRBA 转入 D（内部账户间转账，非用户出入金）
+                │
+                ▼
+        若 09:30 ET 开盘时 SRBA 仍不足：
+        → 立即通知 CFO + 合规官
+        → 超过 12 小时不足 → 通知 SEC 区域办公室（电话 + 书面）
+```
+
+### 8.5 数据库表设计
+
+```sql
+CREATE TABLE reserve_computations (
+    id                  BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    computation_date    DATE NOT NULL UNIQUE,          -- 计算基准日（通常周五）
+    total_credits_usd   DECIMAL(20, 2) NOT NULL,       -- 客户信用余额总和
+    total_debits_usd    DECIMAL(20, 2) NOT NULL,       -- 可抵扣项总和
+    net_required_usd    DECIMAL(20, 2) NOT NULL,       -- max(0, credits - debits)
+    srba_balance_usd    DECIMAL(20, 2) NOT NULL,       -- 计算时 SRBA 实际余额
+    shortfall_usd       DECIMAL(20, 2) NOT NULL,       -- max(0, net_required - srba_balance)
+    status              ENUM('COMPUTED','FUNDED','REPORTED_SEC') NOT NULL DEFAULT 'COMPUTED',
+    funded_at           TIMESTAMP NULL,                -- SRBA 补足时间
+    notes               TEXT,
+    created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_computation_date (computation_date),
+    INDEX idx_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+```
+
+### 8.6 合规责任分配
+
+| 职责 | 负责人 |
+|------|--------|
+| 每周储备金计算执行 | Fund Transfer 系统自动运行（定时任务，周五 22:00 UTC） |
+| 计算结果审核 | CFO 或指定财务主管（次工作日 09:00 ET 前签署） |
+| SRBA 划转执行 | Finance Ops（在系统触发告警后手动执行银行转账） |
+| SEC 通知 | Chief Compliance Officer（如 12h 仍不足时） |
+| 年度合规认证 | Compliance Officer + external auditor（FINRA FOCUS Report） |
+
+### 8.7 HK 对应要求
+
+香港 SFC 《持牌法团持有客户资产规定》（CIS 条例）要求类似隔离，但计算周期为**每月**（月末最后工作日）：
+- 客户资金隔离账户 ≠ 公司资金
+- 如托管行为恒生/中银，需签订独立的"客户资金保管协议"
+- Fund Transfer 需分别维护 USD SRBA 和 HKD 客户账户，并定期与 SFC 申报
+
+
 
 在实现前，以下问题需要明确：
 

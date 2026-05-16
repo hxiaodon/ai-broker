@@ -54,6 +54,18 @@ enum TransferStatus {
   TRANSFER_STATUS_COMPLETED = 9;
   TRANSFER_STATUS_FAILED = 10;
   TRANSFER_STATUS_REJECTED = 11;
+  // --- Compliance / AML states ---
+  TRANSFER_STATUS_BLOCKED_AML = 12;          // Hard OFAC/AMLO block; account frozen
+  TRANSFER_STATUS_REVIEW_AML = 13;           // AML returned REVIEW; pending compliance officer
+  // --- Bank channel states ---
+  TRANSFER_STATUS_PENDING_BANK_CONFIRM = 14; // Sent to bank; awaiting settlement confirmation
+  TRANSFER_STATUS_RETURN_IN_PROGRESS = 15;   // Bank initiated return (ACH R-code received)
+  TRANSFER_STATUS_RETURNED = 16;             // ACH/Wire return fully processed; balance reversed
+  // --- Reversal / correction states ---
+  TRANSFER_STATUS_REVERSAL_PENDING = 17;     // Compensating transaction queued but not executed
+  TRANSFER_STATUS_REVERSED = 18;             // Ledger fully reversed; net balance restored
+  // --- Holiday / scheduling states ---
+  TRANSFER_STATUS_QUEUED_HOLIDAY = 19;       // Request accepted but queued until next banking day
 }
 
 // Bank channel

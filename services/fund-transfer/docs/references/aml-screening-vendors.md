@@ -7,28 +7,45 @@
 
 ---
 
+## 0. 强制能力清单(选型一票否决项)
+
+任何阶段的供应商组合**必须**满足以下全部能力,否则不可用于生产:
+
+| 能力 | 说明 | 法规依据 |
+|------|------|----------|
+| **OFAC 50% Rule / UBO 追溯** | 支持查询实体的 Ultimate Beneficial Owner,至少追溯 2 层股权,识别"被 SDN 持股 ≥ 50% 即视同 SDN"的间接命中 | OFAC Sanctions Compliance Guidance 2019 §III.A |
+| **OFAC SDN + Non-SDN + Sectoral + FSE** | 全列表覆盖,不可只筛 SDN | OFAC 制裁条例 |
+| **HK 指定人员 / AMLO Schedule 2** | 港股业务必须 | AMLO Cap. 615 |
+| **每日刷新** | T-1 06:00 UTC 之前完成名单同步 | OFAC 实操要求 |
+| **模糊匹配 + 转写** | 中文姓名、连字符、缩写、音译 | 实务必备 |
+| **审计日志可导出** | 每次筛查留痕 7 年,可应 SEC/SFC 调取 | SEC 17a-4 / SFO |
+
+**moov-io/watchman 开源版当前不原生支持 50% Rule UBO 追溯**,因此 watchman 单独使用**只能覆盖 Phase 1 MVP 的部分场景**(用于实时低延迟初筛),**生产环境必须叠加商业 SaaS** 完成 UBO + PEP + 不良媒体三项能力。
+
+---
+
 ## 1. 方案选型矩阵
 
-| 方案 | 类型 | OFAC/UN/EU | PEP 数据库 | 不良媒体监控 | 成本 | 推荐阶段 |
-|------|------|-----------|------------|------------|------|---------|
-| **moov-io/watchman** | 开源自托管 | ✅ | ❌ | ❌ | 免费 | 早期 / MVP |
-| **ComplyAdvantage** | 商业 SaaS | ✅ | ✅ | ✅ | $1,000+/月 | 规模化 |
-| **LexisNexis WorldCompliance** | 商业 SaaS | ✅ | ✅（最全） | ✅ | 协商 | 企业级 |
-| **Refinitiv World-Check** | 商业 SaaS | ✅ | ✅ | ✅ | 协商 | 大型机构 |
-| **Dow Jones Risk & Compliance** | 商业 SaaS | ✅ | ✅ | ✅ | 协商 | 企业级 |
+| 方案 | 类型 | OFAC/UN/EU | **UBO 50%** | PEP 数据库 | 不良媒体监控 | 成本 | 推荐阶段 |
+|------|------|-----------|-------------|------------|------------|------|---------|
+| **moov-io/watchman** | 开源自托管 | ✅ | ❌ | ❌ | ❌ | 免费 | 仅初筛(必须叠加 SaaS) |
+| **ComplyAdvantage** | 商业 SaaS | ✅ | ✅ | ✅ | ✅ | $1,000+/月 | 规模化 |
+| **LexisNexis WorldCompliance** | 商业 SaaS | ✅ | ✅ | ✅（最全） | ✅ | 协商 | 企业级 |
+| **Refinitiv World-Check** | 商业 SaaS | ✅ | ✅(行业基准) | ✅ | ✅ | 协商 | 大型机构 |
+| **Dow Jones Risk & Compliance** | 商业 SaaS | ✅ | ✅ | ✅ | ✅ | 协商 | 企业级 |
 
 **推荐演进路径**：
 
 ```
-阶段 1（早期）：moov-io/watchman 自托管
-  → 零成本，覆盖 OFAC/UN/EU/UK，满足基础合规要求
+阶段 1(MVP):  watchman 自托管(初筛)+ ComplyAdvantage(UBO + PEP 补强)
+              → watchman 处理高并发名单匹配,SaaS 处理 50% Rule / PEP / 不良媒体
+              → 任一返回 BLOCK 即视同 BLOCK,两路独立审计
 
-阶段 2（规模化后）：moov-io/watchman + ComplyAdvantage
-  → watchman 继续处理制裁名单（低延迟）
-  → ComplyAdvantage 补充 PEP 筛查 + 媒体监控（Enhanced Due Diligence）
+阶段 2(规模化): ComplyAdvantage 全量接管,watchman 退役或仅作灾备
+              → 统一审计日志,减少双源数据同步成本
 
-阶段 3（机构化）：按监管要求全面升级
-  → LexisNexis 或 Refinitiv（监管审计认可度更高）
+阶段 3(机构化): LexisNexis 或 Refinitiv(监管审计认可度更高)
+              → 替换 ComplyAdvantage,签订 BAA / 数据驻留协议
 ```
 
 ---

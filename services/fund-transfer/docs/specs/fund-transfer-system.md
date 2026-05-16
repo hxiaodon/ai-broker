@@ -142,10 +142,10 @@ Bank Confirmation → Ledger Update → Notification
 2. 检查可用余额（已结算资金）
 3. 检查是否有未结算交易（US T+1, HK T+2）
 4. 合规检查（AML、Travel Rule、同名账户）
-5. 审批流程（自动审批/人工审核/合规专员，详见 Domain PRD）
-   - 自动审批：金额 ≤ 日限额 + 无 AML 标记 + 低风险评分
-   - 人工审核：金额 > $50,000 USD 或其他条件（1 工作日）
-   - 合规专员：金额 > $200,000 USD 或 SAR 触发（1-2 工作日）
+5. 审批流程（自动审批/人工审核/合规专员，SSOT 见 Domain PRD §2.4）
+   - 自动审批：需同时满足**全部 5 条件**:金额≤日限额 + 银行卡绑定>3天 + 无AML标记 + 风险评分LOW + 有历史出金记录
+   - 人工审核：满足任意一条触发条件（金额>$50K、AML_REVIEW、新账户<30天等）
+   - 合规专员：金额 ≥ $200,000 USD 或 SAR 触发（SSOT 见 compliance Rule 5）
 6. 发起银行转账
 7. 等待银行确认
 8. 更新分类账和余额
@@ -164,7 +164,7 @@ CONFIRMED → LEDGER_UPDATED → COMPLETED
 | 通道 | 市场 | 到账时间 | 费用 | 限额 |
 |------|------|----------|------|------|
 | ACH | US | T+1～T+3（Standard）/ 当日（Same Day ACH） | $0-3 | $250K/day |
-| Wire | US | 当日 | $15-30 | $1M/day |
+| Wire | US | 当日 | **$25**（以银行协议为准） | $1M/day |
 | FPS | HK | 实时 | HK$0-5 | HK$1M/day |
 | CHATS | HK | 当日 | HK$10-50 | HK$10M/day |
 | SWIFT | 国际 | 3-5 工作日 | $30-50 | $1M/day |
@@ -178,20 +178,24 @@ CONFIRMED → LEDGER_UPDATED → COMPLETED
 **AML 筛查**
 - OFAC SDN List（美国出口管制）
 - OFAC Sectoral Sanctions（行业制裁）
-- SFC Designated Persons List（香港金融管理局指定人员，Phase 2）
-- AMLO Part 4A Designated Entities（香港反洗钱条例，Phase 2）
+- OFAC Non-SDN + 50% Rule UBO 追溯（Phase 1，见 compliance Rule 2）
+- SFC Designated Persons List + AMLO Part 4A（**Phase 2，HK 市场上线时**）
 - 实时 API 调用或本地缓存（每日更新）
 
 **Travel Rule**
 - 单笔 >$3,000 需记录受益人信息
 - 跨境转账需向监管机构报告
 
-**KYC 额度限制**
-| 等级 | 单笔限额 | 日限额 | 月限额 |
-|------|----------|--------|--------|
-| Tier 1 | $5K | $10K | $50K |
-| Tier 2 | $50K | $100K | $500K |
-| Tier 3 | $500K | $1M | $10M |
+**KYC 额度限制**(示例,SSOT = AMS)
+
+| 等级 | 入金单笔/日 | 入金月限 | 出金单笔/日 | 出金月限 |
+|------|------------|---------|------------|---------|
+| Basic | $2K | $10K | $1K | $5K |
+| Standard | $50K | $200K | $25K | $100K |
+| Enhanced | $500K | $2M | $250K | $1M |
+| VIP | 无固定上限 | 无固定上限 | 无固定上限 | 无固定上限 |
+
+> 数值仅供参考,**生产值以 AMS `GetAccountKYCTier` 返回为准**。完整 SSOT 定义见 `docs/prd/fund-transfer-system.md` §2.5。
 
 > **📝 NOTE**: 出金审批阈值已更新对齐 Domain PRD。人工审核 > $50K，合规专员 > $200K。
 > 详见 [Domain PRD § 2.4](../prd/fund-transfer-system.md#24-出金审批规则) 和
@@ -225,7 +229,8 @@ CONFIRMED → LEDGER_UPDATED → COMPLETED
 - 不匹配立即告警（Slack/PagerDuty）
 
 **EOD 批量对账**
-- 每日 23:00 UTC 运行
+- 每日 **23:00 UTC 启动**，完成时限 **01:00 UTC 次日**（2 小时窗口）
+- 如 01:00 UTC 仍未完成，触发 PagerDuty 告警并通知值班工程师
 - 生成对账报告（CSV/PDF）
 - 自动标记异常交易
 
@@ -239,12 +244,35 @@ CONFIRMED → LEDGER_UPDATED → COMPLETED
 **账户类型**
 ```go
 const (
-    AccountTypeAsset      = "ASSET"       // 资产（券商账户）
+    AccountTypeAsset      = "ASSET"       // 资产（券商托管银行账户）
     AccountTypeLiability  = "LIABILITY"   // 负债（用户账户）
-    AccountTypeBank       = "BANK"        // 银行账户
-    AccountTypeFee        = "FEE"         // 手续费收入
+    AccountTypeBank       = "BANK"        // 外部银行账户（入出金通道）
+    AccountTypeFee        = "FEE"         // 手续费/佣金收入
+    AccountTypeFXPool     = "FX_POOL"     // 平台换汇中间账户（USD/HKD 各一个）
+    AccountTypeSRBA       = "SRBA"        // SEC 15c3-3 Special Reserve Bank Account
 )
 ```
+
+**FX_POOL 账户说明**:
+
+`platform:fx_pool:usd` 和 `platform:fx_pool:hkd` 是换汇操作的中转账户，不是真实银行账户，而是内部虚拟账户。每笔换汇产生 3 条 ledger 分录（见 `fx-conversion-flow.md §4.1`）：FX_DEBIT 借记 FX_POOL，FX_CREDIT 贷记用户，FX_SPREAD_INCOME 结转 Spread 收入。
+
+**FX_POOL EOD 不变量**（每日 23:00 UTC 对账时强制验证）：
+
+```sql
+-- USD FX Pool 应为零（所有换汇已结算）
+SELECT
+    SUM(CASE WHEN debit_account  LIKE 'platform:fx_pool:usd%' THEN amount ELSE 0 END) -
+    SUM(CASE WHEN credit_account LIKE 'platform:fx_pool:usd%' THEN amount ELSE 0 END) AS fx_pool_usd_net
+FROM ledger_entries
+WHERE currency = 'USD' AND entry_type IN ('FX_DEBIT','FX_CREDIT','FX_SPREAD_INCOME')
+  AND DATE(created_at) = CURDATE();
+-- 结果必须 = 0；差异 > $0.01 自动告警
+
+-- HKD FX Pool 同理
+```
+
+实现要点：FX_POOL 账户的余额在 `account_balances` 表中必须有独立行（`account_type = 'FX_POOL'`），且参与 3-way 对账。若不追踪此账户，EOD Sum Invariant 无法验证。
 
 **入金分录**
 ```
@@ -257,6 +285,18 @@ const (
 借：用户券商账户 (LIABILITY)  $10,000
 借：手续费收入 (FEE)          $25
   贷：券商银行账户 (ASSET)     $10,025
+```
+
+**FX 换汇分录（完整示例见 fx-conversion-flow.md §4.1）**
+```
+借：user:{id}:usd:available  (LIABILITY) $1,000
+  贷：platform:fx_pool:usd   (FX_POOL)   $1,000
+
+借：platform:fx_pool:hkd     (FX_POOL)   $7,764.40
+  贷：user:{id}:hkd:available (LIABILITY) $7,764.40
+
+借：platform:fx_pool:hkd     (FX_POOL)   $15.60
+  贷：platform:income:fx_spread (FEE)     $15.60
 ```
 
 ## 10. 数据库设计

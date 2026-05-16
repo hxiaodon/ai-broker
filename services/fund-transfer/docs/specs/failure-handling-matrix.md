@@ -553,34 +553,76 @@ const (
     CTRThresholdHKD = decimal.NewFromFloat(120000)
 )
 
+// FinCEN: "in excess of $10,000" — 严格大于,$10,000 整数不触发
 func CheckCTRRequired(amount decimal.Decimal, currency string) bool {
     switch currency {
     case "USD":
-        return amount.GreaterThanOrEqual(CTRThresholdUSD)
+        return amount.GreaterThan(CTRThresholdUSD)
     case "HKD":
-        return amount.GreaterThanOrEqual(CTRThresholdHKD)
+        return amount.GreaterThan(CTRThresholdHKD)
     }
     return false
 }
 ```
 
-**Structuring Detection（拆单检测）：**
+**Structuring Detection(拆单检测,双窗口)：**
+
+SSOT 在 `.claude/rules/fund-transfer-compliance.md` Rule 2;实现层面任一窗口命中即触发,**严禁通知用户(Tipping-off)**:
 
 ```
-过去 24 小时内，同一用户的入金/出金记录：
-条件：sum(amounts) >= CTR_threshold AND 单笔均 < CTR_threshold
-      AND count >= 3
+窗口 A — 24h 滑动:
+  count >= 3 AND 每笔 < CTR_threshold AND sum >= $8,000 USD (HK$96,000)
 
-触发：
-1. 标记所有关联 transfers 为 STRUCTURING_SUSPECTED
-2. 阻断当前操作，升级合规官
-3. 生成 SAR 草稿
-4. 关联的历史成功交易也纳入 SAR 评估范围
+窗口 B — 7d 滚动(FinCEN 标准):
+  count >= 3 AND 每笔 < CTR_threshold AND sum >= CTR_threshold
+
+聚合维度: 同用户 + 同方向 + 同币种 + 跨渠道(ACH/Wire/FX-funded) + 跨账户(同 SSN/HKID)
+
+任一命中触发:
+1. 当前 transfer 标记 AML_STATUS = REVIEW (不阻断,除非风险评分 HIGH)
+2. 关联历史成功交易纳入 SAR 评估范围
+3. 生成 SAR 草稿 → 合规官 30 日内决定是否申报(31 CFR 1023.320)
+4. 用户通信使用脱敏话术,不得透露任何 AML/SAR/CTR 字眼
+5. 如同时触发 CTR(单笔/累计 > 阈值),CTR 独立流程照常申报,但两份日志不交叉
 ```
 
----
+**账户 AML_FROZEN 状态下的资金流处置规则**：
 
-### C2. 入金时余额写入异常（幂等冲突）
+> **场景补充**：账户被冻结（`account_status = AML_FROZEN`）后，资金并不静止——可能有已 PENDING 的出金、到账的 ACH、Trading Engine 推送的 settlement 事件。以下规则明确各类资金的处置路径。
+
+| 资金事件 | 处置规则 | 账本动作 |
+|---------|---------|---------|
+| **已 PENDING 的出金**（冻结发生时已在 APPROVAL 或 BANK_PROCESSING 状态） | 立即终止流程，状态 → `REJECTED`（原因: `ACCOUNT_FROZEN`）；释放 `frozen_withdrawal`，写 `HOLD_RELEASE` 分录 | `HOLD_RELEASE` 分录恢复可用余额 |
+| **正在银行通道中的出金**（已发出，等 bank confirm）| **不可撤回**：银行已处理的转账无法追回；标记 `PENDING_COMPLIANCE_REVIEW`；合规官处理后决定是否启动 Wire Recall | 暂不写 Ledger；待合规官决定后补写 |
+| **到账的 ACH 入金**（银行回调触发）| 金额入账到用户余额，账本正常写入 `DEPOSIT_CREDITED`；但用户无法使用（`account_status = AML_FROZEN` 限制所有出金/交易） | 正常 DEPOSIT 分录；余额增加但被冻结 |
+| **到账的 Wire 入金** | 同上；额外触发告警通知合规官（大额资金流入被冻结账户需重点审查） | 正常 DEPOSIT 分录 + 合规告警 |
+| **Trading Engine settlement 事件**（T+1/T+2 结算） | 正常写 Ledger，将 unsettled → available；用户仍无法提现但余额数字准确（对账不能停） | 正常 SETTLEMENT 分录 |
+| **股息/利息入账** | 正常入账到余额；冻结期间不发放（改为 pending，解冻后批量发放） | 写 `DIVIDEND_HELD` 暂挂分录 |
+
+**解冻操作**：合规官解除冻结（`account_status → ACTIVE`）后：
+1. 所有 `DIVIDEND_HELD` 分录批量转为 `DIVIDEND_CREDITED`
+2. 用户收到解冻通知，可正常操作
+3. 若决定永久封户（违规确认），所有余额进入清退流程（见 PRD §十四 账户注销）
+
+```go
+// 账户冻结时出金终止逻辑
+func (s *WithdrawalService) OnAccountFrozen(ctx context.Context, userID int64) error {
+    // 查询该用户所有 PENDING / COMPLIANCE_CHECK / APPROVAL 状态的出金
+    pendingWithdrawals, _ := s.repo.ListActiveWithdrawals(ctx, userID)
+    for _, w := range pendingWithdrawals {
+        if w.Status == StatusBankProcessing {
+            // 已发往银行：标记 PENDING_COMPLIANCE_REVIEW，人工处理
+            s.repo.UpdateStatus(ctx, w.ID, StatusPendingComplianceReview)
+            s.alerts.NotifyCompliance(ctx, "withdrawal_in_transit_account_frozen", w)
+            continue
+        }
+        // 其他早期状态：直接拒绝并释放冻结余额
+        s.repo.UpdateStatus(ctx, w.ID, StatusRejected, "ACCOUNT_FROZEN")
+        s.ledger.WriteHoldRelease(ctx, userID, w.Amount, w.Currency, w.ID)
+    }
+    return nil
+}
+```
 
 **场景：** 银行回调触发余额入账，但 DB 写入失败，银行再次重发回调。
 
