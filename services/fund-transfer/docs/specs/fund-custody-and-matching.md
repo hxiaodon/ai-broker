@@ -430,6 +430,41 @@ RPC: FreezeForWithdrawal / UnfreezeForWithdrawal
   幂等键：withdrawal_id
 ```
 
+### 4.5 入金到账后可交易时机的跨域契约（P3-5）
+
+**问题**：PRD §2.2 说"银行确认到账后立即可用于交易"，但 Trading Engine 何时感知到资金、盘前盘后是否影响这个"立即"，文档未明确。
+
+**明确规则**：
+
+| 场景 | 资金何时可用于交易 | 说明 |
+|------|-----------------|------|
+| **ACH 标准入金**（T+2 到账） | 银行回调触发 → Fund Transfer 写账 → **立即**推送 Kafka 事件 → Trading Engine 可用 | 不受市场时段限制 |
+| **ACH 即时入金**（Instant Credit） | 用户提交申请后 → **立即**按 ICT 层级授信额度可用于买入 | 即时额度可买入，但不可提现（见 ach-risk §6.2） |
+| **Wire 当日到账** | 银行 RTGS 确认 → **立即**可用 | Fedwire 17:00 ET 前到账当日生效 |
+| **盘前时段入金**（美股 04:00–09:30 ET） | 同上，**立即**写账 + 事件推送 | Trading Engine 接受盘前订单时资金已可用 |
+| **盘后/非交易时段入金** | 同上，**立即**写账 | 下个交易时段开盘即可下单 |
+
+**跨域事件契约**（Fund Transfer → Trading Engine 推送）：
+
+```json
+// Topic: fund.balance.updated
+{
+  "event_type": "BALANCE_UPDATED",
+  "user_id": 789456,
+  "currency": "USD",
+  "delta": "10000.00",
+  "new_available": "15000.00",
+  "new_buying_power": "15000.00",
+  "source": "DEPOSIT_CONFIRMED",
+  "transfer_id": "txfr-abc123",
+  "effective_at": "2026-05-16T14:30:00.000Z"
+}
+```
+
+Trading Engine 必须订阅此事件并在收到后 **< 100ms** 内更新本地 buying power 缓存，不得依赖轮询 `GetWithdrawableBalance` RPC 感知入金。
+
+**UI 契约**：Mobile 展示的"可用资金"反映实时余额（含刚到账入金），不论当前是否在交易时段。余额充足但市场未开盘时，提示"当前非交易时段，可在盘前 04:00 ET 开始下单"，而非误导性的"余额不足"。
+
 ### 4.4 Settlement 事件丢失的自愈机制（P1-6）
 
 **问题**：如果 Kafka `trading.settlement.completed` 事件因分区重平衡、消费者重启、网络分区而丢失，对应的 `unsettled` 金额永远无法转入 `available`，用户资金将永久被锁定。

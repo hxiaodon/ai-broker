@@ -190,8 +190,32 @@ message InitiateWithdrawalResponse {
 message ApproveWithdrawalRequest {
   string transfer_id = 1;
   string approver_id = 2;
-  bool approved = 3;
-  string reason = 4;
+
+  // Approval action — replaces the old bool `approved` to support multi-step flows
+  enum Action {
+    ACTION_UNSPECIFIED = 0;
+    ACTION_APPROVE     = 1;  // Approver signs off; if L2, second approver still required
+    ACTION_REJECT      = 2;  // Hard rejection; releases frozen_withdrawal immediately
+    ACTION_REQUEST_INFO = 3; // Pause pending user/ops info; does NOT reject
+  }
+  Action action = 3;
+
+  string reason = 4;  // Required for REJECT and REQUEST_INFO
+
+  // Multi-level approval fields (P3-3)
+  enum ApprovalLevel {
+    APPROVAL_LEVEL_UNSPECIFIED = 0;
+    APPROVAL_LEVEL_L1 = 1;  // Single approver (compliance analyst)
+    APPROVAL_LEVEL_L2 = 2;  // First of two required approvers
+    APPROVAL_LEVEL_L3 = 3;  // Final approver for L2, or CCO for L3 cases
+  }
+  ApprovalLevel approval_level = 5;
+
+  // Sequence position for L2 dual-approver flow:
+  //   sequence = 1 → first approver (L2 analyst); system holds for second
+  //   sequence = 2 → second approver (L2 supervisor); triggers execution if approved
+  // For L1/L3 single-approver flows, leave at 0 (ignored).
+  int32 approver_sequence = 6;
 }
 
 message ApproveWithdrawalResponse {
@@ -226,6 +250,7 @@ message AddBankAccountRequest {
   string swift_code = 5;
   string bank_name = 6;
   Currency currency = 7;
+  string idempotency_key = 8;  // UUID v4, required — compliance Rule 8 (72h cache)
 }
 
 message AddBankAccountResponse {

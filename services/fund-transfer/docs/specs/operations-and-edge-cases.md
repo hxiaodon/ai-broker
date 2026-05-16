@@ -108,6 +108,39 @@ CANCELLED
 
 节假日排队期间，用户可以取消请求（出金为主；入金一旦银行已受理则不可取消）。
 
+**QUEUED_HOLIDAY 节后重新处理规则（P3-2）**
+
+节后第一个工作日 00:00 UTC 唤醒 QUEUED_HOLIDAY 请求时，**必须重新执行以下校验**，不能直接沿用排队前的结果：
+
+| 校验项 | 是否重新执行 | 原因 |
+|--------|------------|------|
+| **AML 筛查** | ✅ **必须** | OFAC/AMLO 名单每周更新多次，排队期间（最长 3 天）用户或对手方可能新上黑名单 |
+| 余额充足性 | ✅ 必须 | 排队期间用户可能有其他出金导致余额不足 |
+| 限额剩余 | ✅ 必须 | 节后第一天是新的限额重置日 |
+| 银行卡冷却期 | ✅ 必须 | 绑卡天数变化，可能已进入允许区间 |
+| KYC Tier 限额 | ✅ 必须 | Tier 可能在排队期间升级或降级 |
+| 审批条件 | ✅ 重新评估 | 排队期间自动审批条件可能已变化 |
+
+```go
+func (s *TransferService) ResumeQueuedHolidayTransfers(ctx context.Context) error {
+    queued, _ := s.repo.ListByStatus(ctx, TransferStatusQueuedHoliday)
+    for _, t := range queued {
+        // 重新走完整校验流水线，不走快速通道
+        if err := s.pipeline.Revalidate(ctx, t, RevalidateOptions{
+            SkipIdempotencyCheck: true, // 已有幂等键，跳过重复检测
+            ForceAMLRescreen:     true, // 强制 AML 重筛，即使距上次 < 24h
+        }); err != nil {
+            // 校验失败（如新上 AML 黑名单）：拒绝 + 释放 frozen_withdrawal + 通知合规
+            s.repo.UpdateStatus(ctx, t.ID, StatusRejected, err.Error())
+            s.notify.ComplianceAlert(ctx, t, "holiday_queued_transfer_rejected_on_resume")
+            continue
+        }
+        s.repo.UpdateStatus(ctx, t.ID, StatusPending) // 重新进入正常流水线
+    }
+    return nil
+}
+```
+
 ### 1.4 跨时区"工作日"定义
 
 **系统统一使用 UTC 存储和比较时间，但 ACH 截止时间以美国东部时间（ET）为基准。**
@@ -250,6 +283,39 @@ type LimitConfig struct {
 
 实际展示的本地时间需在 Mobile 端转换，API 只返回 UTC 时间戳。
 
+### 2.2.1 跨时区"日"定义与 ACH cutoff 的交叉（P3-1）
+
+**问题**：限额"日"按 UTC 00:00 重置，但 ACH 提交窗口按 ET 计算。这导致两个不同维度的"当日"定义，对 HK 用户（UTC+8）尤其明显。
+
+**规则明确**：
+
+| 维度 | 使用的时区 | 说明 |
+|------|-----------|------|
+| 限额日计数器重置 | **UTC 00:00** | 防止时区切换规避限额；系统内部统一 |
+| ACH 是否算当日到账 | **ET（纽约时间）** | Fedwire/NACHA 以 ET 为标准 |
+| CTR 当日累计归属 | **ET 自然日** | FinCEN 要求；见 compliance Rule 2 |
+
+**典型边界场景**：
+
+```
+HK 用户（UTC+8）在北京时间 00:30（= UTC 16:30 前一天）提交出金
+
+限额计数器视角：
+  UTC 16:30（前一天）→ 计入前一天的限额消耗
+
+ACH 视角（ET，UTC-5 冬季）：
+  UTC 16:30 = ET 11:30（当天工作时间）→ ACH 提交到当天批次
+
+结果：用户感知是"今天提交的"，但系统限额计入"昨天"。
+```
+
+**用户界面缓解措施**（Mobile 契约）：
+
+1. **限额显示**：用北京时间（UTC+8）标注重置时间，明确告知"限额每天 08:00 北京时间重置（即 UTC 00:00）"
+2. **提交提示**：当用户的本地时间在 23:00–00:00 之间提交出金，App 应弹出提示：
+   > "您当前操作处于日期切换时段，此笔出金计入 [明日/今日] 限额。"（按 UTC 计算后翻译为用户本地时间）
+3. **ACH 到账预期**：无论用户本地时间是什么，始终展示 ET 时区的预计到账区间，防止"以为是当日，实际是次日"的误解
+
 ### 2.3 月限额重置时间
 
 **月限额在每月1日 UTC 00:00 重置。**
@@ -330,6 +396,48 @@ func RollbackLimitCounter(ctx context.Context, userID int64, direction string,
 | 大额入金 | > $5,000 USD 需触发人工审核（即便 KYC 层级足够） |
 
 冷却期到期后自动解除，无需用户操作。冷却期状态在限额检查时实时计算，不存储为单独字段（避免状态不一致）。
+
+### 2.5.1 KYC Tier 升级/降级时 pending 出金的处理（P3-6）
+
+**场景**：用户提交出金申请（APPROVAL 状态），在等待人工审核期间 KYC Tier 发生变化（升级 Basic→Standard，或降级 Enhanced→Standard）。
+
+**规则**：
+
+| 变化方向 | 处理规则 |
+|---------|---------|
+| **升级**（Basic → Standard 或更高） | 已 pending 的出金**重新评估**：如新 Tier 允许自动审批（满足 5 条件），可升级为自动审批并立即执行；否则仍走人工流程，但限额上限按新 Tier 计算 |
+| **降级**（Enhanced → Standard 或更低） | 已 pending 的出金**必须重新评估**：如申请金额超出新 Tier 限额，立即拒绝并释放冻结余额，通知用户重新提交符合新限额的申请 |
+| **冻结/封停**（任意 → FROZEN/SUSPENDED） | 所有 pending 出金立即中止，状态 → REJECTED(ACCOUNT_STATUS_CHANGED)，释放 frozen_withdrawal |
+
+**实现**：AMS 推送 `account.kyc_tier_changed` Kafka 事件，Fund Transfer 消费后：
+
+```go
+func (s *TransferService) OnKYCTierChanged(ctx context.Context, event KYCTierChangedEvent) error {
+    pendingWithdrawals, _ := s.repo.ListActiveWithdrawals(ctx, event.UserID)
+    newLimits, _ := s.amsClient.GetAccountKYCTier(ctx, event.UserID)
+
+    for _, w := range pendingWithdrawals {
+        if newLimits.IsFrozen() {
+            s.rejectWithdrawal(ctx, w, "ACCOUNT_STATUS_CHANGED")
+            continue
+        }
+        // 检查申请金额是否仍在新 Tier 限额内
+        if w.Amount.GreaterThan(newLimits.WithdrawMaxPerTx) {
+            s.rejectWithdrawal(ctx, w, "EXCEEDS_NEW_KYC_TIER_LIMIT")
+            s.notify.User(ctx, w.UserID, "您的 KYC 等级已变更，出金申请超出新限额，请重新提交")
+            continue
+        }
+        // 如升级后满足自动审批条件，加速处理
+        if s.meetsAutoApprove(ctx, w, newLimits) {
+            s.autoApprove(ctx, w)
+        }
+        // 否则继续在人工队列等待（限额已按新 Tier 重新验证）
+    }
+    return nil
+}
+```
+
+**审计要求**：每次因 Tier 变化导致的出金状态变更，必须在 `audit_log` 记录 `event_type: WITHDRAWAL_REEVALUATED_ON_TIER_CHANGE`，包含旧 Tier、新 Tier、金额、最终决定。
 
 ### 2.6 限额来源与缓存策略
 
