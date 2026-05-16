@@ -478,20 +478,219 @@ func (s *pdtService) CountDayTrades(ctx context.Context, accountID int64, busine
 
 | 报告 | 频率 | 内容 |
 |------|------|------|
-| **CAT Reports** | 每日 | 全量订单和成交事件 |
-| **Short Interest Report** | 每月两次 | 空头头寸汇总 |
-| **Blue Sheet** | 按需 | SEC 调查时要求的交易详细数据 |
-| **Large Trader Report (Form 13H)** | 按需 | 大额交易者身份信息 |
+| **CAT Reports** | 每日 | 全量订单和成交事件（详见 §2.2）|
+| **Short Interest Report** | 每月两次（1日、15日）| 空头头寸汇总，向 FINRA 提交 |
+| **Blue Sheet (Rule 17a-25)** | 按需（48-72h 内响应）| SEC 调查时要求的逐笔交易详细数据 |
+| **Green Sheet** | 按需 | FINRA 调查时要求（类似 Blue Sheet）|
+| **Rule 606 Report** | 每季度 | 订单路由披露（对散户）|
+| **Rule 605 Report** | 每月 | 成交质量统计（Order Execution Quality）|
+| **Large Trader Report (Form 13H)** | 初次 + 每年修订 | 大额交易者身份信息 |
+| **Form 13F** | 每季度 | 机构持仓报告（管理资产 > $1亿）|
 | **SAR (Suspicious Activity Report)** | 发现后 30 天内 | 向 FinCEN 报告可疑活动 |
+| **TRF 上报** | 实时（T+1 17:30 ET）| OTC 成交上报到 Trade Reporting Facility |
 
 #### 港股特有报告
 
 | 报告 | 频率 | 内容 |
 |------|------|------|
 | **STR (Suspicious Transaction Report)** | 发现后 3 个工作日 | 向 JFIU 报告可疑交易 |
-| **卖空头寸申报** | 每周 | 净空头头寸超过阈值的标的 |
+| **Short Position Reporting (SFO Part XV)** | 每周（周二报上周五持仓）| 净空头头寸 ≥ 阈值的申报 |
 | **大额交易申报** | 按需 | 单笔成交超过一定金额 |
 | **关联交易报告** | 按需 | 涉及关联方的交易 |
+
+#### 3.3.1 Rule 605/606 最优执行报告（详细规范）
+
+**Rule 605（SEC Rule 11Ac1-5 → 605）— 每月成交质量报告**：
+
+Market centers（交易所 / ATS）必须披露；我们作为 broker 也需在内部保留同等粒度数据用于 606 分析。
+
+```
+605 报告必须包含的统计项（按订单类型和大小分桶）:
+
+- 覆盖的订单类型: 限价单（LMT）、市价单（MKT）、可执行限价单（marketable limit）
+- 统计维度:
+    订单数量 / 股数
+    成交数量 / 股数
+    成交在 NBBO 内 / 超出 NBBO 的比例
+    平均执行速度（ms）
+    价格改善率（% of orders with price improvement）
+    价格改善幅度（cents per share）
+- 数据来源: executions 表 + order_events 表 + route_decisions 表
+```
+
+**Rule 606（Best Execution 路由披露报告）— 每季度**：
+
+```go
+type Rule606ReportSection struct {
+    // 对每个 venue（交易所/暗池）
+    Venue            string
+    Quarter          string            // e.g. "2026-Q2"
+    OrdersSent       int64             // 该 venue 收到的总订单数
+    SharesSent       int64
+    OrdersExecuted   int64
+    SharesExecuted   int64
+    ExecutionRate    decimal.Decimal   // 执行率%
+    AvgExecutionMs   decimal.Decimal   // 平均执行延迟（毫秒）
+    PriceImprovementPct decimal.Decimal  // 价格改善比例
+    AvgPriceImprovementCents decimal.Decimal
+    // 接受的款项（Payment for Order Flow）
+    PFOFPerShare     decimal.Decimal   // 如有
+    RebaatesReceived decimal.Decimal   // 流动性返佣
+}
+```
+
+**生成流程**：
+```
+每季度结束后 30 日内:
+  1. 从 route_decisions 表聚合该季度所有路由记录
+  2. 与 executions 表 JOIN 得到成交质量指标
+  3. 按 venue + order_type 分桶统计
+  4. 生成 JSON / PDF 报告（公开发布至官网 + 提交 SEC EDGAR）
+  5. 写入 compliance_reports 表（retention 7 年）
+```
+
+所需数据：`route_decisions.chosen_venue`, `route_decisions.score_breakdown`, `executions.price`, `executions.executed_at`, `order_events.nbbo_at_submit`（下单时 NBBO 快照）
+
+> **实现 gap**: `order_events` 目前未存储 NBBO 快照。需在 `ORDER_SUBMITTED` 事件的 `event_data` 中添加 `nbbo_bid`, `nbbo_ask`, `nbbo_venue_bid`, `nbbo_venue_ask` 字段。
+
+#### 3.3.2 Blue Sheet / Green Sheet（监管调查响应）
+
+**触发场景**：SEC（蓝表）或 FINRA（绿表）在调查市场操纵、内幕交易等案件时，向 broker 发出 `Subpoena` 或正式请求，要求提供指定时段内指定账户或证券的逐笔交易数据。
+
+**响应时限**：
+- 非紧急（标准）：10 个工作日
+- 紧急（Informal Request）：48-72 小时
+- 紧急（Formal Subpoena）：可向 SEC 申请延期，通常 5-7 个工作日
+
+**Blue Sheet 数据字段**（SEC 标准格式 EDGAR Rulebook）：
+
+| 字段 | 来源 | 说明 |
+|------|------|------|
+| AccountID / FDID | `accounts.fdid` | 客户匿名标识 |
+| SecurityID (CUSIP/ISIN) | `orders.symbol` + 证券主数据 | |
+| OrderDate / ExecutionDate | `order_events.created_at` | 微秒精度 |
+| Buy/Sell indicator | `orders.side` | |
+| Quantity / Price | `executions` | |
+| OrderType (LMT/MKT) | `orders.type` | |
+| BrokerDealerID | 本券商 MPID | |
+| FDID | `accounts.fdid` | |
+| Exchange | `executions.venue` | |
+
+```go
+type BlueSheetGenerator struct {
+    orderRepo     order.Repository
+    execRepo      execution.Repository
+    accountRepo   account.Repository
+    encryptionSvc EncryptionService
+}
+
+// GenerateBlueSheet 根据 SEC 请求参数生成 Blue Sheet 文件
+func (g *BlueSheetGenerator) GenerateBlueSheet(ctx context.Context, req BlueSheetRequest) (*BlueSheetFile, error) {
+    // 1. 查询时段内所有符合条件的订单和成交
+    executions, err := g.execRepo.GetByDateRangeAndFilter(ctx,
+        req.StartDate, req.EndDate, req.Symbol, req.AccountIDs)
+    // 2. 关联账户 FDID（不暴露真实姓名 / SSN）
+    // 3. 生成 SEC Blue Sheet 格式（CSV with fixed-width fields）
+    // 4. 加密并记录 audit log（谁请求、何时生成、文件哈希）
+    // 5. 写入 compliance_requests 表（7 年 retention）
+    ...
+}
+```
+
+**审计要求**：每次 Blue Sheet 生成必须写入 `compliance_requests` 表（request_source, request_id, request_date, responded_at, file_hash, requester_name）。
+
+#### 3.3.3 TRF（Trade Reporting Facility）上报
+
+OTC 成交（不在交易所成交的交易，如暗池、第三市场）必须通过 FINRA TRF 上报。
+
+**上报时限**：成交后 10 秒内（real-time）；否则最迟 T+1 17:30 ET。
+
+```
+TRF 上报消息格式（FINRA 规范）:
+  - Trade Date / Time (microsecond)
+  - Symbol
+  - Quantity
+  - Price
+  - Side (Buy/Sell)
+  - Counterparty MPID
+  - Clearing Broker
+  - Trade Type (Regular / Correction / Cancel)
+
+触发条件:
+  - executions.venue IN ('ATS', 'OTC', 'DARK_POOL', 'INTERNALIZED')
+  → 需要在 route_decisions / executions 中记录 venue_type 字段
+
+生成方式:
+  - FIX 35=AK TradeCaptureReport 发送给 FINRA TRF（FINRA 使用的 FIX extension）
+  - 或通过 FINRA Web API 提交
+```
+
+**实现 gap**：`executions.venue` 需新增 `venue_type` 字段（EXCHANGE / ATS / OTC），并在 FIX Engine 的 ExecutionReport 处理时根据 `LastMkt` 字段推断。
+
+#### 3.3.4 Form 13H（Large Trader Reporting）
+
+适用条件：单日成交股票数量 ≥ 200 万股 **或** 市值 ≥ USD 2000 万，视为"Large Trader"。
+
+**义务**：
+- **初次注册**：首次达标后 10 个工作日内向 SEC 提交 Form 13H（EDGAR 电子提交）
+- **年度更新**：每年 2 月 1 日前提交修订版（如有变化）
+- **非活跃状态申报**：连续 6 个月未达标时提交"Inactive" 状态申报
+
+**系统操作**：
+```go
+// 每日盘后扫描，检查是否触发 Large Trader 报告义务
+type LargeTraderChecker struct {
+    execRepo execution.Repository
+    alert    AlertService
+}
+
+func (c *LargeTraderChecker) CheckDailyThreshold(ctx context.Context, date time.Time) error {
+    totalShares, totalNotional := c.execRepo.DailySummary(ctx, date)
+    if totalShares >= 2_000_000 || totalNotional.GreaterThanOrEqual(decimal.NewFromInt(20_000_000)) {
+        c.alert.NotifyCompliance("Large Trader threshold reached: %d shares, $%s",
+            totalShares, totalNotional.StringFixed(2))
+        // 触发 Form 13H 提交流程（人工 + 电子提交 EDGAR）
+    }
+    return nil
+}
+```
+
+#### 3.3.5 HK Short Position Reporting（SFO Part XV）
+
+**触发条件**：持有指定证券的净空头头寸 ≥ 以下阈值之一：
+- 股票市值 ≥ HK$30,000,000（港元 3000 万）
+- 该证券已发行股本的 0.02%
+
+**申报周期**：每周（就截止上周五 16:00 HKT 的持仓，于周二中午前向 SFC 申报）
+
+```go
+type HKShortPositionReporter struct {
+    positionRepo position.Repository
+    sfc          SFCAPIClient
+}
+
+// GenerateWeeklyReport 生成周报（每周一执行，报告上周五收盘持仓）
+func (r *HKShortPositionReporter) GenerateWeeklyReport(ctx context.Context, asOfDate time.Time) error {
+    // 1. 查询 asOfDate 收盘时所有 position.position_side = SHORT 的港股持仓
+    shorts, err := r.positionRepo.GetShortPositions(ctx, "HK", asOfDate)
+
+    // 2. 计算每只证券的净空头市值
+    for _, pos := range shorts {
+        marketValue := pos.Quantity.Abs().Mul(pos.ClosePrice)
+        pct := pos.Quantity.Abs().Div(decimal.NewFromInt(pos.IssuedShares)).Mul(decimal.NewFromInt(100))
+
+        if marketValue.GreaterThanOrEqual(decimal.NewFromInt(30_000_000)) ||
+            pct.GreaterThanOrEqual(decimal.NewFromFloat(0.02)) {
+            // 3. 生成申报记录
+        }
+    }
+
+    // 4. 通过 SFC 电子申报系统提交（或人工提交）
+    return r.sfc.Submit(ctx, report)
+}
+```
+
+**数据依赖**：`positions.position_side = SHORT`（由 §05 §4.2.7 新增字段）+ 证券总发行股本（从证券主数据服务取）。
 
 ---
 

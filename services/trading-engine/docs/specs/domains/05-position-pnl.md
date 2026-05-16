@@ -484,7 +484,96 @@ func calcDayPnL(pos *Position, marketPrice, prevClose decimal.Decimal, dayRealiz
 **FIFO 作为后期可选升级（Phase 3+）：**
 如未来需要支持 FIFO（例如用户税务特殊需求），需要额外维护 `tax_lots` 表追踪每笔买入批次，预计工作量 20-25 人天。
 
-### 4.3 成交处理流程（核心写入路径）
+#### 4.2.7 做空持仓的成本基准（Short Position Cost Basis）
+
+当 `position.quantity < 0` 时，代表卖空持仓（Short Position）。其成本基准的计算与多头相反：
+
+**做空建仓（Short Sell）：**
+```
+avg_short_cost = (旧做空数量 * 旧平均卖空价格 + 新卖空数量 * 新卖空价格 - 手续费) /
+                 (旧做空数量 + 新卖空数量)
+-- 注意: 手续费是"成本"因而从收益中扣减（卖出收入减少 = 成本提高）
+```
+
+**做空平仓（Buy to Cover）：**
+```
+realized_pnl = (avg_short_cost - buy_cover_price) × cover_qty - 手续费
+-- 做空盈利: 卖出价 > 买回价时盈利
+-- 做空亏损: 卖出价 < 买回价时亏损
+```
+
+**借股成本（Stock Borrow Fee）的处理**：
+- 做空持仓需要借券，每日产生 `borrow_rate_annual` × `position.market_value / 365` 的借股费
+- 借股费计入已实现亏损（不调整 avg_short_cost），在 P&L 展示中单独列项
+- 每日批处理：
+  ```go
+  dailyBorrowFee = shortQty * currentPrice * borrowRate / decimal.NewFromInt(365)
+  // 写入 realized_pnl_adjustments 表
+  // 不修改 avg_cost_basis（借股费不是成本基准的一部分）
+  ```
+
+**未实现盈亏（做空）：**
+```
+unrealized_pnl = (avg_short_cost - current_price) × abs(quantity)
+-- current_price 是买回所需的当前市价
+```
+
+**数据模型扩展**：`positions` 表新增：
+```sql
+ALTER TABLE positions
+    ADD COLUMN position_side VARCHAR(10) NOT NULL DEFAULT 'LONG', -- LONG / SHORT
+    ADD COLUMN borrow_rate   DECIMAL(10,6) NULL,    -- 借股年化利率
+    ADD COLUMN borrow_fee_accrued DECIMAL(18,8) NULL; -- 本日已计提借股费
+```
+
+**Reg SHO Locate 要求**：做空建仓前必须在 `short_locate_records` 表记录已获取 Locate（详见 02-pre-trade-risk.md §4.3.2 Gate 2 Symbol Check 中的 Reg SHO 检查）。
+
+#### 4.2.8 跨币种持仓的换算时点
+
+当账户基础货币（USD）持有港股时，P&L 计算需要 FX 换算。
+
+**换算时点规范**：
+
+| 计算场景 | FX 汇率选用 | 理由 |
+|---------|-----------|------|
+| 实时未实现 P&L（盘中） | 最新 FX mid-rate（TTL 1min）| 实时展示，精度要求高 |
+| 日终已实现 P&L 确认 | T 日 16:15 HKT HKEX official FX close | 官方汇率，可审计 |
+| Margin calculation（盘中）| 最新 FX mid-rate（TTL 1min）| 保证金实时性 |
+| Margin Call 触发判断 | T-1 日官方 FX close（+盘中 ≥5% FX 波动则用盘中）| 稳定性优先，防止 FX 微波触发误 Call |
+| 1099-B 税务报告 | 成交当日官方汇率（IRS Publication 550）| 税务合规要求 |
+| Settlement（港股）| T+2 结算日 HKD 汇率（由 CCASS 决定）| 以实际划转金额为准 |
+
+```go
+type FXRateContext string
+
+const (
+    FXForRealTimePnL    FXRateContext = "REALTIME_PNL"
+    FXForDailyRealizedPnL FXRateContext = "DAILY_REALIZED"
+    FXForMarginIntraday FXRateContext = "MARGIN_INTRADAY"
+    FXForMarginCall     FXRateContext = "MARGIN_CALL"
+    FXForTaxReport      FXRateContext = "TAX_REPORT"
+)
+
+func (c *FXRateService) Get(
+    ctx context.Context, from, to string, purpose FXRateContext, asOfDate time.Time,
+) (decimal.Decimal, error) {
+    switch purpose {
+    case FXForRealTimePnL, FXForMarginIntraday:
+        return c.realtimeCache.Get(from + "/" + to) // TTL 1min
+    case FXForDailyRealizedPnL, FXForMarginCall:
+        return c.officialCloseRate(ctx, from, to, asOfDate) // T-1 close
+    case FXForTaxReport:
+        return c.irsRateForDate(ctx, from, to, asOfDate) // IRS official
+    }
+    return decimal.Zero, fmt.Errorf("unknown FX context: %s", purpose)
+}
+```
+
+**已实现盈亏的汇兑损益归属**：
+- 当港股卖出价格（HKD）转换为 USD 时，与买入时的换算汇率可能不同
+- 汇兑损益 = `sell_hkd * sell_fx_rate - buy_hkd * buy_fx_rate`
+- 单独列入 `realized_pnl_fx_adjustment`，不混入证券 P&L
+- 在账户报表中单列"外汇损益"行
 
 成交处理是持仓系统中最关键的写入操作，必须保证**原子性**（Atomicity）。
 
@@ -1010,6 +1099,280 @@ INSERT INTO corporate_action_log (
 - 自动化企业行动数据源接入（使用 FactSet / Bloomberg 企业行动 API）
 - 自动计算和执行（无需手工确认）
 - 支持配股、合并、权利问题等复杂企业行动
+
+#### 4.8.5a Phase 1 手工流程的 Rollback 方案
+
+§4.8.5 描述的手工流程缺少失败补偿——SQL 执行到一半中断会造成单边持仓。以下是 rollback 规范：
+
+```sql
+-- 每次企业行动操作必须在单个事务中完成
+BEGIN;
+
+-- 1. 记录操作前的快照（用于回滚）
+INSERT INTO corporate_action_snapshots (
+    corporate_action_log_id, account_id, symbol, market,
+    qty_before, avg_cost_before, cash_before, snapshot_at
+)
+SELECT
+    :log_id, account_id, symbol, market,
+    quantity, avg_cost_basis, cash_balance, NOW()
+FROM positions
+WHERE symbol = :symbol AND market = :market AND quantity != 0
+FOR UPDATE;  -- 锁定，防止并发修改
+
+-- 2. 执行实际修改（如股票拆分）
+UPDATE positions
+SET quantity = quantity * :split_ratio,
+    avg_cost_basis = avg_cost_basis / :split_ratio,
+    version = version + 1
+WHERE symbol = :symbol AND market = :market;
+
+-- 3. 记录操作后状态
+INSERT INTO corporate_action_log (
+    symbol, market, action_type, parameters,
+    affected_rows, executed_by, executed_at, status
+) VALUES (
+    :symbol, :market, 'STOCK_SPLIT', :params,
+    ROW_COUNT(), :admin_user, NOW(), 'COMPLETED'
+);
+
+COMMIT;
+
+-- 回滚脚本（事故时由 DBA 执行）：
+-- 从 corporate_action_snapshots 表恢复
+-- UPDATE positions SET quantity=snapshot.qty_before, avg_cost_basis=snapshot.avg_cost_before ...
+-- WHERE snapshot.corporate_action_log_id = :log_id
+```
+
+**二次确认机制**：Admin Panel 在执行前必须展示"影响账户数 + 总影响金额"预览，需要第二位管理员账户确认（Maker-Checker 双人控制）。
+
+#### 4.8.6 企业行动数据源接入规范（Phase 2）
+
+Phase 2 自动化依赖外部企业行动数据供应商：
+
+| 供应商 | 特点 | 接入方式 | 延迟 |
+|--------|------|---------|------|
+| **Bloomberg Corporate Actions** | 最全面，含国际 | API (Bloomberg Data License) | T-1 到 T 日公告 |
+| **FactSet Corporate Actions** | 精度高，支持历史溯源 | RESTful API + FTP feed | T-1 到 T 日公告 |
+| **Refinitiv (LSEG) Elektron** | 准实时，含 HK 本地行情 | Elektron API / WebSocket | T 日实时 |
+| **HKEX 企业行动公告** | 港股权威来源，免费 | HKEXnews RSS / 官方 API | 公告日实时 |
+
+**接入架构**：
+```
+外部数据源 → Corporate Action Ingester → corporate_action_staging 表
+                                        → 人工 Review（异常情形）
+                                        → corporate_action_confirmed 表
+                                        → 自动执行引擎
+```
+
+**数据字段映射**（以股息为例）：
+```go
+type CorporateActionEvent struct {
+    Source          string          // bloomberg / factset / hkex
+    EventID         string          // 供应商内部 ID（用于去重）
+    Symbol          string          // 标的代码
+    Market          string          // US / HK
+    ActionType      string          // CASH_DIV / STOCK_DIV / SPLIT / RIGHTS / MERGER / SPINOFF
+    AnnouncedAt     time.Time       // 公告时间 UTC
+    ExDate          time.Time       // 除权/除息日
+    RecordDate      time.Time       // 登记日
+    PayDate         time.Time       // 派发日（股息）/ 生效日（拆股）
+    DivPerShare     decimal.Decimal // 每股股息（CASH_DIV）
+    SplitRatio      decimal.Decimal // 拆股比例（SPLIT）
+    RightsPriceHKD  decimal.Decimal // 配股价（RIGHTS，港股）
+    MergerCashPerShare decimal.Decimal
+    MergerStockRatio   decimal.Decimal
+    Currency        string          // 股息货币
+}
+```
+
+#### 4.8.7 ADR Fee 对 Cost Basis 的影响（美股）
+
+美国存托凭证（ADR）持有人每年需支付 ADR 保管费（Custodian Fee），通常由托管行直接从账户扣除。
+
+**费用规模**：通常 $0.01-$0.05 / ADR share / 年，按持仓规模扣取。
+
+**会计处理**：
+```
+ADR Fee 扣除时:
+  - 减少账户现金余额（托管行直接扣）
+  - 不改变 avg_cost_basis（ADR fee 是持仓成本，但加权平均法下不重新分配）
+  - 记入已实现亏损（realized_pnl_adjustments 表，调整类型 = ADR_FEE）
+  
+税务影响（美国客户）:
+  - ADR fee 可作为投资费用在美国税表 Schedule A 上抵扣（受限）
+  - 在 1099-B 中作为 Miscellaneous Deduction 列出（非 cost basis 调整）
+```
+
+```go
+// ADR Fee 处理
+type ADRFeeProcessor struct {
+    custodianFeedClient CustodianFeedClient // 托管行数据
+    positionRepo        position.Repository
+}
+
+func (p *ADRFeeProcessor) ProcessADRFee(ctx context.Context, fee ADRFeeNotification) error {
+    // fee.Symbol, fee.FeePerShare, fee.AsOfDate, fee.TotalFee
+
+    // 1. 从托管行确认扣费（已实际扣除，不重复扣）
+    // 2. 记录 realized_pnl_adjustments
+    return p.positionRepo.RecordPnLAdjustment(ctx, PnLAdjustment{
+        Symbol:     fee.Symbol,
+        Market:     "US",
+        AdjustType: "ADR_FEE",
+        Amount:     fee.TotalFee.Neg(), // 费用为负
+        AsOfDate:   fee.AsOfDate,
+    })
+    // 注意: 不更新 avg_cost_basis
+}
+```
+
+#### 4.8.8 碎股（Fractional Share）P&L 精度
+
+碎股来源：拆股比例非整数、股息再投资（DRIP）、部分成交。
+
+**存储精度**：`positions.quantity` 升级为 `DECIMAL(18, 6)` 支持小数（与整数兼容，整数证券值为 xxx.000000）。
+
+**P&L 计算精度**：
+```
+unrealized_pnl = (current_price - avg_cost_basis) × quantity
+                 用 decimal.Mul 全程保持 8 位精度
+
+向用户展示: 四舍五入到 2 位小数（显示用），内部保留 8 位
+```
+
+**港股碎股（odd lot）**：来自拆股/配股，系统记为独立 `position_type = ODD_LOT`，不能参与常规买卖（仅可通过碎股市场出售），P&L 独立展示。
+
+### 4.9 Wash Sale Rule（美国税法，38 C.F.R. §1091）
+
+**定义**：如果投资者在证券亏损卖出后 30 天内（前后各 30 天，共 61 天窗口），买入"实质相同"的证券，该亏损不可在当年税表中抵扣，必须并入新买入证券的成本基准。
+
+**适用范围**：仅适用于美国税务居民（US Person）；非美居民（持有 W-8BEN 表格）不适用。
+
+**"实质相同"判定**：
+- 同一股票（AAPL sell → AAPL buy）：是
+- 期权行权（AAPL call exercise → 持有 AAPL）：视情况
+- 不同股票（AAPL → MSFT）：否
+- ETF → 成分股：通常否
+
+**系统实现**：
+
+```go
+type WashSaleDetector struct {
+    execRepo   execution.Repository
+    taxProfile TaxProfileService  // 判断账户是否为 US Person
+}
+
+// CheckWashSale 在亏损卖出发生时检查是否存在 wash sale
+func (d *WashSaleDetector) CheckWashSale(
+    ctx context.Context,
+    accountID int64,
+    symbol, market string,
+    sellDate time.Time,
+    lossAmount decimal.Decimal,
+) (*WashSaleResult, error) {
+    if !d.taxProfile.IsUSPerson(ctx, accountID) {
+        return &WashSaleResult{Applies: false}, nil
+    }
+    if !lossAmount.IsNegative() {
+        return &WashSaleResult{Applies: false}, nil // 盈利不触发
+    }
+
+    // 查询前后 30 天内的买入记录
+    windowStart := sellDate.AddDate(0, 0, -30)
+    windowEnd   := sellDate.AddDate(0, 0, +30)
+    buys, err := d.execRepo.GetBySymbolSideDateRange(ctx,
+        accountID, symbol, market, "BUY", windowStart, windowEnd)
+    if err != nil {
+        return nil, err
+    }
+    if len(buys) == 0 {
+        return &WashSaleResult{Applies: false}, nil
+    }
+
+    // 存在买入 → Wash Sale 触发
+    return &WashSaleResult{
+        Applies:           true,
+        DisallowedLoss:    lossAmount.Abs(), // 不可抵扣的亏损金额
+        CostBasisAddition: lossAmount.Abs(), // 并入新买入 cost basis 的金额
+        TriggerBuyDate:    buys[0].ExecutedAt,
+        TriggerBuyQty:     buys[0].Quantity,
+    }, nil
+}
+```
+
+**Wash Sale 处理流程**：
+```
+1. 亏损卖出 AAPL (-$500 loss)
+2. 30 天内买入 AAPL (触发 wash sale)
+3. 亏损 $500 不可在当年抵扣 → 并入新买入的 avg_cost_basis 中
+   新买入 cost basis = 实际成交价 + $500 (wash sale add-back)
+4. 在税务记录中标注 wash_sale_amount = $500
+5. 1099-B 上: Box 5 (Wash Sale Loss Disallowed) = $500
+```
+
+**数据库存储**：
+```sql
+ALTER TABLE tax_lots
+    ADD COLUMN wash_sale_adjustment DECIMAL(18,8) DEFAULT 0,
+    ADD COLUMN is_wash_sale         BOOLEAN DEFAULT FALSE,
+    ADD COLUMN wash_sale_lot_id     BIGINT REFERENCES tax_lots(id);
+-- wash_sale_lot_id 指向触发 wash sale 的对手买入 tax lot
+```
+
+### 4.10 IRS 1099-B 成本基准报告
+
+**适用范围**：美国税务居民，每年 2 月 15 日前发出（IRS 规定 broker 报税截止日）。
+
+**1099-B 关键字段**（Box 1-16）：
+
+| Box | 字段 | 来源 |
+|-----|------|------|
+| Box 1a | 出售标的描述 | positions.symbol + 公司名称 |
+| Box 1b | 获得日期 | tax_lots.acquired_at |
+| Box 1c | 出售日期 | executions.executed_at |
+| Box 1d | 收到金额 | executions.price × qty - fees |
+| Box 1e | 成本基础 | tax_lots.cost_per_share × qty |
+| Box 1f | 调整代码 | "W" = Wash Sale; "B" = Ordinary gain/loss |
+| Box 1g | 调整金额 | wash_sale_adjustment（如有）|
+| Box 2 | 短期/长期 | 持有期：< 1年 = Short-term; ≥ 1年 = Long-term |
+| Box 5 | Wash Sale 不可抵扣亏损 | WashSaleResult.DisallowedLoss |
+| Box 6 | 是否有 cost basis 向 IRS 上报 | 是（我们属于 "covered security" broker）|
+
+**生成流程**：
+```
+每年 2 月 1 日:
+  1. 查询上一年度所有已实现成交（卖出 / 全成交 / 部分成交带平仓）
+  2. 匹配 tax_lots 获得成本基准
+  3. 应用 wash sale 调整
+  4. 区分 Short-term vs Long-term（持仓超 365 天为 Long-term）
+  5. 生成 PDF 1099-B + 电子提交 IRS（IRS FIRE system）
+  6. 发送给客户（邮件 + App 内下载）
+  7. 保留记录 7 年（SEC Rule 17a-4）
+```
+
+```go
+type Form1099BGenerator struct {
+    execRepo   execution.Repository
+    taxLotRepo TaxLotRepository
+    washSaleDetector WashSaleDetector
+    pdfRenderer PDFRenderer
+    irsClient   IRS_FIRE_Client
+}
+
+func (g *Form1099BGenerator) GenerateForAccount(
+    ctx context.Context, accountID int64, taxYear int,
+) (*Form1099B, error) {
+    // 1. 获取当年所有实现盈亏记录
+    // 2. 计算每笔 short-term / long-term
+    // 3. 应用 wash sale
+    // 4. 汇总 Box 1-16
+    // 5. 生成 PDF
+    ...
+}
+```
+
+**港股税务**（对比）：香港无资本利得税，港股客户无需 1099-B；但需提供年度交易明细供客户自行申报（如适用其他税务管辖权）。
 
 ---
 

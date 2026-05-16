@@ -860,6 +860,74 @@ func (r *USRouter) calculateNBBO(quotes map[string]*VenueQuote) *NBBO {
 
 当订单数量远大于 BBO 可用数量时，直接发送整单会造成严重的市场冲击（价格被推高/压低）。SOR 提供以下拆单策略：
 
+#### 4.7.0 触发阈值（新增：何时自动启用拆单）
+
+```
+大单判定规则（以下任一满足即触发）:
+
+1. 数量超过 20 日平均日成交量 (ADV) 的 1%:
+     qty > ADV_20d * 0.01
+     → 启用 Iceberg（最小冲击策略）
+
+2. 数量超过 ADV_20d 的 5%:
+     qty > ADV_20d * 0.05
+     → 启用 TWAP（均匀拆分，30 min 时间窗口默认值）
+
+3. 数量超过 ADV_20d 的 10%:
+     qty > ADV_20d * 0.10
+     → 启用 VWAP（按历史成交量分布拆分）
+
+4. 订单名义价值 > USD 1,000,000（或 HKD 7,800,000）:
+     估算市值 = qty × current_price > threshold
+     → 启用 VWAP（优先考虑资金影响）
+
+5. 用户显式指定 algo_type:
+     ICEBERG / VWAP / TWAP → 直接使用用户指定的算法
+
+优先级: 用户显式 > 金额阈值 > 数量阈值 (规则 3 > 2 > 1)
+```
+
+```go
+type AlgoDecision struct {
+    AlgoType    AlgoType // NONE / ICEBERG / TWAP / VWAP
+    SliceCount  int      // 子单数量
+    TimeWindow  time.Duration
+    SliceSize   int64    // 每次 Iceberg 显示量
+    Reason      string   // 触发原因 (for audit)
+}
+
+func (r *Router) decideAlgo(ord *order.Order, adv20 int64) AlgoDecision {
+    if ord.AlgoType != AlgoNone {
+        return AlgoDecision{AlgoType: ord.AlgoType, Reason: "user_specified"}
+    }
+
+    notional := ord.EstimatedPrice.Mul(decimal.NewFromInt(ord.Quantity))
+    notionalThreshold := decimal.NewFromInt(1_000_000)
+    if ord.Market == "HK" {
+        notionalThreshold = decimal.NewFromInt(7_800_000)
+    }
+
+    switch {
+    case notional.GreaterThan(notionalThreshold) || ord.Quantity > adv20/10:
+        return AlgoDecision{AlgoType: AlgoVWAP,
+            TimeWindow: 6 * time.Hour, // 全天分批
+            Reason: "large_order_vwap"}
+    case ord.Quantity > adv20/20:
+        return AlgoDecision{AlgoType: AlgoTWAP,
+            TimeWindow: 30 * time.Minute, SliceCount: 6,
+            Reason: "medium_order_twap"}
+    case ord.Quantity > adv20/100:
+        return AlgoDecision{AlgoType: AlgoIceberg,
+            SliceSize: ord.Quantity / 10, // 每次显示 10%
+            Reason: "small_large_order_iceberg"}
+    default:
+        return AlgoDecision{AlgoType: AlgoNone, Reason: "normal_order"}
+    }
+}
+```
+
+**ADV 数据来源**：Market Data service 提供 `GET /v1/market-data/adv?symbol=AAPL&market=US&days=20`。SOR 启动时预热 top-1000 symbol 缓存，TTL 24h（每日盘前更新）。ADV 为 decimal 类型（不用 float64）。港股 ADV 以成交股数计，美股以成交股数计。
+
 #### VWAP (Volume Weighted Average Price)
 
 ```
@@ -1030,6 +1098,130 @@ func (cb *VenueCircuitBreaker) RecordFailure(venue string) {
         cb.state[venue] = CircuitOpen
     }
 }
+```
+
+### 4.9 多 Venue 成交回报对账
+
+当一笔原始订单被拆分路由到多个 venue（VWAP/TWAP/ISO），各 venue 的 ExecutionReport 带有各自的 `ExecID` 和 `ClOrdID`。OMS 必须能正确地把所有 fills 汇聚回原始 `parent_order_id`。
+
+#### 4.9.1 订单 ID 层次
+
+```
+parent_order_id (用户原始单, 在 OMS 中创建)
+  └── child_order_id_1 (发往 XNYS 的子单)
+        ├── ExecID = NYSE-A1234  (fill 1, qty=30)
+        └── ExecID = NYSE-A1235  (fill 2, qty=70)
+  └── child_order_id_2 (发往 XNAS 的子单)
+        └── ExecID = NSDQ-B5678  (fill, qty=100)
+```
+
+父单 `filled_qty = 200`, `avg_fill_price = VWAP(A1234, A1235, B5678)`
+
+#### 4.9.2 路由 ClOrdID 命名规范
+
+```
+ClOrdID 格式: {parent_cl_ord_id}_{venue}_{seq}
+例: "CLI-1747246800000-001_XNYS_1"
+
+命名函数:
+func childClOrdID(parentClOrdID, venue string, seq int) string {
+    return fmt.Sprintf("%s_%s_%d", parentClOrdID, venue, seq)
+}
+```
+
+这确保了：
+1. 任意 child ClOrdID 都可以反向解析出 parent（截断到最后一个 `_` 前两段）
+2. FIX 层面每个 venue 独立的 ClOrdID 空间不冲突
+
+#### 4.9.3 汇聚规则
+
+```go
+type ChildFill struct {
+    ChildClOrdID string
+    Venue        string
+    ExecID       string
+    Qty          int64
+    Price        decimal.Decimal
+    Fee          decimal.Decimal
+    FilledAt     time.Time
+}
+
+type ParentOrderAggregator struct {
+    db   order.Repository
+    mu   sync.Mutex   // 保护同一 parent 的并发 fill 累计
+}
+
+func (a *ParentOrderAggregator) OnChildFill(ctx context.Context, fill ChildFill) error {
+    parentID := extractParentID(fill.ChildClOrdID)
+    a.mu.Lock()
+    defer a.mu.Unlock()
+
+    parent, err := a.db.GetForUpdate(ctx, parentID)
+    if err != nil {
+        return fmt.Errorf("get parent order: %w", err)
+    }
+
+    // VWAP 累计
+    totalFilled := parent.FilledQty + fill.Qty
+    newAvgPrice := (parent.AvgFillPrice.Mul(decimal.NewFromInt(parent.FilledQty)).
+        Add(fill.Price.Mul(decimal.NewFromInt(fill.Qty)))).
+        Div(decimal.NewFromInt(totalFilled))
+
+    parent.FilledQty  = totalFilled
+    parent.AvgFillPrice = newAvgPrice
+    parent.TotalFees  = parent.TotalFees.Add(fill.Fee)
+
+    // 判断父单状态
+    if parent.FilledQty >= parent.Quantity {
+        parent.Status = order.StatusFilled
+    } else {
+        parent.Status = order.StatusPartialFill
+    }
+
+    return a.db.Update(ctx, parent)
+}
+```
+
+#### 4.9.4 ExecID 去重
+
+同一 ExecID 不能被处理两次（网络重传场景）：
+
+```sql
+-- executions 表唯一约束
+UNIQUE INDEX idx_executions_venue_exec_id (venue, exchange_exec_id)
+```
+
+`INSERT IGNORE`（MySQL）或 `ON CONFLICT DO NOTHING`（PostgreSQL）保证幂等。
+
+#### 4.9.5 对账
+
+每日盘后批：
+```
+1. 汇总 child_orders.filled_qty WHERE parent_order_id = X
+2. 对比 parent_orders.filled_qty
+3. 不一致 → P1 告警 + 写 reconcile_discrepancies 表（人工核查）
+4. 一致 → 更新 parent_orders.reconciled_at
+```
+
+#### 4.9.6 NBBO 失败降级（补充 §4.8.3）
+
+§4.8 中"报价数据不可用 → 使用 5s 内缓存，否则拒单"的规则需要细化：
+
+```
+NBBO 来源优先级:
+  1. SIP (Consolidated Tape): 官方 NBBO，延迟 ~5ms，成本较高
+  2. Direct Feed (各 exchange): 延迟 <1ms，需要多路合并
+  3. 本地缓存: TTL = 1s（正常），5s（降级）
+
+降级决策:
+  SIP 可用   → 用 SIP NBBO（满足 Reg NMS compliance）
+  SIP 不可用，Direct Feed 可用 →
+    用 Direct Feed 自行合并 NBBO + 记录"using_direct_feed_nbbo=true"（供合规审计）
+  两者均不可用 →
+    市价单: 拒绝 (MARKET_DATA_UNAVAILABLE)
+    限价单: 用用户给定价格路由到流动性最深的 venue，附加 WARNING
+  缓存 stale > 5s:
+    同"两者均不可用"处理
 ```
 
 ---

@@ -260,6 +260,154 @@ HK Business Day 排除:
 - 半日交易日（如农历年除夕）结算正常
 ```
 
+#### 3.2.1 HKEX 实时日历更新机制（重要补充）
+
+香港台风信号 8 号 / 黑色暴雨警告 导致的临时休市具有以下特点：
+- **不可预测**：通常在休市前 2 小时内由香港天文台发布
+- **官方渠道**：HKEX 在 HKEx News (www.hkexnews.hk) 发布公告；同时通过 HKEX API 推送
+- **影响结算**：若在收市竞价前发出，当日结算推迟至下一交易日
+
+**系统实现方案**：
+
+```go
+type HKEXHolidayMonitor struct {
+    hkexNewsClient  HKEXNewsClient  // 轮询 HKEX RSS 或 Webhook
+    calendarCache   *MarketCalendar // 热缓存
+    alertService    AlertService
+}
+
+// PollHKEXAnnouncements 每 15 分钟轮询一次 HKEX 公告（交易时段内）
+// 若检测到临时休市公告，立即更新日历并触发级联处理
+func (m *HKEXHolidayMonitor) PollHKEXAnnouncements(ctx context.Context) error {
+    announcements, err := m.hkexNewsClient.GetLatestAnnouncements(ctx, 30*time.Minute)
+    if err != nil {
+        return fmt.Errorf("fetch HKEX news: %w", err)
+    }
+
+    for _, ann := range announcements {
+        if isEmergencyHaltAnnouncement(ann) {
+            effectiveDate := ann.EffectiveDate
+            m.calendarCache.MarkEmergencyHalt(effectiveDate)
+            m.publishMarketStateChange(ctx, effectiveDate, SessionEmergencyHalt)
+            m.alertService.NotifyP0("HK Emergency Halt on %s: %s", effectiveDate, ann.Summary)
+        }
+    }
+    return nil
+}
+
+// isEmergencyHaltAnnouncement 识别台风/暴雨休市公告
+func isEmergencyHaltAnnouncement(ann HKEXAnnouncement) bool {
+    keywords := []string{
+        "typhoon", "rainstorm", "typhoon signal no. 8",
+        "black rainstorm warning", "trading session",
+        "台风", "暴雨", "8号风球",
+    }
+    title := strings.ToLower(ann.Title + " " + ann.Summary)
+    for _, kw := range keywords {
+        if strings.Contains(title, kw) {
+            return true
+        }
+    }
+    return false
+}
+```
+
+**级联处理（休市公告发出后的操作）**：
+
+```
+1. market_session_state → EMERGENCY_HALT
+2. Kafka publish: market.session.state { market: HK, state: EMERGENCY_HALT }
+3. OMS 停止接收新订单（现有 OPEN 单保持）
+4. SOR 停止路由到 HKEX
+5. FIX session 仍保持（若 HKEX 允许：台风期间 FIX session 通常也断开）
+6. Settlement: 若当日成交已进入结算流程但 CCASS 推迟 → 记录 settlement_status=PENDING_WEATHER
+7. 台风解除后 market 状态恢复 → 重新处理挂起的结算
+```
+
+**数据库 market_calendar 表追加字段**：
+```sql
+ALTER TABLE market_calendar
+    ADD COLUMN halt_type VARCHAR(30) NULL,   -- WEATHER / TECHNICAL / REGULATORY
+    ADD COLUMN halt_announced_at TIMESTAMP NULL,
+    ADD COLUMN halt_lifted_at TIMESTAMP NULL,
+    ADD COLUMN source VARCHAR(50) NOT NULL DEFAULT 'PRESET'; -- PRESET / HKEX_REALTIME
+```
+
+#### 3.2.2 DK（Don't Know）和 Fail-to-Deliver（FTD）处理
+
+**DK（Don't Know）**：买卖双方在成交确认时不匹配，NSCC/CCASS 拒绝配对。
+
+```
+DK 触发场景:
+  - 成交数量不匹配
+  - 对手方信息不符
+  - 结算指令错误
+
+DK 处理流程:
+  1. NSCC/CCASS 返回 DK 通知（通常 T 日 22:00 ET 前）
+  2. Settlement Engine 收到 DK，将对应成交记录状态标记为 DK_PENDING
+  3. 通知 OMS：该订单的相关成交回到"待确认"状态（不回滚 position，但标记为 unconfirmed）
+  4. 通知 Compliance：DK 需要人工调查
+  5. 与对手方或 clearing house 协商修正
+  6. 修正成功 → 重新提交结算，settlement_status = SETTLED
+  7. 无法修正 → DK_FAILED → 进入 FTD 流程
+```
+
+```go
+const (
+    SettlementStatusPending      = "PENDING"
+    SettlementStatusSettled      = "SETTLED"
+    SettlementStatusDKPending    = "DK_PENDING"     // 等待 DK 解决
+    SettlementStatusDKFailed     = "DK_FAILED"      // DK 无法解决
+    SettlementStatusFTD          = "FAIL_TO_DELIVER" // 卖方未交割
+    SettlementStatusFTR          = "FAIL_TO_RECEIVE" // 买方未收到
+    SettlementStatusBuyIn        = "BUY_IN"          // 被买入处置
+    SettlementStatusPendingWeather = "PENDING_WEATHER" // 天气原因暂缓
+)
+```
+
+**Fail-to-Deliver（FTD）**：卖方在结算日无法交付证券。
+
+```
+美股 FTD 处理（Reg SHO Rule 204）:
+
+1. T 日成交
+2. T+1（Settlement Date）：若卖方未交割
+   → Clearing House（NSCC）标记 FTD
+   → 通知 participant broker
+3. T+2（T+1 之后）：
+   → Broker 必须 Close-Out（强制购入）
+   → 强制购入价格为市场价（不是原成交价）
+   → 强制购入的差价损失由原卖方（即我们的客户）承担
+4. 特殊情况（Reg SHO §204 豁免）：
+   → Market Maker / ETF Arbitrage 等有额外 T+6 宽限期
+
+系统操作:
+  - 检测到 FTD → 生成系统强制平仓单（source=SYSTEM_FTD_CLOSEOUT）
+  - 绕过风控的多数检查（只保留价格合理性检查）
+  - 成交后差价损失计入用户账户（debit）并发通知
+  - 写入 audit_events：event_type = FTD_CLOSEOUT
+```
+
+```
+港股 FTD 处理（CCASS Rule）:
+
+1. CCASS 在 T+2 结算日自动尝试 Settlement
+2. 若 FTD → CCASS 启动 Buy-In 程序
+   - Buy-In Offer 在 T+3 开盘竞价
+   - 若 Buy-In 成功：以 Buy-In 价格结算，差价由 defaulting seller 承担
+   - 若 Buy-In 失败（罕见）：Cash Settlement（以 CCASS 规定的现金价值结算）
+3. 系统记录 settlement_status = BUY_IN，关联原成交 trade_id
+```
+
+**FTD 监控告警**：
+```
+每日 T+1 收盘后 22:00 ET（美股）/ 18:00 HKT（港股）：
+  扫描未结算成交，找出 FTD 候选
+  FTD 数量 > 0 → P1 告警
+  FTD 金额 > $10,000 → P0 告警 + Compliance Officer 通知
+```
+
 ### 3.3 费用计算公式
 
 #### 美股费用计算
@@ -333,6 +481,250 @@ SFC征费      = HK$700,000 x 0.000027 = HK$18.90
 | **股息税** | 非美居民 15% 预扣税（W-8BEN 表格） | 港股无股息预扣税；通过港股通投资的 A 股有 10% 红利税 |
 | **股票拆分** | Ex-Date 前收盘后生效 | Ex-Date 生效 |
 | **配股（Rights Issue）** | 较少见 | 常见，需通知客户行权或放弃 |
+
+### 3.5 HK CCASS 结算模式：ISP vs CSP
+
+HKEX 的 CCASS（Central Clearing and Settlement System）提供两种结算方式，系统必须根据成交性质选择：
+
+#### ISP（Isolated Trades Settlement）
+
+- **适用场景**：特殊大宗交易（Off-Exchange Trades）、块状成交（Block Trades）
+- **特点**：买卖双方一对一匹配结算，**不经过 CCASS 的中央对手方（CCP）novation**
+- **结算风险**：由原交易对手双方自行承担（non-novated），若一方违约需走人工处置
+- **对我们的影响**：通过第三方机构参与 ISP 的成交，Settlement Engine 必须追踪对手方信息，并在 `executions.venue_type = 'OTC_ISP'` 时标记
+
+#### CSP（Continuous Net Settlement）
+
+- **适用场景**：所有通过 HKEX 撮合的常规交易
+- **特点**：CCASS 作为中央对手方（CCP）承接所有交易，通过**净额轧差**减少交割量
+- **净额规则**：同一成员同一标的的所有买入和卖出在同一结算日进行净额处理
+- **优点**：极大减少交割量，降低违约风险
+
+```go
+type SettlementType string
+const (
+    SettlementCSP SettlementType = "CSP" // 常规 CCASS 净额结算
+    SettlementISP SettlementType = "ISP" // 孤立大宗交割
+    SettlementDVP SettlementType = "DVP" // Delivery vs Payment（美股 DTC）
+)
+
+// execution 表新增 settlement_type 字段
+// 在 FIX ExecutionReport 处理时根据 LastMkt / ExecInst 推断
+```
+
+**净额计算示例**（CSP）：
+```
+同一成员，同一天，AAPL：
+  买入 1000 股（成交1）
+  买入 500 股（成交2）
+  卖出 800 股（成交3）
+
+净额结算量 = +1000 + 500 - 800 = +700 股（净买入）
+结算日仅需交割 700 股，而非 3 次独立交割
+```
+
+### 3.6 Stock Connect 结算特殊规则
+
+沪深港通的结算机制与普通港股不同，需要特殊处理：
+
+#### 3.6.1 北向通（沪/深股通：HK → A股）
+
+- **结算货币**：人民币（CNH，离岸人民币）
+- **结算地点**：通过 HKEX（中间对手方）→ CCDC/CSDC（内地托管结算）
+- **结算周期**：T+1（遵循内地结算惯例，比港股快一天）
+- **汇兑风险**：港元换成 CNH 再买 A 股；卖出 A 股得 CNH 再换港元
+
+**FX 结算时点**：
+```
+北向买入:
+  T 日成交（在 HKEX 以 CNH 报价）
+  T 日收盘后: 客户账户扣除 HKD（按 T 日官方 CNH/HKD 汇率折算）
+  T+1 日: A 股到账
+
+北向卖出:
+  T 日成交
+  T+1 日: CNH 到账（来自内地结算）
+  T+1 收盘后: 折换为 HKD 入账（按 T+1 CNH/HKD 汇率）
+```
+
+**系统处理**：`executions.currency = 'CNH'` + `settlement_currency = 'HKD'`，Settlement Engine 在 Pay Date 进行 FX 换算。
+
+#### 3.6.2 南向通（港股通：A股 → 港股）
+
+- **结算货币**：人民币（CNY，在岸人民币）
+- **结算周期**：T+2（遵循 HKEX 惯例）
+- **CCASS 角色**：CCASS 作为内地投资者的名义持有人（Nominee），以 HKEX 名义持有港股
+
+**重要限制**：
+- A 股投资者通过港股通买入的港股，不显示在 HKEX 股东名册（显示 HKEX 名义）
+- 股息以人民币结算（CCASS 换汇后汇给内地）
+- 不适用港股通的港股（需满足 HKEX 筛选条件）拒绝交易
+
+#### 3.6.3 系统实现差异
+
+```sql
+-- executions 表新增字段
+ALTER TABLE executions
+    ADD COLUMN stock_connect_direction VARCHAR(10) NULL,   -- NORTHBOUND / SOUTHBOUND
+    ADD COLUMN settlement_currency VARCHAR(5) NOT NULL DEFAULT 'USD',
+    ADD COLUMN fx_rate_applied DECIMAL(12,6) NULL,         -- 结算时使用的汇率
+    ADD COLUMN fx_rate_date DATE NULL;                     -- 汇率的基准日期
+```
+
+### 3.7 ACATS（跨经纪商账户转入/转出）
+
+ACATS（Automated Customer Account Transfer Service）是美股 NSCC 提供的标准账户转移服务。
+
+#### 3.7.1 转出（Delivering Side - 我们是转出方）
+
+```
+客户发起 ACATS 转出申请
+  ↓
+1. 我们验证客户身份 + 确认账户余额
+2. 向 NSCC 发送 ACATS 转出指令（TDT - Transfer Initiation Form）
+3. 接收方 Broker 验证并接受（4个工作日内）
+4. 同步持仓到接收方:
+   - 股票: DTCC DRS 转移
+   - 现金: FedFunds 转账
+5. 标记账户为 ACATS_IN_PROGRESS（期间暂停交易）
+6. 转移完成 → 账户清零 → 关闭
+```
+
+**转出期间的限制**：
+```go
+const (
+    AccountStatusACATSPending AccountStatus = "ACATS_PENDING"
+)
+// ACATS_PENDING 状态下：
+// - 禁止新建订单（REJECT: ACCOUNT_TRANSFER_IN_PROGRESS）
+// - 禁止出入金
+// - 允许查询持仓（只读）
+```
+
+#### 3.7.2 转入（Receiving Side - 我们是接收方）
+
+```
+客户在我们这里填写 ACATS 转入申请（来源 Broker 账户号）
+  ↓
+1. 我们向来源 Broker 发送 ACATS 请求
+2. 来源 Broker 有 1个工作日接受/拒绝
+3. 接受后：4个工作日内完成转移
+4. 接收股票和现金
+5. 建立对应持仓记录（从来源 Broker 获取 cost basis）
+6. 通知客户转入完成
+```
+
+**Cost Basis 接收**：ACATS 规范要求转出方提供每笔持仓的原始购买日期和成本（用于 1099-B 报税）。我们必须：
+```go
+type ACATSPositionTransfer struct {
+    Symbol        string
+    Market        string
+    Quantity      int64
+    CostBasisUSD  decimal.Decimal  // 从来源 Broker 提供的原始成本
+    AcquiredDate  time.Time        // 原始购买日期（决定 short-term vs long-term）
+    SourceBroker  string
+}
+// 写入 tax_lots 表，acquired_date = 原始购买日期（不是今天）
+```
+
+### 3.8 税费扣缴流程
+
+#### 3.8.1 美股股息预扣税（Withholding Tax）
+
+美国税法要求对外国投资者的美国公司股息扣缴 30% 预扣税（可通过税收协定降低）。
+
+```
+客户类型判断:
+  账户持有 W-9 表格（美国税务居民）→ 不预扣（客户自行申报）
+  账户持有 W-8BEN 表格（外国个人）→ 预扣 30%（或按协定税率）
+  账户持有 W-8BEN-E 表格（外国实体）→ 按实体类型和协定税率
+
+常见税收协定优惠税率:
+  中国内地: 10%（Sino-US Tax Treaty）
+  香港特别行政区: 15%（无全面税收协定，享受标准 30%；但部分情况 15%）
+  
+扣缴时点:
+  Pay Date 处理股息时：gross_dividend × withholding_rate = tax_withheld
+  净股息 = gross_dividend - tax_withheld → 入账客户现金余额
+
+报税义务:
+  每年 3 月 15 日前：向 IRS 提交 Form 1042-S（Withholding 申报表）
+  发给客户：Form 1042-S 副本（供客户在本国申报退税时使用）
+```
+
+```go
+func (s *DividendProcessor) ApplyWithholdingTax(
+    accountID int64, grossDividend decimal.Decimal,
+) (netDividend, taxWithheld decimal.Decimal, err error) {
+    taxProfile, _ := s.taxProfileRepo.Get(accountID)
+    rate := s.getWithholdingRate(taxProfile.TaxForm, taxProfile.TaxResidency)
+
+    taxWithheld = grossDividend.Mul(rate).Round(2)
+    netDividend = grossDividend.Sub(taxWithheld)
+    return
+}
+
+func (s *DividendProcessor) getWithholdingRate(taxForm, residency string) decimal.Decimal {
+    switch taxForm {
+    case "W-9":
+        return decimal.Zero // 美国居民
+    case "W-8BEN", "W-8BEN-E":
+        // 查税收协定表
+        if rate, ok := taxTreatyRates[residency]; ok {
+            return rate
+        }
+        return decimal.NewFromFloat(0.30) // 默认 30%
+    }
+    return decimal.NewFromFloat(0.30)
+}
+
+var taxTreatyRates = map[string]decimal.Decimal{
+    "CN": decimal.NewFromFloat(0.10), // 中国内地
+    "JP": decimal.NewFromFloat(0.10), // 日本
+    "GB": decimal.NewFromFloat(0.15), // 英国
+    "DE": decimal.NewFromFloat(0.15), // 德国
+    "SG": decimal.NewFromFloat(0.15), // 新加坡
+}
+```
+
+#### 3.8.2 港股印花税
+
+港股印花税由 HKEX/HKSCC 在结算时自动扣除，broker 代垫后从客户结算金额中扣除。
+
+```
+港股印花税规则（2023 年 8 月起）:
+  税率: 0.13%（买卖双方各付）
+  计算: gross_amount × 0.0013，不足 HK$1 按 HK$1 计（向上取整 Ceil）
+  扣除时机: 结算日（T+2）由 HKEX 从 CCASS 账户直接扣除
+  申报方: HKEX 统一向税务局申报，broker 无需单独申报
+
+系统处理:
+  成交时（ExecutionReport）: 预估印花税 = ceil(gross × 0.0013) → 记入 executions.stamp_duty
+  结算日（T+2）: 实际扣款由 CCASS 处理，与预估对账
+  差异处理: 实际 vs 预估差 > HK$1 → 触发对账告警
+```
+
+#### 3.8.3 SFC 征费 / HKEX 交易征费
+
+除印花税外，港股成交还需缴纳：
+
+| 费用 | 税率 | 征收方 | 结算方式 |
+|------|------|-------|---------|
+| 证监会征费（SFC Levy）| 0.0027% | SFC | 通过 HKEX 从 CCASS 扣除 |
+| 联交所交易征费 | 0.00565% | HKEX | 同上 |
+| 交易系统使用费 | HK$0.50 / 笔 | HKEX | 固定金额 |
+
+```go
+// HK 全费用计算（与 04-execution-fix.md §4.8 的 calculateFees 保持一致）
+func calcHKFees(grossAmount decimal.Decimal) FeeBreakdown {
+    return FeeBreakdown{
+        StampDuty:    grossAmount.Mul(decimal.NewFromFloat(0.0013)).Ceil(2, decimal.ROUND_UP),
+        SFCLevy:      grossAmount.Mul(decimal.NewFromFloat(0.0000027)),
+        ExchangeLevy: grossAmount.Mul(decimal.NewFromFloat(0.0000565)),
+        TradingFee:   decimal.NewFromFloat(0.50), // HKD 固定
+    }
+}
+```
 
 ---
 

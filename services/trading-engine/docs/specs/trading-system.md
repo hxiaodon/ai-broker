@@ -111,83 +111,106 @@
 
 ```
                           ┌─────────────────┐
-                          │    CREATED       │
+                          │    CREATED (1)   │
                           │  (订单已创建)     │
                           └────────┬────────┘
                                    │ validate()
                                    ▼
                           ┌─────────────────┐
-                  ┌───────│    VALIDATED     │───────┐
+                  ┌───────│   VALIDATED (2)  │───────┐
                   │       │  (格式校验通过)   │       │
                   │       └────────┬────────┘       │
-                  │                │ riskCheck()     │ reject()
-                  │                ▼                 ▼
-                  │       ┌─────────────────┐  ┌──────────┐
-                  │       │  RISK_APPROVED   │  │ REJECTED │
-                  │       │  (风控通过)       │  │ (被拒绝)  │
-                  │       └────────┬────────┘  └──────────┘
-                  │                │ submit()
-                  │                ▼
-                  │       ┌─────────────────┐
-                  │       │    PENDING       │
-                  │       │  (已发送交易所)   │
-                  │       └────────┬────────┘
-                  │                │ exchange_ack()
-                  │                ▼
-                  │       ┌─────────────────┐
-                  │       │      OPEN        │◄──── partialFill() 循环
-                  │       │  (交易所已确认)   │
-                  │       └───┬────┬────┬───┘
-                  │          │    │    │
-                  │    fill() │    │    │ cancel()
-                  │          ▼    │    ▼
-                  │  ┌────────┐   │   ┌─────────────┐
-                  │  │ FILLED │   │   │ CANCEL_SENT │
-                  │  │(全部成交)│   │   │(取消请求已发)│
-                  │  └────────┘   │   └──────┬──────┘
-                  │               │          │ cancel_ack()
-                  │               │          ▼
-                  │               │   ┌───────────┐
-                  │               │   │ CANCELLED │
-                  │               │   │ (已取消)   │
-                  │               │   └───────────┘
-                  │               │
-                  │          partialFill()
-                  │               │
-                  │               ▼
-                  │       ┌─────────────────┐
-                  │       │  PARTIAL_FILL   │───▶ 继续等待更多成交
-                  │       │  (部分成交)      │     或转为 FILLED/CANCELLED
-                  │       └─────────────────┘
+                  │     market_closed()│  riskCheck() │ reject()
+                  │                ▼  ▼              ▼
+                  │       ┌──────────┐ ┌──────────────┐  ┌──────────┐
+                  │       │QUEUED(14)│ │RISK_APPROVED │  │REJECTED  │
+                  │       │(等待开盘) │ │(风控通过) (3) │  │(被拒绝)  │
+                  │       └────┬─────┘ └──────┬───────┘  └──────────┘
+                  │    market_open()  submit() │
+                  │            └──────────────┘
+                  │                   │
+                  │                   ▼
+                  │          ┌─────────────────┐
+                  │          │    PENDING (4)   │
+                  │          │  (已发送交易所)   │
+                  │          └────────┬────────┘
+                  │                   │ exchange_ack()
+                  │                   ▼
+                  │          ┌─────────────────┐
+                  │          │     OPEN (5)     │◄──── partialFill() 循环
+                  │          │  (交易所已确认)   │
+                  │          └───┬───┬───┬──┬──┘
+                  │         fill()│   │   │  │ amend()
+                  │              ▼   │   │  ▼
+                  │       ┌────────┐ │   │ ┌──────────────┐
+                  │       │FILLED  │ │   │ │ AMENDING(12) │
+                  │       │(7)全成交│ │   │ │ (改单待确认)  │
+                  │       └────────┘ │   │ └──┬──┬────────┘
+                  │                  │   │    │  │ reject(35=9)
+                  │           cancel()│   │ replaced│    ▼
+                  │                  │   │    ▼  ┌───────────────┐
+                  │                  │   │  OPEN  │AMEND_REJECTED │
+                  │                  │   │       │(13) → 回原状态 │
+                  │                  ▼   │       └───────────────┘
+                  │          ┌─────────────┐
+                  │          │ CANCEL_SENT │
+                  │          │(8)(取消请求) │
+                  │          └──────┬──────┘
+                  │                 │ cancel_ack()
+                  │                 ▼
+                  │          ┌───────────┐
+                  │          │ CANCELLED │
+                  │          │(9)(已取消) │
+                  │          └───────────┘
+                  │
+                  │    partialFill()
+                  │          │
+                  │          ▼
+                  │  ┌─────────────────┐
+                  │  │ PARTIAL_FILL(6) │──▶ 继续等待更多成交
+                  │  │  (部分成交)      │     或转 FILLED/CANCELLED/AMENDING
+                  │  └─────────────────┘
                   │
                   │  exchange_reject()
                   │       ┌─────────────────┐
-                  └──────▶│ EXCHANGE_REJECT │
-                          │ (交易所拒绝)     │
+                  └──────▶│EXCHANGE_REJECT  │
+                          │(11)(交易所拒绝)  │
                           └─────────────────┘
 
-终态: FILLED, CANCELLED, REJECTED, EXCHANGE_REJECT
+终态: FILLED(7), CANCELLED(9), REJECTED(10), EXCHANGE_REJECT(11)
+过渡态: QUEUED(14), AMENDING(12), AMEND_REJECTED(13), CANCEL_SENT(8)
 ```
 
 #### 状态转换规则 (严格执行)
 
 ```go
-// 合法的状态转换定义
 var validTransitions = map[OrderStatus][]OrderStatus{
     StatusCreated:       {StatusValidated, StatusRejected},
-    StatusValidated:     {StatusRiskApproved, StatusRejected},
+    StatusValidated:     {StatusRiskApproved, StatusQueued, StatusRejected},
+    StatusQueued:        {StatusRiskApproved, StatusCancelled, StatusRejected},
     StatusRiskApproved:  {StatusPending},
     StatusPending:       {StatusOpen, StatusExchangeReject, StatusRejected},
-    StatusOpen:          {StatusPartialFill, StatusFilled, StatusCancelSent},
-    StatusPartialFill:   {StatusPartialFill, StatusFilled, StatusCancelSent},
+    StatusOpen:          {StatusPartialFill, StatusFilled, StatusCancelSent, StatusAmending},
+    StatusPartialFill:   {StatusPartialFill, StatusFilled, StatusCancelSent, StatusAmending},
     StatusCancelSent:    {StatusCancelled, StatusFilled, StatusPartialFill},
-    // 终态: 不允许任何转换
-    StatusFilled:        {},
-    StatusCancelled:     {},
-    StatusRejected:      {},
-    StatusExchangeReject:{},
+    StatusAmending:      {StatusOpen, StatusPartialFill, StatusFilled, StatusAmendRejected},
+    StatusAmendRejected: {StatusOpen, StatusPartialFill, StatusCancelSent},
+    // 终态
+    StatusFilled:         {},
+    StatusCancelled:      {},
+    StatusRejected:       {},
+    StatusExchangeReject: {},
 }
+
+// 新增状态常量（与 01-order-management.md §4.1 保持一致）
+const (
+    StatusAmending       OrderStatus = 12
+    StatusAmendRejected  OrderStatus = 13
+    StatusQueued         OrderStatus = 14
+)
 ```
+
+> 状态详细语义、触发条件、错误码见 [`domains/01-order-management.md §4.1`](domains/01-order-management.md#41-订单状态机)。
 
 ### 3.2 支持的订单类型
 
@@ -338,6 +361,57 @@ func (v *OrderValidator) Validate(ctx context.Context, order *Order) error {
     return nil
 }
 ```
+
+#### `isValidTickSize()` 实现规范
+
+```go
+// isValidTickSize 验证限价是否符合该市场的最小变动价位规则
+func isValidTickSize(price decimal.Decimal, market, symbol string) bool {
+    tick := getTickSize(price, market, symbol)
+    return price.Mod(tick).IsZero()
+}
+
+// getTickSize 返回给定价格的 tick size
+func getTickSize(price decimal.Decimal, market, symbol string) decimal.Decimal {
+    switch market {
+    case "US":
+        // 美股 Reg NMS Rule 612: 价格 >= $1 → tick $0.01; < $1 → $0.0001
+        if price.GreaterThanOrEqual(decimal.NewFromInt(1)) {
+            return decimal.NewFromFloat(0.01)
+        }
+        return decimal.NewFromFloat(0.0001)
+    case "HK":
+        return hkexTickSize(price)
+    }
+    return decimal.NewFromFloat(0.01)
+}
+
+// hkexTickSize 港股 HKEX Tick Size Table（从 symbol_config 表读取，此处为 fallback 逻辑）
+func hkexTickSize(price decimal.Decimal) decimal.Decimal {
+    type band struct{ upper, tick decimal.Decimal }
+    bands := []band{
+        {decimal.NewFromFloat(0.25), decimal.NewFromFloat(0.001)},
+        {decimal.NewFromFloat(0.50), decimal.NewFromFloat(0.005)},
+        {decimal.NewFromFloat(10.0), decimal.NewFromFloat(0.010)},
+        {decimal.NewFromFloat(20.0), decimal.NewFromFloat(0.020)},
+        {decimal.NewFromFloat(100),  decimal.NewFromFloat(0.050)},
+        {decimal.NewFromFloat(200),  decimal.NewFromFloat(0.100)},
+        {decimal.NewFromFloat(500),  decimal.NewFromFloat(0.200)},
+        {decimal.NewFromFloat(1000), decimal.NewFromFloat(0.500)},
+        {decimal.NewFromFloat(2000), decimal.NewFromFloat(1.000)},
+        {decimal.NewFromFloat(5000), decimal.NewFromFloat(2.000)},
+        {decimal.NewFromFloat(9995), decimal.NewFromFloat(5.000)},
+    }
+    for _, b := range bands {
+        if price.LessThanOrEqual(b.upper) {
+            return b.tick
+        }
+    }
+    return decimal.NewFromFloat(10.0)
+}
+```
+
+> HKEX Tick Table 每年 1 月更新；生产实现从 `symbol_config.tick_size` 热读取，不硬编码。
 
 ---
 

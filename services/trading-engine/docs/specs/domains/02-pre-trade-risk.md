@@ -1243,6 +1243,65 @@ CREATE TABLE day_trade_counts (
     └── 4+次   → REJECT ("PDT 限制: 已超过上限")
 ```
 
+**PDT 计数窗口边界精确定义**：
+
+这是最容易实现出错的细节。"过去 5 个工作日"的切割点：
+
+```
+定义: 滚动窗口 = [T-4 交易日 00:00 ET, T 当日 16:00 ET)
+     （含当日，共 5 个交易日；"交易日"指 NYSE 有效开市日）
+
+具体边界:
+  - 窗口起始: T-4 交易日 04:00 ET（盘前开始）
+    -- 理由: 盘前成交（04:00-09:30 ET）同样构成日内交易；用 04:00 而非 00:00 避免跨日混淆
+  - 窗口终止: T 当日 20:00 ET（盘后结束）
+    -- 理由: 盘后成交（16:00-20:00 ET）也计入同日日内交易
+
+示例（今日 = 周三 9:45 ET）:
+  T-4 = 上周四 04:00 ET
+  T   = 本周三 20:00 ET
+  窗口内的日内交易次数 = sum(day_trade_counts WHERE trade_date IN {Thu, Fri, Mon, Tue, Wed})
+  -- 注意: 如果周末有临时休市，getNextBusinessDay 需要引用 market_calendar 服务
+  
+边界陷阱:
+  - 跨年度/跨夏令时：统一使用 America/New_York 时区转换，不存储 UTC+offset 固定值
+  - "当日"以 NYSE 收盘前最后一秒（19:59:59.999 ET）为准，而非 24:00
+```
+
+```go
+// getTradingDate 把 UTC 时间转为"交易日"字符串 (NYSE 视角)
+func getTradingDate(utcNow time.Time, market string) time.Time {
+    tz := "America/New_York"
+    if market == "HK" {
+        tz = "Asia/Hong_Kong"
+    }
+    loc, _ := time.LoadLocation(tz)
+    local := utcNow.In(loc)
+
+    // 盘后 20:00 ET 之后，视为次日交易日
+    if market == "US" {
+        cutoff := time.Date(local.Year(), local.Month(), local.Day(), 20, 0, 0, 0, loc)
+        if local.After(cutoff) {
+            local = local.AddDate(0, 0, 1)
+        }
+    }
+    return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC)
+}
+
+// getNBusinessDaysAgo 从 market_calendar 服务获取 N 个交易日前的日期
+// 不再依赖硬编码假期表
+func getNBusinessDaysAgo(ctx context.Context, n int, market string) (time.Time, error) {
+    return calendarSvc.GetNthPreviousBusinessDay(ctx, time.Now().UTC(), n, market)
+}
+```
+
+**用户级 vs 账户级 PDT 限额**：
+
+当同一 customer 拥有多个账户（margin + IRA + 子账户）时：
+- **PDT 计数按 account_id 独立统计**，不聚合到 customer 级别
+- 理由：FINRA 规则针对"账户"（单一账户关系），不是"人"
+- 但同一 customer 在同一券商下通过不同账户规避 PDT（如 account A 买、account B 卖同一标的）属于规避行为，需要在 Post-Trade 监控中检测（属于 4.3.8 Gate 8 的范畴）
+
 #### 4.3.7 Gate 7: Margin Check (保证金检查)
 
 ```go
@@ -1340,6 +1399,66 @@ func (e *MarginEngine) CalculateAfterOrder(
     }, nil
 }
 ```
+
+**Margin Call 期间的下单限制（重要补充）**：
+
+当账户处于 Margin Call 状态（CallStatus=Triggered 或 Liquidation）时，MarginCheck 必须执行额外的方向性限制：
+
+```go
+// 在 §4.3.7 MarginCheck.Execute 中增加以下检查:
+func (c *MarginCheck) checkMarginCallRestriction(
+    ctx context.Context,
+    ord *order.Order,
+    account *Account,
+    marginReq *margin.Requirement,
+) *Result {
+    callStatus, err := c.marginEngine.GetCallStatus(ctx, account.ID)
+    if err != nil {
+        return Reject("margin call status check failed: %w", err)
+    }
+
+    switch callStatus {
+    case margin.CallStatusNone, margin.CallStatusWarning:
+        return nil // 无限制
+
+    case margin.CallStatusTriggered:
+        // Triggered: 允许平仓/减仓单，禁止新开多头买入
+        if ord.Side == order.SideBuy && !isClosingOrder(ord, account) {
+            return RejectCode("MARGIN_CALL_RESTRICT_OPEN",
+                "account has active margin call; only reducing/closing orders are allowed")
+        }
+        return nil
+
+    case margin.CallStatusLiquidation:
+        // Liquidation: 系统正在强平，禁止所有手动交易
+        return RejectCode("MARGIN_CALL_LIQUIDATION_IN_PROGRESS",
+            "forced liquidation in progress; manual trading suspended")
+
+    default:
+        return nil
+    }
+}
+
+// isClosingOrder 判断卖单是否为平仓（持有多头 qty > 0）
+func isClosingOrder(ord *order.Order, account *Account) bool {
+    if ord.Side != order.SideSell {
+        return false
+    }
+    pos, _ := positionSvc.Get(ctx, account.ID, ord.Symbol)
+    return pos != nil && pos.Quantity > 0
+}
+```
+
+**下单限制矩阵（Margin Call 状态 × 订单类型）**：
+
+| CallStatus | 开仓买入 | 加仓 | 减仓卖出 | 空头平仓(买入) | 开空头(卖空) |
+|---|:---:|:---:|:---:|:---:|:---:|
+| NONE | ✅ | ✅ | ✅ | ✅ | ✅ |
+| WARNING | ✅ | ✅ | ✅ | ✅ | ✅ |
+| TRIGGERED | ❌ | ❌ | ✅ | ✅ | ❌ |
+| LIQUIDATION | ❌ | ❌ | ❌（系统代劳）| ❌ | ❌ |
+
+错误码：`MARGIN_CALL_RESTRICT_OPEN` (403)，`MARGIN_CALL_LIQUIDATION_IN_PROGRESS` (503)。
 
 #### 4.3.8 Gate 8: Post-Trade Check (交易后检查)
 
@@ -1496,10 +1615,73 @@ func (m *PostTradeMonitor) isWashTrade(ctx context.Context, exec *ExecutionRepor
 
 | 依赖 | 不可用时的处理 |
 |------|--------------|
-| Redis 不可用 | 退化为 DB 查询（延迟升高但功能正确） |
-| AMS 不可用 | 使用最近缓存的账户信息（TTL 内） |
-| Market Data 不可用 | 市价单拒绝，限价单继续（使用限价作为估算） |
-| DB 不可用 | 拒绝所有新订单（保护性拒绝） |
+| Redis 不可用 | 退化为 DB 查询（延迟升高但功能正确）；购买力降级详见 §9.2.2 |
+| AMS 不可用 | 使用最近缓存的账户信息（TTL 内）；TTL 外则拒绝（保护性拒绝）|
+| Market Data 不可用 | 见下方"行情延迟降级"详细规则 |
+| DB 不可用 | 拒绝所有新订单（保护性拒绝）|
+
+#### 5.4.1 行情延迟 / 不可用时的购买力降级
+
+购买力检查需要估算订单名义价值（`notional = price × qty`）：
+- 限价单：用用户输入的 `price` 估算 → **不依赖 Market Data**，行情不可用时仍可继续
+- 市价单：必须用 NBBO / last price 估算 → 若行情延迟超限，必须作出决策
+
+```
+行情数据 freshness 检查:
+
+  lastMarketDataAge = now() - lastReceivedAt (来自 Market Data service 的心跳)
+
+  if lastMarketDataAge < 2s:
+      用 NBBO bestBid/bestAsk 估算市价单 notional
+  else if 2s <= lastMarketDataAge < 10s:
+      使用最后已知价格 + 额外 5% buffer (保守估算)
+      ApproveWithWarning("market data delayed %dms; using stale price", ms)
+  else if lastMarketDataAge >= 10s:
+      拒绝市价单: MARKET_DATA_UNAVAILABLE
+      限价单仍可继续（用用户给定的 price 估算）
+  else if Market Data 服务完全不可用:
+      拒绝市价单: MARKET_DATA_SERVICE_DOWN
+      限价单继续
+```
+
+```go
+type MarketDataFreshnessChecker struct {
+    mdClient   MarketDataClient
+    priceCache *PriceCache       // TTL = 30s，最多接受轻微 stale
+    staleThresholdWarn  time.Duration // 2s
+    staleThresholdReject time.Duration // 10s
+}
+
+func (c *MarketDataFreshnessChecker) GetPriceForRisk(
+    ctx context.Context, symbol, market string, orderType order.Type, userPrice decimal.Decimal,
+) (price decimal.Decimal, err error) {
+    if orderType == order.TypeLimit || orderType == order.TypeStopLimit {
+        return userPrice, nil // 限价单直接用用户输入，不查行情
+    }
+
+    snap, err := c.mdClient.GetQuote(ctx, symbol, market)
+    age := time.Since(snap.ReceivedAt)
+
+    switch {
+    case err != nil:
+        return decimal.Zero, ErrCode("MARKET_DATA_SERVICE_DOWN")
+    case age < c.staleThresholdWarn:
+        return snap.MidPrice(), nil
+    case age < c.staleThresholdReject:
+        // 保守估算：用最新价 +5% buffer（买入估高，卖出估低）
+        return snap.MidPrice().Mul(decimal.NewFromFloat(1.05)), nil
+    default:
+        return decimal.Zero, ErrCode("MARKET_DATA_UNAVAILABLE")
+    }
+}
+```
+
+**错误码**：`MARKET_DATA_UNAVAILABLE` (503)，`MARKET_DATA_SERVICE_DOWN` (503)。
+
+**保证金计算中的行情降级**（§4.4 盘中实时监控）：
+- 若 Market Data 连续 30s 无心跳，停止实时保证金更新，发出 P1 告警
+- 使用最后已知价格快照继续计算，不触发 Margin Call（避免因行情故障导致误平仓）
+- Market Data 恢复后，立即全量重算并恢复正常监控
 
 ---
 

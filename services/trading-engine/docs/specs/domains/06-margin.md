@@ -440,9 +440,107 @@ const (
     └──────────┘
 ```
 
-### 4.2 核心计算公式
+#### 4.1.3a Margin Call Deadline 可配置化（新增）
 
-#### 4.2.1 账户净值（Total Equity）
+"补足期限"目前仅在文档中写了"T+2 到 T+5"，但没有程序化定义。这导致强平触发时间点不可预测，合规审计无法追溯。
+
+```go
+type MarginCallConfig struct {
+    // 不同场景的补足期限（工作日数）
+    DefaultDeadlineDays   int // 默认 T+3
+    RegTDeadlineDays      int // Reg T Margin Call = T+5 (监管要求，不可缩短)
+    MaintenanceDeadlineHours int // 维持保证金 Call = 24h（可配置 24-120h）
+
+    // Good-Faith 机会窗口（给用户补足机会，超时才强平）
+    GoodFaithWindowHours  int // 默认 24h（强平前的最后通知窗口）
+
+    // 小额 Call 直接豁免阈值
+    MinCallAmountUSD      decimal.Decimal // < $100 的 Call 不触发强平
+}
+
+// MarginCallDeadline 计算补足截止时间
+func CalcDeadline(callType MarginCallType, triggeredAt time.Time, cfg *MarginCallConfig) time.Time {
+    switch callType {
+    case RegTMarginCall:
+        // 监管强制 T+5 工作日
+        return addBusinessDays(triggeredAt, cfg.RegTDeadlineDays) // 5
+    case MaintenanceMarginCall:
+        // 维持保证金 Call：24-120h 可配置
+        return triggeredAt.Add(time.Duration(cfg.MaintenanceDeadlineHours) * time.Hour)
+    default:
+        return addBusinessDays(triggeredAt, cfg.DefaultDeadlineDays)
+    }
+}
+```
+
+**DB 记录**：每个 Margin Call 写入 `margin_calls` 表，包含 `deadline_at`、`good_faith_ends_at`、`call_type`：
+
+```sql
+ALTER TABLE margin_calls
+    ADD COLUMN call_type           VARCHAR(30) NOT NULL, -- REG_T / MAINTENANCE / HOUSE
+    ADD COLUMN deadline_at         TIMESTAMP(6) NOT NULL,
+    ADD COLUMN good_faith_ends_at  TIMESTAMP(6) NOT NULL,
+    ADD COLUMN good_faith_sent_at  TIMESTAMP(6) NULL,    -- 最后通知发出时间
+    ADD COLUMN min_call_waived     BOOLEAN DEFAULT FALSE; -- 小额豁免
+```
+
+**强平前的 Good-Faith 流程**：
+```
+T=0  Margin Call TRIGGERED → 通知用户 (Push + Email + SMS)
+T=GoodFaithWindow-2h  提醒通知 "距强平还有 2 小时"
+T=GoodFaithWindow     若仍未补足 → CallStatus = LIQUIDATION → 开始执行
+```
+
+#### 4.1.3b 跨币种 Margin 折算（新增）
+
+当用户的账户基础货币（USD）持有港股时，需要将 HKD 计价的持仓市值折算为 USD 再参与保证金计算。
+
+```
+跨币种保证金折算规则:
+
+账户基础货币: USD
+港股持仓市值 (HKD): HK$100,000
+折算时点: 用 T-1 收盘时的 USD/HKD 收盘价（以 HKEX 官方 FX fixing 为准）
+折算结果 (USD): HK$100,000 / 7.80 = USD 12,820.51
+
+保证金要求 (USD): 12,820.51 * initial_rate_for_HK_stock
+```
+
+```go
+type CrossCurrencyMarginCalc struct {
+    fxRateCache FXRateCache // TTL 24h，每日盘前更新
+}
+
+func (c *CrossCurrencyMarginCalc) ConvertToAccountCurrency(
+    marketValue decimal.Decimal, fromCurrency, toCurrency string,
+) (decimal.Decimal, error) {
+    if fromCurrency == toCurrency {
+        return marketValue, nil
+    }
+
+    rate, err := c.fxRateCache.Get(fromCurrency + "/" + toCurrency)
+    if err != nil {
+        // FX rate 不可用：保守估算，使用 T-2 汇率（若有缓存），否则用监管认可的固定汇率上限
+        return decimal.Zero, fmt.Errorf("fx rate unavailable: %w", err)
+    }
+
+    return marketValue.Div(rate), nil
+}
+```
+
+**FX 汇率来源**：HKEX 官方 USD/HKD 牌价（每日 16:15 HKT 公布），通过 Market Data service 接入。
+
+**折算时点决策**：
+- 日终 Margin Call 计算：用当日 16:15 HKT closing FX rate（官方率，可审计）
+- 实时盘中监控：允许使用最近一次 FX rate 快照（TTL 1min），偏差通常 < 0.1%
+- FX rate 不可用时：不更新 margin requirement，保持最后已知值，告警运维
+
+**港股保证金利率特殊规则**：
+- 港股维持保证金率 ≥ 30%（SFC 规定上限），比美股更高
+- 具体比率由 `margin_rates` 表按 symbol 配置
+- 配额制标的（如同时在 A+H 上市）可能有更高的 house requirement
+
+### 4.2 核心计算公式
 
 ```
 账户净值 = 持仓市值 + 现金余额
@@ -937,6 +1035,39 @@ func calcLiquidationScore(pos *LiquidationCandidate) decimal.Decimal {
         Add(pnlScore.Mul(pnlWeight))
 }
 ```
+
+**评分因子参数源（完整规范）**：
+
+| 因子 | 权重 | 数据来源 | 更新频率 | 计算方式 |
+|------|------|---------|---------|---------|
+| `liquidityScore` | 0.30 | Market Data service `GET /adv?days=20` | 每日盘前更新，TTL 24h | `min(ADV_20d / 1_000_000, 1.0)`（线性归一化到 0-1；百万股以上均为满分 1.0）|
+| `marginScore` | 0.40 | 本地 margin_rates 表 + position.market_value | 实时（成交后更新）| `pos.MarginContribution / pos.MarketValue`（保证金释放效率）|
+| `pnlScore` | 0.30 | position.unrealized_pnl | 实时 | `abs(unrealized_pnl) / market_value`（亏损深度，仅亏损持仓有值）|
+
+```go
+type LiquidationCandidate struct {
+    Symbol              string
+    Market              string
+    Quantity            int64
+    MarketValue         decimal.Decimal
+    MarginContribution  decimal.Decimal
+    ADV20d              decimal.Decimal   // 20日平均日成交量（股数）
+    UnrealizedPnL       decimal.Decimal
+}
+
+func calcLiquidityScore(adv20d decimal.Decimal) decimal.Decimal {
+    // 单位: 股；百万股以上 = 满分 1.0
+    normalized := adv20d.Div(decimal.NewFromInt(1_000_000))
+    if normalized.GreaterThan(decimal.NewFromInt(1)) {
+        return decimal.NewFromInt(1)
+    }
+    return normalized
+}
+```
+
+**ADV 数据不可用的降级**：若 Market Data service 超时，`liquidityScore` 默认为 0.5（中等流动性），写 warning log；不阻断强平流程，但在审计记录中标注 `liquidity_data_source=default`。
+
+**停牌证券的处理**：若目标证券处于 HALTED/SUSPENDED 状态，跳过该标的（继续选下一个），在审计记录中记录 `skipped_reason=SYMBOL_HALTED`。若所有候选证券均停牌，升级告警（P0）并通知 Compliance Officer 人工处理。
 
 #### 4.6.3 平仓执行
 
@@ -1857,7 +1988,196 @@ func checkCallWithHysteresis(equity, maintenance decimal.Decimal, currentStatus 
 
 当前建议：保持独立计算，但在 PortfolioSummary 中合并展示。
 
-### 9.6 灾难恢复
+### 9.7 特殊账户与持仓类型的保证金规则
+
+#### 9.7.1 Portfolio Margin（投资组合保证金）
+
+> **当前状态**：Phase 3 功能，MVP 不实现。以下为规范设计，供架构参考。
+
+Portfolio Margin 允许以整体投资组合的净风险而非单一持仓的 Reg-T 公式计算保证金，通常比 Reg-T 要求低 50-80%。
+
+**适用条件**：
+- 账户净值 ≥ $125,000（FINRA 规定最低门槛）
+- 账户类型为 Portfolio Margin Account（需单独申请）
+- 仅适用于美股和期权（港股不支持）
+
+**计算模型（简化描述）**：
+```
+Portfolio Margin = max(
+    OCC TIMS 压力测试模型：在 ±15% 价格波动 + ±5% 波动率变化场景下的最大亏损,
+    FINRA 最低保证金要求（通常 15%）
+)
+
+-- 对冲对的保证金可相互抵扣：
+-- 持有 100 股 AAPL 多头 + 买入 100 股 AAPL Put 期权
+-- → 保证金 = 只需覆盖 delta 暴露的部分，而非全仓
+```
+
+**系统架构预留**：
+```go
+type AccountMarginModel string
+const (
+    MarginModelRegT       AccountMarginModel = "REG_T"      // 当前实现
+    MarginModelPortfolio  AccountMarginModel = "PORTFOLIO"  // Phase 3
+    MarginModelCash       AccountMarginModel = "CASH"        // 现金账户，无保证金
+)
+
+// accounts 表新增字段（Phase 3 启用）
+// margin_model VARCHAR(20) NOT NULL DEFAULT 'REG_T'
+```
+
+#### 9.7.2 Leveraged ETF 的特殊保证金
+
+杠杆 ETF（如 SQQQ = 3x 反向纳斯达克）和反向 ETF 波动性远高于普通 ETF，FINRA 和 DTCC 要求更高的保证金比例。
+
+**规则**：
+- 2x 杠杆 ETF：初始保证金 ≥ 75%（vs Reg-T 50%）
+- 3x 杠杆 ETF：初始保证金 ≥ 100%（不允许融资持仓）
+- 反向 ETF（1x）：初始保证金 ≥ 75%
+
+**实现方式**：在 `margin_rates` 配置表中为这类标的设置覆盖规则：
+
+```sql
+-- margin_rates 表新增 leveraged_etf_override 字段
+INSERT INTO margin_rates (symbol, market, initial_rate, maintenance_rate, note)
+VALUES
+    ('SQQQ', 'US', 1.00, 0.30, '3x inverse ETF - Reg T 100%'),
+    ('TQQQ', 'US', 1.00, 0.30, '3x leveraged ETF - Reg T 100%'),
+    ('SPXU', 'US', 1.00, 0.30, '3x inverse S&P500 - Reg T 100%'),
+    ('SSO',  'US', 0.75, 0.30, '2x leveraged ETF'),
+    ('SH',   'US', 0.75, 0.30, '1x inverse S&P500');
+```
+
+**Admin Panel** 维护此清单，每季度 FINRA 更新时人工刷新；同时每日从 DTCC 接收 Enhanced Margin Requirements 列表自动更新。
+
+#### 9.7.3 集中持仓（Concentrated Position）
+
+单只证券市值占账户净值超过 50% 的持仓属于"集中持仓"，风险集中，需要更高的 house requirement。
+
+```go
+func (e *engine) calculateConcentratedPositionSurcharge(
+    positions []*Position,
+    totalEquity decimal.Decimal,
+) decimal.Decimal {
+    surcharge := decimal.Zero
+    for _, pos := range positions {
+        concentrationPct := pos.MarketValue.Div(totalEquity)
+        if concentrationPct.GreaterThan(decimal.NewFromFloat(0.50)) {
+            // 超过 50% 的部分额外加征 25% surcharge
+            excessPct := concentrationPct.Sub(decimal.NewFromFloat(0.50))
+            surcharge = surcharge.Add(
+                pos.MarketValue.Mul(excessPct).Mul(decimal.NewFromFloat(0.25)),
+            )
+        }
+    }
+    return surcharge
+}
+```
+
+**对用户的提示**：当集中度 > 40% 时触发 WARNING（Pre-Margin-Call 提醒）；> 50% 时在 Portfolio 页面显示集中持仓风险提示。
+
+#### 9.7.4 对冲组合的保证金抵扣（Covered Strategies）
+
+当用户同时持有多头和对应的期权保护，可降低保证金要求（仅适用于 Phase 3 Portfolio Margin）：
+
+| 策略 | 保证金影响 |
+|------|-----------|
+| Covered Call（持有股票 + 卖出同标的 Call）| 卖出 Call 无需额外保证金（已有标的兜底）|
+| Protective Put（持有股票 + 买入同标的 Put）| 持股保证金按对冲后 delta 计算，最低 = Put 行权价亏损上限 |
+| Cash-Secured Put（现金 + 卖出 Put）| 保证金 = Put 行权价 × 100 × 合约数（纯现金覆盖）|
+
+> MVP 阶段不支持期权，此规则预留；股票多空对冲（如 AAPL Long + AAPL Short）的保证金计算见 §4.2 相关公式。
+
+#### 9.7.5 IRA / 退休账户的特殊规则
+
+**IRA（Individual Retirement Account）在美国税法下的限制**：
+
+```
+IRA 账户的保证金限制:
+  ✅ 现金账户（Cash Account）: 允许
+  ❌ 融资账户（Margin Account）: 禁止（IRS Regulation § 4975(c)(1)(B) 禁止 IRA 借款）
+  ❌ 卖空：禁止（短头寸需要借券，等价于借款）
+  ✅ 无需保证金的期权策略（Covered Call, Cash-Secured Put）: 允许
+  ❌ 需要保证金的期权策略（Naked Put, Uncovered Call）: 禁止
+
+实现:
+  accounts.account_type = 'IRA' → MarginModel 强制设置为 CASH
+  任何试图为 IRA 账户开通 Margin 的操作 → 403 FORBIDDEN
+```
+
+```go
+// IRA 账户保证金计算（简化版）
+func (e *engine) Calculate(ctx context.Context, accountID int64) (*Requirement, error) {
+    account, _ := e.accountRepo.Get(ctx, accountID)
+
+    if account.AccountType == AccountTypeIRA {
+        // IRA: 无保证金要求（纯现金）
+        return &Requirement{
+            InitialMargin:     decimal.Zero,
+            MaintenanceMargin: decimal.Zero,
+            BuyingPower:       account.CashBalance, // 仅可用现金
+        }, nil
+    }
+    // ... 正常 Reg-T 计算
+}
+```
+
+**港股 IRA 等效账户**：香港没有 IRA 制度，但 MPFA（强积金管理局）下的 MPF 账户同样不允许融资交易（不适用本系统，无需实现）。
+
+#### 9.7.6 Margin Interest 计提规则
+
+融资利息每日计提，月末或账户结清时出账。
+
+```
+利率公式:
+  日利息 = 融资余额 × 年化利率 / 计息天数
+    美股: 计息天数 = 360（Actual/360 惯例）
+    港股: 计息天数 = 365（Actual/365 惯例）
+
+计提时机:
+  - 每日盘后（22:00 ET）扫描所有 margin 账户的融资余额
+  - 若当日曾使用融资 → 计提一天利息
+  - 即使当日已还清，也需计提（"today's interest"）
+
+出账时机:
+  - 月末最后一个工作日统一出账（写入 fund_transfer 扣款）
+  - 账户平仓时结清所有未出账利息
+
+税务处理（美国）:
+  - 融资利息属于 Investment Interest Expense（IRS Schedule A）
+  - 可抵扣投资收入（但不超过当年净投资收入）
+  - 在账户年度报表中单独列出 "Margin Interest Paid"
+```
+
+```go
+// DailyInterestAccrual 每日利息计提
+func (e *engine) AccrueInterest(ctx context.Context, accountID int64, date time.Time) error {
+    account, _ := e.accountRepo.Get(ctx, accountID)
+    if account.MarginLoanBalance.IsZero() {
+        return nil // 无融资，无需计提
+    }
+
+    rate, _ := e.rateService.GetCurrentRate(account.AccountType, account.Market)
+    denominator := 360
+    if account.Market == "HK" {
+        denominator = 365
+    }
+
+    dailyInterest := account.MarginLoanBalance.
+        Mul(rate).
+        Div(decimal.NewFromInt(int64(denominator))).
+        Round(8) // 保留 8 位精度
+
+    // 写入 margin_interest_accruals 表（月末汇总出账）
+    return e.accrualRepo.Insert(ctx, MarginInterestAccrual{
+        AccountID:   accountID,
+        AccrualDate: date,
+        Principal:   account.MarginLoanBalance,
+        Rate:        rate,
+        DayCount:    1,
+        Amount:      dailyInterest,
+    })
+}
 
 | 场景 | 恢复策略 | RTO | RPO |
 |------|---------|-----|-----|
